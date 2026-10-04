@@ -13,11 +13,12 @@ set -euo pipefail
 OUT="$(cd "$(dirname "$0")/.." && pwd)/data/fixtures"
 mkdir -p "$OUT"
 
-SINTEL_URL="https://download.blender.org/demo/movies/Sintel.2010.720p.mkv"
+SINTEL_URL="https://download.blender.org/durian/movies/Sintel.2010.720p.mkv.zip"
 TOS_URL="https://download.blender.org/demo/movies/ToS/tears_of_steel_720p.mov"
 
 download() {
-  curl -fL --retry 3 -C - -o "$OUT/sintel.mkv" "$SINTEL_URL"
+  curl -fL --retry 3 -C - -o "$OUT/sintel.zip" "$SINTEL_URL"
+  unzip -o -q "$OUT/sintel.zip" -d "$OUT" && mv "$OUT/Sintel.2010.720p.mkv" "$OUT/sintel.mkv" && rm "$OUT/sintel.zip"
   curl -fL --retry 3 -C - -o "$OUT/tears_of_steel.mov" "$TOS_URL"
 }
 
