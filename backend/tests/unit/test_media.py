@@ -8,35 +8,6 @@ from offscreen.media.ffmpeg import FFmpegCanceled, FFmpegError, run_ffmpeg
 from offscreen.media.probe import ProbeError, probe
 
 
-@pytest.fixture(scope="module")
-def clip(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    p = tmp_path_factory.mktemp("media") / "clip.mp4"
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc2=size=320x180:rate=24000/1001:duration=3",
-            "-f",
-            "lavfi",
-            "-i",
-            "sine=frequency=440:duration=3:sample_rate=48000",
-            "-c:v",
-            "libx264",
-            "-c:a",
-            "aac",
-            "-shortest",
-            str(p),
-        ],
-        check=True,
-    )
-    return p
-
-
 def test_probe_reports_exact_rational_fps(clip: Path) -> None:
     r = probe(clip)
     assert (r.video.width, r.video.height, r.video.codec) == (320, 180, "h264")

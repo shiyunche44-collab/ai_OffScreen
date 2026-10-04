@@ -39,3 +39,22 @@ def write_model(path: Path, model: BaseModel) -> str:
 
 def read_model(path: Path, cls: type[M]) -> M:
     return cls.model_validate_json(path.read_bytes())
+
+
+FINGERPRINT_SPAN = 16 * 1024 * 1024
+
+
+def fingerprint_file(path: Path, span: int = FINGERPRINT_SPAN) -> str:
+    """Cheap identity for huge media files: sha256 over the size plus the first and last
+    `span` bytes (the whole file when it is no longer than 2 * span). Survives moves and
+    renames; changes if the file is re-encoded or truncated."""
+    size = path.stat().st_size
+    h = hashlib.sha256(f"{size}:".encode())
+    with path.open("rb") as f:
+        if size <= 2 * span:
+            h.update(f.read())
+        else:
+            h.update(f.read(span))
+            f.seek(size - span)
+            h.update(f.read(span))
+    return "sha256:" + h.hexdigest()
