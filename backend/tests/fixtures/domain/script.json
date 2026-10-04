@@ -1,0 +1,54 @@
+{
+  "annotations": [
+    {
+      "message": "待核对",
+      "segment_id": "seg_01",
+      "type": "fact_check"
+    }
+  ],
+  "author": "human",
+  "id": "scr_demo01",
+  "outline": [
+    {
+      "beat": "hook",
+      "scene_refs": [
+        "sc_040"
+      ],
+      "target_s": 15
+    }
+  ],
+  "params": {
+    "language": "zh",
+    "perspective": "third",
+    "spoil_ending": true,
+    "style": "suspense",
+    "target_duration_s": 300,
+    "voice_id": "male-qn-qingse"
+  },
+  "parent_version": 3,
+  "project_id": "prj_demo01",
+  "schema_version": 1,
+  "segments": [
+    {
+      "beat": "hook",
+      "id": "seg_01",
+      "kind": "narration",
+      "line_refs": [],
+      "scene_refs": [
+        "sc_040"
+      ],
+      "text": "这个女孩为了一条龙，走遍了整个世界。"
+    },
+    {
+      "beat": null,
+      "id": "seg_02",
+      "kind": "original",
+      "line_refs": [
+        "ln_0001"
+      ],
+      "scene_refs": [],
+      "text": "（原声）"
+    }
+  ],
+  "version": 4
+}

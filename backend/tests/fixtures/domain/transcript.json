@@ -1,0 +1,35 @@
+{
+  "asset_id": "ast_sintel01",
+  "language": "en",
+  "lines": [
+    {
+      "end_ms": 63900,
+      "id": "ln_0001",
+      "speaker": "spk_1",
+      "start_ms": 61240,
+      "text": "What are you doing here?",
+      "words": [
+        {
+          "end_ms": 61420,
+          "start_ms": 61240,
+          "w": "What"
+        },
+        {
+          "end_ms": 61560,
+          "start_ms": 61420,
+          "w": "are"
+        }
+      ]
+    },
+    {
+      "end_ms": 66000,
+      "id": "ln_0002",
+      "speaker": null,
+      "start_ms": 64200,
+      "text": "I came to find you.",
+      "words": []
+    }
+  ],
+  "schema_version": 1,
+  "source": "asr:faster-whisper/large-v3"
+}

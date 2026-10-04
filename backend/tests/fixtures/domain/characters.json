@@ -1,0 +1,30 @@
+{
+  "asset_id": "ast_sintel01",
+  "characters": [
+    {
+      "aliases": [],
+      "bio": "独自旅行的少女",
+      "face_cluster": {
+        "centroid_ref": "faces/ch_01_centroid.npy",
+        "size": 312,
+        "thumbnails": [
+          "faces/ch_01_1.jpg"
+        ]
+      },
+      "id": "ch_01",
+      "name": "Sintel",
+      "name_source": "ai",
+      "role": "主角"
+    },
+    {
+      "aliases": [],
+      "bio": null,
+      "face_cluster": null,
+      "id": "ch_02",
+      "name": null,
+      "name_source": null,
+      "role": null
+    }
+  ],
+  "schema_version": 1
+}

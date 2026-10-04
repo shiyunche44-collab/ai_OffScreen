@@ -8,7 +8,6 @@ dependencies = [
   "pydantic-settings>=2.3",
   "pyyaml>=6.0",
   "typer>=0.12",
-  "python-ulid>=2.7",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +40,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF012", "RUF001", "RUF002", "RUF003"]  # pydantic copies defaults; CJK punctuation is intended
 
 [tool.mypy]
 python_version = "3.11"

@@ -1,0 +1,15 @@
+{
+  "asset_id": "ast_sintel01",
+  "captions": [
+    {
+      "action": "抱起",
+      "caption": "女孩跪在雪地里，抱着受伤的小龙",
+      "emotion": "悲伤",
+      "has_onscreen_text": false,
+      "is_credits": false,
+      "shot_id": "sh_0412",
+      "shot_size": "close_up"
+    }
+  ],
+  "schema_version": 1
+}

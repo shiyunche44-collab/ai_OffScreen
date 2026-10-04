@@ -1,0 +1,84 @@
+{
+  "author": "ai",
+  "bgm": {
+    "duck_under_narration_db": -8,
+    "file": "bgm/tense_01.mp3",
+    "gain_db": -22
+  },
+  "id": "pln_demo01",
+  "output_profile": "vertical_1080",
+  "parent_version": 6,
+  "project_id": "prj_demo01",
+  "schema_version": 1,
+  "script_ref": {
+    "id": "scr_demo01",
+    "version": 4
+  },
+  "segments": [
+    {
+      "audio": {
+        "char_timings": [
+          [
+            0,
+            180
+          ],
+          [
+            180,
+            340
+          ]
+        ],
+        "duration_ms": 5230,
+        "file": "tts/9f3a.wav"
+      },
+      "clips": [
+        {
+          "asset_id": "ast_sintel01",
+          "locked": false,
+          "score": 0.81,
+          "shot_id": "sh_0412",
+          "speed": 1.0,
+          "src_in_ms": 1234400,
+          "src_out_ms": 1236900
+        }
+      ],
+      "id": "seg_01",
+      "kind": "narration",
+      "source_audio": {
+        "gain_db": -14,
+        "mode": "duck",
+        "stem": "no_vocals"
+      },
+      "stale": false,
+      "text_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "voice": {
+        "speed": 1.1,
+        "voice_id": "male-qn-qingse"
+      }
+    },
+    {
+      "audio": null,
+      "clips": [
+        {
+          "asset_id": "ast_sintel01",
+          "locked": true,
+          "score": null,
+          "shot_id": null,
+          "speed": 1.0,
+          "src_in_ms": 61040,
+          "src_out_ms": 64100
+        }
+      ],
+      "id": "seg_02",
+      "kind": "original",
+      "source_audio": {
+        "gain_db": 0,
+        "mode": "full",
+        "stem": "mix"
+      },
+      "stale": false,
+      "text_hash": null,
+      "voice": null
+    }
+  ],
+  "version": 7
+}

@@ -1,0 +1,93 @@
+{
+  "bgm": [
+    {
+      "duck": {
+        "depth_db": -8,
+        "under": "narration"
+      },
+      "f0": 0,
+      "f1": 250,
+      "file": "bgm/tense_01.mp3",
+      "gain_db": -22
+    }
+  ],
+  "duration_frames": 250,
+  "narration": [
+    {
+      "f0": 0,
+      "file": "tts/9f3a.wav",
+      "gain_db": 0,
+      "seg": "seg_01"
+    }
+  ],
+  "output": {
+    "fps": {
+      "den": 1,
+      "num": 30
+    },
+    "height": 1920,
+    "layout": "blur_pad",
+    "profile": "vertical_1080",
+    "width": 1080
+  },
+  "overlays": [
+    {
+      "f0": 0,
+      "f1": 60,
+      "text": "龙与少女",
+      "type": "title"
+    }
+  ],
+  "plan_ref": {
+    "id": "pln_demo01",
+    "version": 7
+  },
+  "schema_version": 1,
+  "source_audio": [
+    {
+      "asset_id": "ast_sintel01",
+      "f0": 0,
+      "f1": 157,
+      "gain_db": -14,
+      "seg": "seg_01",
+      "src_in_ms": 1234400,
+      "stem": "no_vocals"
+    },
+    {
+      "asset_id": "ast_sintel01",
+      "f0": 157,
+      "f1": 250,
+      "gain_db": 0,
+      "seg": "seg_02",
+      "src_in_ms": 61040,
+      "stem": "mix"
+    }
+  ],
+  "subtitles": [
+    {
+      "f0": 0,
+      "f1": 42,
+      "text": "这个女孩为了一条龙"
+    }
+  ],
+  "video": [
+    {
+      "asset_id": "ast_sintel01",
+      "f0": 0,
+      "f1": 157,
+      "seg": "seg_01",
+      "speed": 1.0,
+      "src_in_ms": 1234400,
+      "src_out_ms": 1236900
+    },
+    {
+      "asset_id": "ast_sintel01",
+      "f0": 157,
+      "f1": 250,
+      "seg": "seg_02",
+      "speed": 1.0,
+      "src_in_ms": 61040,
+      "src_out_ms": 64100
+    }
+  ]
+}

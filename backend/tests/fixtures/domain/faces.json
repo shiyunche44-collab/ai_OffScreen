@@ -1,0 +1,21 @@
+{
+  "asset_id": "ast_sintel01",
+  "schema_version": 1,
+  "shots": [
+    {
+      "faces": [
+        {
+          "area_ratio": 0.18,
+          "bbox": [
+            0.31,
+            0.12,
+            0.58,
+            0.66
+          ],
+          "character_id": "ch_01"
+        }
+      ],
+      "shot_id": "sh_0412"
+    }
+  ]
+}

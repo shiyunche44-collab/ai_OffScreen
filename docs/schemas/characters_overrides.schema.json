@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "CharacterOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aliases"
+        },
+        "character_id": {
+          "pattern": "^ch_[0-9A-Za-z]+$",
+          "title": "Character Id",
+          "type": "string"
+        },
+        "ignored": {
+          "default": false,
+          "title": "Ignored",
+          "type": "boolean"
+        },
+        "merged_into": {
+          "anyOf": [
+            {
+              "pattern": "^ch_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Merged Into"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "character_id"
+      ],
+      "title": "CharacterOverride",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "overrides": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CharacterOverride"
+      },
+      "title": "Overrides",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id"
+  ],
+  "title": "CharacterOverrides",
+  "type": "object"
+}

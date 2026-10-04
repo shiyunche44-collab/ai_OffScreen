@@ -1,0 +1,31 @@
+{
+  "audio": [
+    {
+      "channels": 2,
+      "index": 0,
+      "language": "eng",
+      "sample_rate": 48000
+    }
+  ],
+  "derived": {
+    "audio_16k": "assets/ast_sintel01/audio_16k.wav",
+    "audio_48k": "assets/ast_sintel01/audio_48k.wav",
+    "proxy": "assets/ast_sintel01/proxy_540p.mp4"
+  },
+  "duration_ms": 888000,
+  "fingerprint": "sha256:abababababababababababababababababababababababababababababababab",
+  "id": "ast_sintel01",
+  "schema_version": 1,
+  "source_path": "/movies/sintel.mkv",
+  "subtitles_external": "/movies/sintel.srt",
+  "title": "Sintel",
+  "video": {
+    "codec": "h264",
+    "fps": {
+      "den": 1,
+      "num": 24
+    },
+    "height": 818,
+    "width": 1920
+  }
+}

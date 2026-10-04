@@ -1,0 +1,15 @@
+{
+  "asset_id": "ast_sintel01",
+  "overrides": [
+    {
+      "aliases": [
+        "小辛"
+      ],
+      "character_id": "ch_01",
+      "ignored": false,
+      "merged_into": null,
+      "name": "辛特尔"
+    }
+  ],
+  "schema_version": 1
+}

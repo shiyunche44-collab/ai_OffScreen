@@ -1,0 +1,414 @@
+{
+  "$defs": {
+    "BgmItem": {
+      "additionalProperties": false,
+      "properties": {
+        "duck": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Duck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "f1": {
+          "minimum": 0,
+          "title": "F1",
+          "type": "integer"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "gain_db": {
+          "default": -22.0,
+          "title": "Gain Db",
+          "type": "number"
+        }
+      },
+      "required": [
+        "f0",
+        "f1",
+        "file"
+      ],
+      "title": "BgmItem",
+      "type": "object"
+    },
+    "Duck": {
+      "additionalProperties": false,
+      "properties": {
+        "depth_db": {
+          "default": -8.0,
+          "title": "Depth Db",
+          "type": "number"
+        },
+        "under": {
+          "const": "narration",
+          "default": "narration",
+          "title": "Under",
+          "type": "string"
+        }
+      },
+      "title": "Duck",
+      "type": "object"
+    },
+    "NarrationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "gain_db": {
+          "default": 0.0,
+          "title": "Gain Db",
+          "type": "number"
+        },
+        "seg": {
+          "pattern": "^seg_[0-9A-Za-z]+$",
+          "title": "Seg",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seg",
+        "f0",
+        "file"
+      ],
+      "title": "NarrationItem",
+      "type": "object"
+    },
+    "OutputSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "fps": {
+          "$ref": "#/$defs/Rational"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "layout": {
+          "default": "keep",
+          "enum": [
+            "keep",
+            "blur_pad",
+            "center_crop"
+          ],
+          "title": "Layout",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile",
+        "width",
+        "height",
+        "fps"
+      ],
+      "title": "OutputSpec",
+      "type": "object"
+    },
+    "OverlayItem": {
+      "additionalProperties": false,
+      "properties": {
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "f1": {
+          "minimum": 0,
+          "title": "F1",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "title",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "f0",
+        "f1",
+        "type",
+        "text"
+      ],
+      "title": "OverlayItem",
+      "type": "object"
+    },
+    "PlanRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "title": "PlanRef",
+      "type": "object"
+    },
+    "Rational": {
+      "additionalProperties": false,
+      "description": "Exact fraction, used for frame rates (23.976 -> 24000/1001).",
+      "properties": {
+        "den": {
+          "exclusiveMinimum": 0,
+          "title": "Den",
+          "type": "integer"
+        },
+        "num": {
+          "exclusiveMinimum": 0,
+          "title": "Num",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "num",
+        "den"
+      ],
+      "title": "Rational",
+      "type": "object"
+    },
+    "SourceAudioItem": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "pattern": "^ast_[0-9A-Za-z]+$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "f1": {
+          "minimum": 0,
+          "title": "F1",
+          "type": "integer"
+        },
+        "gain_db": {
+          "default": 0.0,
+          "title": "Gain Db",
+          "type": "number"
+        },
+        "seg": {
+          "pattern": "^seg_[0-9A-Za-z]+$",
+          "title": "Seg",
+          "type": "string"
+        },
+        "src_in_ms": {
+          "minimum": 0,
+          "title": "Src In Ms",
+          "type": "integer"
+        },
+        "stem": {
+          "enum": [
+            "mix",
+            "no_vocals",
+            "vocals"
+          ],
+          "title": "Stem",
+          "type": "string"
+        }
+      },
+      "required": [
+        "f0",
+        "f1",
+        "seg",
+        "asset_id",
+        "stem",
+        "src_in_ms"
+      ],
+      "title": "SourceAudioItem",
+      "type": "object"
+    },
+    "SubtitleItem": {
+      "additionalProperties": false,
+      "properties": {
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "f1": {
+          "minimum": 0,
+          "title": "F1",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "f0",
+        "f1",
+        "text"
+      ],
+      "title": "SubtitleItem",
+      "type": "object"
+    },
+    "VideoItem": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "pattern": "^ast_[0-9A-Za-z]+$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "f0": {
+          "minimum": 0,
+          "title": "F0",
+          "type": "integer"
+        },
+        "f1": {
+          "minimum": 0,
+          "title": "F1",
+          "type": "integer"
+        },
+        "seg": {
+          "pattern": "^seg_[0-9A-Za-z]+$",
+          "title": "Seg",
+          "type": "string"
+        },
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "number"
+        },
+        "src_in_ms": {
+          "minimum": 0,
+          "title": "Src In Ms",
+          "type": "integer"
+        },
+        "src_out_ms": {
+          "minimum": 0,
+          "title": "Src Out Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "f0",
+        "f1",
+        "seg",
+        "asset_id",
+        "src_in_ms",
+        "src_out_ms"
+      ],
+      "title": "VideoItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bgm": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/BgmItem"
+      },
+      "title": "Bgm",
+      "type": "array"
+    },
+    "duration_frames": {
+      "exclusiveMinimum": 0,
+      "title": "Duration Frames",
+      "type": "integer"
+    },
+    "narration": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/NarrationItem"
+      },
+      "title": "Narration",
+      "type": "array"
+    },
+    "output": {
+      "$ref": "#/$defs/OutputSpec"
+    },
+    "overlays": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/OverlayItem"
+      },
+      "title": "Overlays",
+      "type": "array"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/PlanRef"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "source_audio": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SourceAudioItem"
+      },
+      "title": "Source Audio",
+      "type": "array"
+    },
+    "subtitles": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SubtitleItem"
+      },
+      "title": "Subtitles",
+      "type": "array"
+    },
+    "video": {
+      "items": {
+        "$ref": "#/$defs/VideoItem"
+      },
+      "title": "Video",
+      "type": "array"
+    }
+  },
+  "required": [
+    "plan_ref",
+    "output",
+    "duration_frames",
+    "video"
+  ],
+  "title": "Timeline",
+  "type": "object"
+}

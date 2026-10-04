@@ -1,0 +1,25 @@
+{
+  "asset_id": "ast_sintel01",
+  "scenes": [
+    {
+      "characters": [
+        "ch_01",
+        "ch_02"
+      ],
+      "end_ms": 1302000,
+      "id": "sc_040",
+      "importance": 0.9,
+      "line_ids": [
+        "ln_0001"
+      ],
+      "location": "雪山",
+      "shot_ids": [
+        "sh_0411",
+        "sh_0412"
+      ],
+      "start_ms": 1220000,
+      "summary": "Sintel 在雪山上找到受伤的小龙并救治它"
+    }
+  ],
+  "schema_version": 1
+}

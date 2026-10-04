@@ -1,0 +1,33 @@
+{
+  "acts": [
+    {
+      "name": "第一幕",
+      "scene_ids": [
+        "sc_040"
+      ],
+      "summary": "相遇"
+    }
+  ],
+  "asset_id": "ast_sintel01",
+  "ending": "结局",
+  "logline": "一个女孩为了找回小龙，走遍世界。",
+  "relations": [
+    {
+      "a": "ch_01",
+      "b": "ch_02",
+      "relation": "伙伴"
+    }
+  ],
+  "schema_version": 1,
+  "synopsis": "……",
+  "themes": [
+    "成长",
+    "失去"
+  ],
+  "turning_points": [
+    {
+      "scene_id": "sc_040",
+      "what": "救下小龙"
+    }
+  ]
+}

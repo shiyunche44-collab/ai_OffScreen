@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "AudioStream": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "exclusiveMinimum": 0,
+          "title": "Channels",
+          "type": "integer"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "sample_rate": {
+          "exclusiveMinimum": 0,
+          "title": "Sample Rate",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "channels",
+        "sample_rate"
+      ],
+      "title": "AudioStream",
+      "type": "object"
+    },
+    "DerivedFiles": {
+      "additionalProperties": false,
+      "description": "Paths relative to data_dir.",
+      "properties": {
+        "audio_16k": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio 16K"
+        },
+        "audio_48k": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio 48K"
+        },
+        "proxy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proxy"
+        }
+      },
+      "title": "DerivedFiles",
+      "type": "object"
+    },
+    "Rational": {
+      "additionalProperties": false,
+      "description": "Exact fraction, used for frame rates (23.976 -> 24000/1001).",
+      "properties": {
+        "den": {
+          "exclusiveMinimum": 0,
+          "title": "Den",
+          "type": "integer"
+        },
+        "num": {
+          "exclusiveMinimum": 0,
+          "title": "Num",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "num",
+        "den"
+      ],
+      "title": "Rational",
+      "type": "object"
+    },
+    "VideoInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "codec": {
+          "title": "Codec",
+          "type": "string"
+        },
+        "fps": {
+          "$ref": "#/$defs/Rational"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "fps",
+        "codec"
+      ],
+      "title": "VideoInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "audio": {
+      "items": {
+        "$ref": "#/$defs/AudioStream"
+      },
+      "title": "Audio",
+      "type": "array"
+    },
+    "derived": {
+      "$ref": "#/$defs/DerivedFiles",
+      "default": {
+        "audio_16k": null,
+        "audio_48k": null,
+        "proxy": null
+      }
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{8,64}$",
+      "title": "Fingerprint",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "source_path": {
+      "title": "Source Path",
+      "type": "string"
+    },
+    "subtitles_external": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subtitles External"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "video": {
+      "$ref": "#/$defs/VideoInfo"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "source_path",
+    "fingerprint",
+    "duration_ms",
+    "video",
+    "audio"
+  ],
+  "title": "MediaAsset",
+  "type": "object"
+}

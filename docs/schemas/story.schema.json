@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "Act": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "scene_ids": {
+          "items": {
+            "pattern": "^sc_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Scene Ids",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scene_ids",
+        "summary"
+      ],
+      "title": "Act",
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "pattern": "^ch_[0-9A-Za-z]+$",
+          "title": "A",
+          "type": "string"
+        },
+        "b": {
+          "pattern": "^ch_[0-9A-Za-z]+$",
+          "title": "B",
+          "type": "string"
+        },
+        "relation": {
+          "title": "Relation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "relation"
+      ],
+      "title": "Relation",
+      "type": "object"
+    },
+    "TurningPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "scene_id": {
+          "pattern": "^sc_[0-9A-Za-z]+$",
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "what": {
+          "title": "What",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scene_id",
+        "what"
+      ],
+      "title": "TurningPoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Every claim about the plot carries scene ids: the anchor against hallucination.",
+  "properties": {
+    "acts": {
+      "items": {
+        "$ref": "#/$defs/Act"
+      },
+      "title": "Acts",
+      "type": "array"
+    },
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "ending": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ending"
+    },
+    "logline": {
+      "title": "Logline",
+      "type": "string"
+    },
+    "relations": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Relation"
+      },
+      "title": "Relations",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "synopsis": {
+      "title": "Synopsis",
+      "type": "string"
+    },
+    "themes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Themes",
+      "type": "array"
+    },
+    "turning_points": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TurningPoint"
+      },
+      "title": "Turning Points",
+      "type": "array"
+    }
+  },
+  "required": [
+    "asset_id",
+    "logline",
+    "synopsis",
+    "acts"
+  ],
+  "title": "Story",
+  "type": "object"
+}

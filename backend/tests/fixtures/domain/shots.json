@@ -1,0 +1,32 @@
+{
+  "asset_id": "ast_sintel01",
+  "schema_version": 1,
+  "shots": [
+    {
+      "end_ms": 1234000,
+      "id": "sh_0411",
+      "keyframes": [
+        "kf/sh_0411_a.jpg"
+      ],
+      "quality": {
+        "brightness": 0.5,
+        "sharpness": 0.7
+      },
+      "start_ms": 1230000
+    },
+    {
+      "end_ms": 1237100,
+      "id": "sh_0412",
+      "keyframes": [
+        "kf/sh_0412_a.jpg",
+        "kf/sh_0412_b.jpg",
+        "kf/sh_0412_c.jpg"
+      ],
+      "quality": {
+        "brightness": 0.41,
+        "sharpness": 0.82
+      },
+      "start_ms": 1234000
+    }
+  ]
+}

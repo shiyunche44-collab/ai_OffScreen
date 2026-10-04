@@ -1,0 +1,18 @@
+{
+  "attempt": 1,
+  "cache_key": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+  "created_at": "2026-10-04T08:00:00Z",
+  "error": null,
+  "finished_at": null,
+  "id": "job_demo01",
+  "lane": "api",
+  "log_path": "logs/job_demo01.log",
+  "message": "已描述 630/1500 个镜头",
+  "progress": 0.42,
+  "scope": {
+    "asset_id": "ast_sintel01"
+  },
+  "stage": "analysis.captions",
+  "started_at": "2026-10-04T08:00:05Z",
+  "status": "running"
+}

@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "Scene": {
+      "additionalProperties": false,
+      "properties": {
+        "characters": {
+          "default": [],
+          "items": {
+            "pattern": "^ch_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "title": "Characters",
+          "type": "array"
+        },
+        "end_ms": {
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^sc_[0-9A-Za-z]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Importance",
+          "type": "number"
+        },
+        "line_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^ln_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "title": "Line Ids",
+          "type": "array"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "shot_ids": {
+          "items": {
+            "pattern": "^sh_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Shot Ids",
+          "type": "array"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_ms",
+        "end_ms",
+        "id",
+        "shot_ids",
+        "summary"
+      ],
+      "title": "Scene",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/Scene"
+      },
+      "title": "Scenes",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id",
+    "scenes"
+  ],
+  "title": "Scenes",
+  "type": "object"
+}

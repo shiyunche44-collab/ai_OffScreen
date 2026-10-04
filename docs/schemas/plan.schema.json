@@ -1,0 +1,363 @@
+{
+  "$defs": {
+    "AudioRef": {
+      "additionalProperties": false,
+      "properties": {
+        "char_timings": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "minimum": 0,
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Char Timings",
+          "type": "array"
+        },
+        "duration_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "duration_ms"
+      ],
+      "title": "AudioRef",
+      "type": "object"
+    },
+    "Bgm": {
+      "additionalProperties": false,
+      "properties": {
+        "duck_under_narration_db": {
+          "default": -8.0,
+          "title": "Duck Under Narration Db",
+          "type": "number"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "gain_db": {
+          "default": -22.0,
+          "title": "Gain Db",
+          "type": "number"
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "title": "Bgm",
+      "type": "object"
+    },
+    "Clip": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "pattern": "^ast_[0-9A-Za-z]+$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "shot_id": {
+          "anyOf": [
+            {
+              "pattern": "^sh_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shot Id"
+        },
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "number"
+        },
+        "src_in_ms": {
+          "minimum": 0,
+          "title": "Src In Ms",
+          "type": "integer"
+        },
+        "src_out_ms": {
+          "minimum": 0,
+          "title": "Src Out Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "asset_id",
+        "src_in_ms",
+        "src_out_ms"
+      ],
+      "title": "Clip",
+      "type": "object"
+    },
+    "PlanSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "audio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudioRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clips": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Clip"
+          },
+          "title": "Clips",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^seg_[0-9A-Za-z]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "narration",
+            "original"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_audio": {
+          "$ref": "#/$defs/SourceAudio",
+          "default": {
+            "gain_db": 0.0,
+            "mode": "duck",
+            "stem": "mix"
+          }
+        },
+        "stale": {
+          "default": false,
+          "title": "Stale",
+          "type": "boolean"
+        },
+        "text_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{8,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Hash"
+        },
+        "voice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VoiceSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "PlanSegment",
+      "type": "object"
+    },
+    "ScriptRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^scr_[0-9A-Za-z]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "title": "ScriptRef",
+      "type": "object"
+    },
+    "SourceAudio": {
+      "additionalProperties": false,
+      "properties": {
+        "gain_db": {
+          "default": 0.0,
+          "title": "Gain Db",
+          "type": "number"
+        },
+        "mode": {
+          "default": "duck",
+          "enum": [
+            "mute",
+            "duck",
+            "full"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "stem": {
+          "default": "mix",
+          "enum": [
+            "mix",
+            "no_vocals",
+            "vocals"
+          ],
+          "title": "Stem",
+          "type": "string"
+        }
+      },
+      "title": "SourceAudio",
+      "type": "object"
+    },
+    "VoiceSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "number"
+        },
+        "voice_id": {
+          "title": "Voice Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "voice_id"
+      ],
+      "title": "VoiceSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "author": {
+      "enum": [
+        "ai",
+        "human"
+      ],
+      "title": "Author",
+      "type": "string"
+    },
+    "bgm": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Bgm"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "id": {
+      "pattern": "^pln_[0-9A-Za-z]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "output_profile": {
+      "default": "source",
+      "title": "Output Profile",
+      "type": "string"
+    },
+    "parent_version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Version"
+    },
+    "project_id": {
+      "pattern": "^prj_[0-9A-Za-z]+$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "script_ref": {
+      "$ref": "#/$defs/ScriptRef"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/PlanSegment"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "version",
+    "author",
+    "script_ref",
+    "segments"
+  ],
+  "title": "EditPlan",
+  "type": "object"
+}

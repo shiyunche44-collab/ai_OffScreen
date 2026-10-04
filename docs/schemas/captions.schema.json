@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "ShotCaption": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "caption": {
+          "title": "Caption",
+          "type": "string"
+        },
+        "emotion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Emotion"
+        },
+        "has_onscreen_text": {
+          "default": false,
+          "title": "Has Onscreen Text",
+          "type": "boolean"
+        },
+        "is_credits": {
+          "default": false,
+          "title": "Is Credits",
+          "type": "boolean"
+        },
+        "shot_id": {
+          "pattern": "^sh_[0-9A-Za-z]+$",
+          "title": "Shot Id",
+          "type": "string"
+        },
+        "shot_size": {
+          "default": "other",
+          "enum": [
+            "extreme_close_up",
+            "close_up",
+            "medium",
+            "wide",
+            "extreme_wide",
+            "other"
+          ],
+          "title": "Shot Size",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shot_id",
+        "caption"
+      ],
+      "title": "ShotCaption",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "captions": {
+      "items": {
+        "$ref": "#/$defs/ShotCaption"
+      },
+      "title": "Captions",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id",
+    "captions"
+  ],
+  "title": "Captions",
+  "type": "object"
+}
