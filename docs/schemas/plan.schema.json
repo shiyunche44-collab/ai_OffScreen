@@ -175,6 +175,18 @@
           "title": "Stale",
           "type": "boolean"
         },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
         "text_hash": {
           "anyOf": [
             {

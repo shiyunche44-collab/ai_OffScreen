@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -63,6 +64,7 @@ class SourceAudio(Strict):
 class PlanSegment(Strict):
     id: SegmentId
     kind: Literal["narration", "original"]
+    text: str | None = None  # the narration text the audio was spoken from (ADR-0001)
     text_hash: Sha256 | None = None  # hash of the script text this was built from
     stale: bool = False
     voice: VoiceSpec | None = None
@@ -72,9 +74,15 @@ class PlanSegment(Strict):
 
     @model_validator(mode="after")
     def _kind_rules(self) -> Self:
+        if self.text is not None and self.text_hash is not None:
+            digest = "sha256:" + hashlib.sha256(self.text.encode("utf-8")).hexdigest()
+            if digest != self.text_hash:
+                raise ValueError("text_hash does not match text")
         if self.kind == "narration":
             if self.voice is None:
                 raise ValueError("narration segment needs a voice")
+            if not self.stale and not (self.text and self.text.strip()):
+                raise ValueError("non-stale narration segment needs its text")
             if not self.stale and (self.audio is None or not self.clips):
                 raise ValueError("non-stale narration segment needs audio and clips")
         else:

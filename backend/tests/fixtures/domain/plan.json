@@ -49,7 +49,8 @@
         "stem": "no_vocals"
       },
       "stale": false,
-      "text_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "text": "这个女孩为了一条龙，走遍了整个世界。",
+      "text_hash": "sha256:4dfc1c839fa00594a42a073335c32096f8d2c6e48987d2ac4e80476d6e0623eb",
       "voice": {
         "speed": 1.1,
         "voice_id": "male-qn-qingse"

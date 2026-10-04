@@ -45,7 +45,7 @@ class PlanError(RuntimeError):
 
 class PlanStage(Stage):
     name = "creation.plan"
-    version = 1
+    version = 2  # 2: segments carry the narration text (ADR-0001)
     lane: Lane = "api"
 
     def __init__(self, tts: TTS, voice_speed: float = 1.0) -> None:
@@ -114,6 +114,7 @@ class PlanStage(Stage):
                 PlanSegment(
                     id=seg.id,
                     kind="narration",
+                    text=seg.text,
                     text_hash="sha256:" + hashlib.sha256(seg.text.encode("utf-8")).hexdigest(),
                     voice=voice,
                     audio=AudioRef(

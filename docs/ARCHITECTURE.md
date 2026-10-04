@@ -397,7 +397,7 @@ api / cli / worker
   "script_ref": { "id": "scr_…", "version": 4 },
   "segments": [
     { "id": "seg_01", "kind": "narration",
-      "text_hash": "sha256:…", "stale": false,
+      "text": "这个女孩为了一条龙……", "text_hash": "sha256:…", "stale": false,
       "voice": { "voice_id": "narrator_m1", "speed": 1.1 },
       "audio": { "file": "tts/9f3a….wav", "duration_ms": 5230,
                  "char_timings": [[0, 180], [180, 340]] },
@@ -416,6 +416,7 @@ api / cli / worker
 }
 ```
 
+- `text` 是配音所用文本的快照（编译器生成字幕时只读 EditPlan，见 ADR-0001）；`text_hash` 是它的哈希
 - `text_hash` 与 Script 中对应段比对，不一致即 `stale`，触发该段重算
 - `locked` 的镜头在自动重匹配时保留
 

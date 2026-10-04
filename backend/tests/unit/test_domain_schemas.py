@@ -120,3 +120,18 @@ def test_job_state_machine() -> None:
     assert can_transition("failed", "queued")  # manual retry
     assert not can_transition("succeeded", "running")
     assert not can_transition("canceled", "queued")
+
+
+def test_plan_narration_text_snapshot_rules() -> None:
+    seg = load("plan")["segments"][0]
+    PlanSegment.model_validate(seg)
+
+    stale = {**seg, "stale": True, "audio": None, "clips": [], "text": None}
+    PlanSegment.model_validate(stale)  # a segment waiting for re-synthesis needs no text
+
+    with pytest.raises(ValidationError, match="needs its text"):
+        PlanSegment.model_validate({**seg, "text": None})
+    with pytest.raises(ValidationError, match="needs its text"):
+        PlanSegment.model_validate({**seg, "text": "  ", "text_hash": None})
+    with pytest.raises(ValidationError, match="does not match"):
+        PlanSegment.model_validate({**seg, "text": "另一段话"})
