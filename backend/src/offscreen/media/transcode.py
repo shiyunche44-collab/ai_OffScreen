@@ -1,4 +1,4 @@
-"""Derived media files: browser-friendly proxy video and analysis audio."""
+"""Derived media files: browser-friendly proxy video, analysis audio, thumbnails."""
 
 from __future__ import annotations
 
@@ -64,3 +64,23 @@ def extract_audio(
         str(dst),
     ]  # fmt: skip
     run_ffmpeg(args, duration_ms=duration_ms, on_progress=on_progress, should_cancel=should_cancel)
+
+
+THUMB_HEIGHT = 360
+
+
+def extract_frame(
+    src: Path,
+    dst: Path,
+    *,
+    at_ms: int,
+    height: int = THUMB_HEIGHT,
+    should_cancel: Callable[[], bool] | None = None,
+) -> None:
+    """One jpeg frame at `at_ms`, at most `height` pixels tall (never upscaled)."""
+    args = [
+        "-ss", f"{at_ms / 1000:.3f}", "-i", str(src), "-map", "0:v:0", "-frames:v", "1",
+        "-vf", f"scale=-2:trunc(min({height}\\,ih)/2)*2", "-q:v", "3",
+        str(dst),
+    ]  # fmt: skip
+    run_ffmpeg(args, should_cancel=should_cancel)

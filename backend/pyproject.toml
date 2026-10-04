@@ -7,6 +7,7 @@ dependencies = [
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
   "pyyaml>=6.0",
+  "scenedetect>=0.6.5",
   "sqlmodel>=0.0.47",
   "typer>=0.12",
 ]
@@ -54,6 +55,10 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["offscreen.domain.*", "offscreen.algo.*"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["scenedetect", "scenedetect.*"]
+ignore_missing_imports = true  # ships no type information
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

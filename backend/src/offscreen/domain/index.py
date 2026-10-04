@@ -57,7 +57,7 @@ class ShotQuality(Strict):
 
 class Shot(TimeRange):
     id: ShotId
-    keyframes: list[str] = []  # relative to data_dir
+    keyframes: list[str] = []  # relative to the artifact directory holding this document
     quality: ShotQuality | None = None
 
 
