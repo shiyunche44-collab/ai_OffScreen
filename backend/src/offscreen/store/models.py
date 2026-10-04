@@ -36,3 +36,27 @@ class ArtifactRow(SQLModel, table=True):
     size: int  # total bytes of the artifact's files
     created_at: NaiveDatetime = Field(default_factory=utcnow)
     last_used_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+
+
+class LlmCallRow(SQLModel, table=True):
+    """One chat request to a provider (retries inside it are counted, not listed)."""
+
+    __tablename__ = "llm_calls"
+
+    id: str = Field(primary_key=True)
+    job_id: str | None = Field(default=None, index=True)
+    task: str = Field(index=True)
+    provider: str
+    model: str
+    prompt_version: str
+    status: str  # "ok" | "error"
+    error: str | None = None
+    retries: int = 0
+    in_tokens: int = 0
+    out_tokens: int = 0
+    cached_tokens: int = 0
+    cost_usd: float = 0.0  # subscription plans count as 0; tokens are still recorded
+    latency_ms: int = 0
+    req_path: str | None = None  # request / response bodies, relative to data_dir
+    resp_path: str | None = None
+    created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)

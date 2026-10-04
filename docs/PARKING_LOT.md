@@ -22,3 +22,4 @@
 | 用视频理解直接描述镜头片段（替代关键帧） | T1 分析 / captions | 2026-10-04 | 搁置 | MiniMax-M3.1-Flash、DeepSeek 等支持视频输入；当前 Key 模型列表暂无 M3.1-Flash |
 | 火山方舟按量 Key 接入豆包模型 | providers | 2026-10-04 | 搁置 | 需要另开按量付费 Key（`ARK_PAYG_API_KEY`），代码无需改动 |
 | MiniMax 云端 ASR 作为默认 | T1 分析 / transcript | 2026-10-04 | 搁置 | 无 GPU 时有用；M3-04 已作为可选适配器 |
+| 按量供应商（DeepSeek）的费用估算 | providers / 记账 | 2026-10-04 | 搁置 | `llm_calls.cost_usd` 目前一律记 0，只保留 token 数；需要时在配置里加单价表 |

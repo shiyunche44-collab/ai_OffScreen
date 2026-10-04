@@ -52,6 +52,35 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX ix_artifacts_last_used_at ON artifacts (last_used_at)",
         ),
     ),
+    Migration(
+        2,
+        (
+            """
+            CREATE TABLE llm_calls (
+                id TEXT NOT NULL PRIMARY KEY,
+                job_id TEXT,
+                task TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error TEXT,
+                retries INTEGER NOT NULL,
+                in_tokens INTEGER NOT NULL,
+                out_tokens INTEGER NOT NULL,
+                cached_tokens INTEGER NOT NULL,
+                cost_usd FLOAT NOT NULL,
+                latency_ms INTEGER NOT NULL,
+                req_path TEXT,
+                resp_path TEXT,
+                created_at DATETIME NOT NULL
+            )
+            """,
+            "CREATE INDEX ix_llm_calls_job_id ON llm_calls (job_id)",
+            "CREATE INDEX ix_llm_calls_task ON llm_calls (task)",
+            "CREATE INDEX ix_llm_calls_created_at ON llm_calls (created_at)",
+        ),
+    ),
 )
 
 LATEST_VERSION = MIGRATIONS[-1].version

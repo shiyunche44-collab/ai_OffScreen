@@ -13,6 +13,9 @@ providers:
     api_key_env: MINIMAX_API_KEY
     max_concurrency: 2  # 订阅套餐有 RPM/TPM 限流和 5 小时 / 周额度窗口
     json_mode: prompt   # 无原生 JSON Schema 约束 → JSON 降级模式
+    extra_body:         # 并入每个请求（docs/PROVIDERS.md §2.3）
+      reasoning_split: true            # 思考内容放进 reasoning_content，content 保持干净
+      thinking: { type: disabled }     # MiniMax-M3 可关；M2.x 忽略；M3.1-Flash 不能关，换用时删掉这行
 
   deepseek:             # 按量付费
     kind: openai_compat

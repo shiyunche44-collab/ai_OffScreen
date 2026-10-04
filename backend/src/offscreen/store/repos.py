@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from sqlmodel import col, select
 
 from offscreen.domain.artifact import Manifest
 from offscreen.domain.asset import MediaAsset
-from offscreen.domain.common import canonical_json
+from offscreen.domain.common import canonical_json, new_id
+from offscreen.domain.llm import LlmCallRecord
 from offscreen.store.db import Database
-from offscreen.store.models import ArtifactRow, AssetRow, utcnow
+from offscreen.store.files import atomic_write_bytes
+from offscreen.store.models import ArtifactRow, AssetRow, LlmCallRow, utcnow
 
 
 class AssetRepo:
@@ -119,3 +122,64 @@ class ArtifactIndex:
             row = s.get(ArtifactRow, cache_key)
             if row is not None:
                 s.delete(row)
+
+
+class LlmCallRepo:
+    """`llm_calls` rows, with request and response bodies kept as files next to the other
+    data (`root/llm_calls/<id>.req.json`), the database holding only the pointers."""
+
+    def __init__(self, db: Database, root: Path) -> None:
+        self.db = db
+        self.root = root
+
+    def add(self, rec: LlmCallRecord) -> LlmCallRow:
+        call_id = new_id("llm")
+        rel_dir = Path("llm_calls")
+        (self.root / rel_dir).mkdir(parents=True, exist_ok=True)
+        paths: dict[str, str | None] = {"req": None, "resp": None}
+        for kind, body in (("req", rec.request), ("resp", rec.response)):
+            if body:
+                rel = rel_dir / f"{call_id}.{kind}.json"
+                text = json.dumps(body, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+                atomic_write_bytes(self.root / rel, text.encode("utf-8"))
+                paths[kind] = rel.as_posix()
+        row = LlmCallRow(
+            id=call_id,
+            job_id=rec.job_id,
+            task=rec.task,
+            provider=rec.provider,
+            model=rec.model,
+            prompt_version=rec.prompt_version,
+            status=rec.status,
+            error=rec.error,
+            retries=rec.retries,
+            in_tokens=rec.in_tokens,
+            out_tokens=rec.out_tokens,
+            cached_tokens=rec.cached_tokens,
+            cost_usd=rec.cost_usd,
+            latency_ms=rec.latency_ms,
+            req_path=paths["req"],
+            resp_path=paths["resp"],
+        )
+        with self.db.session() as s:
+            s.add(row)
+        return row
+
+    def list(self, *, task: str | None = None, job_id: str | None = None) -> list[LlmCallRow]:
+        with self.db.session() as s:
+            q = select(LlmCallRow).order_by(col(LlmCallRow.created_at), LlmCallRow.id)
+            if task is not None:
+                q = q.where(LlmCallRow.task == task)
+            if job_id is not None:
+                q = q.where(LlmCallRow.job_id == job_id)
+            return list(s.exec(q).all())
+
+    def totals(self) -> dict[str, int]:
+        """Token totals over all calls, for the analysis cost report."""
+        rows = self.list()
+        return {
+            "calls": len(rows),
+            "in_tokens": sum(r.in_tokens for r in rows),
+            "out_tokens": sum(r.out_tokens for r in rows),
+            "cached_tokens": sum(r.cached_tokens for r in rows),
+        }

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -32,6 +32,8 @@ class ProviderCfg(_Cfg):
     api_key_env: str
     max_concurrency: int = Field(default=2, ge=1, le=64)
     json_mode: Literal["native", "prompt"] = "prompt"
+    extra_body: dict[str, Any] = {}
+    """Provider-specific fields merged into every chat request (e.g. MiniMax `reasoning_split`)."""
     enabled: bool = True
 
     @model_validator(mode="after")

@@ -56,7 +56,8 @@
 - `reasoning_split: true`：思考内容放进 `reasoning_content`，`content` 保持干净，便于解析 JSON
 - `thinking`：`MiniMax-M3` 可 `disabled`；M2.x 无法关闭（传了不报错但不生效）；M3.1-Flash 强制开启，传 `disabled` 报错
 - 文档中**没有** `response_format` / JSON Schema 约束 → 适配器使用 JSON 降级模式（ARCHITECTURE §8.3）。实测"只输出 JSON"的指令能被正确遵守
-- 响应 `usage.prompt_tokens_details.cached_tokens` 有值 → 存在自动前缀缓存
+- 响应 `usage.prompt_tokens_details.cached_tokens` 有值 → 存在自动前缀缓存（M1-07 实测：约 240 token 的请求命中 128）
+- 错误可能以 HTTP 200 + `base_resp.status_code` 返回。适配器按下列码分类（来自官方错误码表，**未实测触发**）：额度类 `1008`（余额不足）、`2056`（套餐窗口用量耗尽）；鉴权 `1004`、`2049`；瞬时 `1000/1001/1002/1013/1033/1039/1041`
 
 ### 2.4 图片理解（同一接口）
 
@@ -137,6 +138,8 @@
 |--------|------|------|-------|
 | `deepseek-flash` | DeepSeek-V4.1-Flash | 文本 + 图片 | 1M |
 | `deepseek-v4-pro` | DeepSeek-V4-Pro | 文本 | 1M |
+
+实测（M1-07）：`deepseek-flash` 经 `/chat/completions` 返回 JSON 正常；默认就会带 `reasoning_content`（与正文分离），适配器单独记录、不参与解析。余额不足为 HTTP 402（适配器按额度耗尽处理，未实测触发）。
 
 模型列表还声明了 `effort` 档位（low / high / max）和 Anthropic Messages 兼容能力。用途：文案事实审查（换一家模型审稿，减少同源偏差），以及 MiniMax 额度耗尽时的后备。
 

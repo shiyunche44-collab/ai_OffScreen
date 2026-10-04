@@ -12,7 +12,21 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ULID_RE = r"[0-9A-HJKMNP-TV-Z]{26}"
 
-ID_PREFIXES = ("ast", "prj", "ln", "sh", "sc", "ch", "seg", "job", "scr", "pln", "rnd", "spk")
+ID_PREFIXES = (
+    "ast",
+    "prj",
+    "ln",
+    "sh",
+    "sc",
+    "ch",
+    "seg",
+    "job",
+    "scr",
+    "pln",
+    "rnd",
+    "spk",
+    "llm",
+)
 
 
 def new_ulid(now_ms: int | None = None, rand: bytes | None = None) -> str:
