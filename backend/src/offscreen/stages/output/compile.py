@@ -2,10 +2,14 @@
 
 The output keeps the source film's frame size and frame rate (M1: profile "source"); the
 asset record supplies them, and the resolved spec is part of the cache key. Subtitle lines
-are limited to 22 characters on landscape output and 14 on portrait (ARCHITECTURE §7.4)."""
+are limited to 22 characters on landscape output and 14 on portrait (ARCHITECTURE §7.4).
+
+The narration audio files the timeline refers to are copied into this artifact (same relative
+paths), so the renderer needs nothing but the timeline's own directory (iron rule 5)."""
 
 from __future__ import annotations
 
+import shutil
 from typing import Any
 
 from offscreen.algo.compile import compile_timeline
@@ -28,7 +32,7 @@ class CompileStageError(RuntimeError):
 
 class CompileStage(Stage):
     name = "output.compile"
-    version = 1
+    version = 2  # 2: narration audio is copied next to the timeline
     lane: Lane = "cpu"
 
     def __init__(self, assets: AssetRepo) -> None:
@@ -59,6 +63,11 @@ class CompileStage(Stage):
         spec = self._spec(ctx.scope)
         limit = SUBTITLE_CHARS_LANDSCAPE if spec.width >= spec.height else SUBTITLE_CHARS_PORTRAIT
         timeline = compile_timeline(plan, spec, subtitle_max_chars=limit)
+        plan_art = ctx.input("creation.plan")
+        for item in timeline.narration:
+            dst = ctx.out_dir / item.file
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(plan_art.path(item.file), dst)
         write_model(ctx.out_dir / TIMELINE_FILE, timeline)
         return StageOutput(
             meta={

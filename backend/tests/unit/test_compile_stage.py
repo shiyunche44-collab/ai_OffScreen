@@ -58,6 +58,8 @@ class StubPlan(Stage):
             segments=segs,
         )
         write_model(ctx.out_dir / PLAN_FILE, plan)
+        (ctx.out_dir / "tts").mkdir()
+        (ctx.out_dir / "tts" / "a.mp3").write_bytes(b"audio-bytes")
         return StageOutput()
 
 
@@ -101,6 +103,8 @@ def test_timeline_keeps_the_source_frame_size_and_rate(repo: AssetRepo, tmp_path
         "小龙倒在地上",
     ]
     assert art.meta["duration_frames"] == 48 and art.meta["subtitles"] == 2
+    # The renderer finds the narration next to the timeline.
+    assert art.path(tl.narration[0].file).read_bytes() == b"audio-bytes"
 
 
 @pytest.mark.parametrize(("w", "h", "limit"), [(1920, 800, 22), (1080, 1920, 14), (1000, 1000, 22)])
