@@ -108,10 +108,13 @@ class Pipeline:
         progress: ProgressFn | None = None,
         on_resolved: ResolvedFn | None = None,
         is_canceled: Callable[[], bool] | None = None,
+        db: Database | None = None,
     ) -> None:
+        """`db`: share an open database (the job service does); otherwise open and own one."""
         self.cfg = cfg
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
-        self.db = Database(cfg.data_dir / "offscreen.db")
+        self._owns_db = db is None
+        self.db = db or Database(cfg.data_dir / "offscreen.db")
         self.assets = AssetRepo(self.db)
         self.providers = providers or build_providers(cfg, self.db)
         self._progress = progress
@@ -120,7 +123,8 @@ class Pipeline:
         self._store = ArtifactStore(cfg.data_dir / "artifacts")
 
     def close(self) -> None:
-        self.db.close()
+        if self._owns_db:
+            self.db.close()
 
     def __enter__(self) -> Pipeline:
         return self
@@ -153,6 +157,23 @@ class Pipeline:
             CompileStage(self.assets),
             RenderStage(self.assets),
         ]
+
+    def stage_chain(self, target: str, asset_id: str, opts: RunOptions | None = None) -> list[str]:
+        """`target` and everything it needs, upstream first (what `ensure` will walk)."""
+        stages = {s.name: s for s in self._stages(opts or RunOptions())}
+        if target not in stages:
+            raise ValueError(f"unknown stage {target!r}; known: {', '.join(stages)}")
+        order: list[str] = []
+
+        def visit(name: str) -> None:
+            if name in order:
+                return
+            for dep in stages[name].inputs({"asset_id": asset_id}):
+                visit(dep.stage)
+            order.append(name)
+
+        visit(target)
+        return order
 
     def _engine(self, opts: RunOptions, reports: list[StageReport] | None) -> Engine:
         def resolved(stage: str, hit: bool) -> None:

@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from offscreen.domain.job import Job, Lane
+from offscreen.domain.job import Job, JobCanceled, Lane
 from offscreen.log import bind_job
 from offscreen.providers.ports import LLMRateLimited, TTSRateLimited
 from offscreen.store.models import utcnow
@@ -36,10 +36,6 @@ logger = logging.getLogger(__name__)
 
 LANES: tuple[Lane, ...] = ("gpu", "cpu", "api")
 MAX_ERROR_CHARS = 2000
-
-
-class JobCanceled(Exception):
-    """Raised by an executor that stopped because `ctx.is_canceled()` turned true."""
 
 
 def is_retryable(exc: BaseException) -> bool:

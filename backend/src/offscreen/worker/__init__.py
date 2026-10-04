@@ -1,8 +1,8 @@
 """Job worker: lane scheduling, heartbeats, retries, cancellation, crash recovery."""
 
+from offscreen.domain.job import JobCanceled
 from offscreen.worker.worker import (
     Executor,
-    JobCanceled,
     JobContext,
     Worker,
     WorkerSettings,

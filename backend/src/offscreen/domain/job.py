@@ -21,6 +21,10 @@ _ALLOWED: dict[JobStatus, frozenset[JobStatus]] = {
 }
 
 
+class JobCanceled(Exception):
+    """Raised by whatever runs a job once it stopped because cancellation was requested."""
+
+
 def can_transition(src: JobStatus, dst: JobStatus) -> bool:
     return dst in _ALLOWED[src]
 
