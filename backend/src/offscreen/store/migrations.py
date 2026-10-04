@@ -81,6 +81,36 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX ix_llm_calls_created_at ON llm_calls (created_at)",
         ),
     ),
+    Migration(
+        3,
+        (
+            """
+            CREATE TABLE jobs (
+                id TEXT NOT NULL PRIMARY KEY,
+                stage TEXT NOT NULL,
+                scope_json TEXT NOT NULL,
+                lane TEXT NOT NULL,
+                status TEXT NOT NULL,
+                progress FLOAT NOT NULL,
+                message TEXT NOT NULL,
+                cache_key TEXT,
+                attempt INTEGER NOT NULL,
+                error TEXT,
+                log_path TEXT,
+                cancel_requested BOOLEAN NOT NULL,
+                not_before DATETIME,
+                heartbeat_at DATETIME,
+                created_at DATETIME NOT NULL,
+                started_at DATETIME,
+                finished_at DATETIME
+            )
+            """,
+            "CREATE INDEX ix_jobs_stage ON jobs (stage)",
+            "CREATE INDEX ix_jobs_lane ON jobs (lane)",
+            "CREATE INDEX ix_jobs_status ON jobs (status)",
+            "CREATE INDEX ix_jobs_created_at ON jobs (created_at)",
+        ),
+    ),
 )
 
 LATEST_VERSION = MIGRATIONS[-1].version

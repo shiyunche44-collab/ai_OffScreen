@@ -38,6 +38,32 @@ class ArtifactRow(SQLModel, table=True):
     last_used_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
 
 
+class JobRow(SQLModel, table=True):
+    """A unit of background work (ARCHITECTURE §5.7). `attempt` counts runs since the last
+    manual retry; a run is guarded by it, so a worker that lost its job cannot overwrite the
+    run that replaced it."""
+
+    __tablename__ = "jobs"
+
+    id: str = Field(primary_key=True)
+    stage: str = Field(index=True)
+    scope_json: str  # canonical JSON object
+    lane: str = Field(index=True)
+    status: str = Field(index=True)
+    progress: float = 0.0
+    message: str = ""
+    cache_key: str | None = None
+    attempt: int = 0
+    error: str | None = None
+    log_path: str | None = None  # relative to data_dir
+    cancel_requested: bool = False
+    not_before: NaiveDatetime | None = None  # not claimed before this (retry backoff)
+    heartbeat_at: NaiveDatetime | None = None
+    created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+    started_at: NaiveDatetime | None = None
+    finished_at: NaiveDatetime | None = None
+
+
 class LlmCallRow(SQLModel, table=True):
     """One chat request to a provider (retries inside it are counted, not listed)."""
 

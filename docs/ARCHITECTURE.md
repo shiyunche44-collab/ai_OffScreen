@@ -730,7 +730,7 @@ data/
 | `projects` | id, asset_id, name, current_script_version, current_plan_version, created_at |
 | `documents` | id, project_id, kind(script/plan), version, parent_version, author(ai/human), path, created_at |
 | `artifacts` | cache_key, stage, stage_version, scope, path, content_hash, size, created_at, last_used_at |
-| `jobs` | id, stage, scope_json, lane, status, progress, message, cache_key, attempt, error, log_path, heartbeat_at, 时间戳 |
+| `jobs` | id, stage, scope_json, lane, status, progress, message, cache_key, attempt, error, log_path, cancel_requested, not_before（重试退避）, heartbeat_at, 时间戳 |
 | `llm_calls` | id, job_id, task, provider, model, prompt_version, in_tokens, out_tokens, cached_tokens, cost_usd, latency_ms, req_path, resp_path |
 
 - 文档内容存文件，数据库只存索引和指针
