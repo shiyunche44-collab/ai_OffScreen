@@ -32,7 +32,7 @@ class VoiceSpec(Strict):
 
 
 class AudioRef(Strict):
-    file: str  # relative to data_dir
+    file: str  # relative to the directory holding the plan document (like Shot.keyframes)
     duration_ms: int = Field(gt=0)
     # per-character (start_ms, end_ms) inside the audio, if the TTS engine provides them
     char_timings: list[tuple[TimeMs, TimeMs]] = []
