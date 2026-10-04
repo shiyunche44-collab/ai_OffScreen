@@ -1,0 +1,61 @@
+# AI OffScreen 配置示例
+# 复制为 config.yaml 后按需修改。密钥只写环境变量名，绝不写密钥本身。
+# 接口细节见 docs/PROVIDERS.md；架构约束见 docs/ARCHITECTURE.md §8。
+
+data_dir: ./data
+media_roots:            # 只允许从这些目录导入电影
+  - ~/Movies
+
+providers:
+  minimax:              # Token Plan 订阅 Key：文本 + 图片理解 + 语音合成
+    kind: openai_compat
+    base_url: https://api.minimaxi.com/v1
+    api_key_env: MINIMAX_API_KEY
+    max_concurrency: 2  # 订阅套餐有 RPM/TPM 限流和 5 小时 / 周额度窗口
+    json_mode: prompt   # 无原生 JSON Schema 约束 → JSON 降级模式
+
+  deepseek:             # 按量付费
+    kind: openai_compat
+    base_url: https://api.deepseek.com
+    api_key_env: DEEPSEEK_API_KEY
+    max_concurrency: 4
+    json_mode: prompt
+
+  ark:                  # 火山方舟：只能填「按量付费」Key，不能用 Coding Plan Key（会被拒绝）
+    kind: openai_compat
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    api_key_env: ARK_PAYG_API_KEY
+    max_concurrency: 4
+    enabled: false
+
+  volc_speech:          # 火山豆包语音（M6-04 接入）
+    kind: volc_tts
+    api_key_env: VOLC_SPEECH_API_KEY
+    enabled: false
+
+tasks:                  # 每个 LLM 任务单独选供应商和模型
+  story_chunk:     { provider: minimax,  model: MiniMax-M3 }
+  scene_segment:   { provider: minimax,  model: MiniMax-M3 }
+  story:           { provider: minimax,  model: MiniMax-M3 }
+  character_name:  { provider: minimax,  model: MiniMax-M3 }
+  shot_caption:    { provider: minimax,  model: MiniMax-M3, shots_per_request: 8 }
+  script_outline:  { provider: minimax,  model: MiniMax-M3 }
+  script_write:    { provider: minimax,  model: MiniMax-M3 }
+  script_rewrite:  { provider: minimax,  model: MiniMax-M3 }
+  script_critic:   { provider: deepseek, model: deepseek-v4-pro }
+  match_rerank:    { provider: minimax,  model: MiniMax-M3 }
+
+asr:
+  provider: faster_whisper   # 本地免费；云端可选 minimax（asr-1.0，单次 ≤ 500 秒）
+  model: large-v3
+  device: cuda
+
+tts:
+  provider: minimax
+  model: speech-2.8-hd
+  default_voice: male-qn-qingse
+  sample_rate: 32000
+  # 备选：edge_tts（免费）、volc_speech、cosyvoice（侧车，音色克隆）
+
+budget:
+  confirm_above_tokens: 2000000   # 单个作业预估 token 超过此值需确认

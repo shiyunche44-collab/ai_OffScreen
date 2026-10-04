@@ -8,9 +8,14 @@
 |------|------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构设计（项目"宪法"） |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | 实施方案：里程碑、任务拆分、验收标准 |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | 模型供应商实测说明（MiniMax / DeepSeek / 火山） |
 | [docs/PARKING_LOT.md](docs/PARKING_LOT.md) | 想法停车场 |
 | [docs/adr/](docs/adr/) | 架构决策记录 |
 | [CLAUDE.md](CLAUDE.md) | AI 编码助手守则 |
+
+## 配置
+
+复制 `config.example.yaml` 为 `config.yaml`；密钥通过环境变量提供（见 `.env.example`）。默认使用 MiniMax，DeepSeek 备选。
 
 ## 状态
 

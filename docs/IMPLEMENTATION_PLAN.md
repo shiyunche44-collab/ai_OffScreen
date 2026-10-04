@@ -17,6 +17,7 @@
 
 - 1 人开发 + AI 编码助手；估时为"专注人天"
 - 硬件：一块 NVIDIA GPU（≥ 12GB 显存，24GB 更舒服）；没有 GPU 时把 ASR / 视觉 / TTS 切到云端适配器，任务不变
+- 模型供应商：默认 MiniMax（Token Plan，文本 + 图片理解 + 语音合成），DeepSeek 备选；火山方舟 Coding Plan Key 不接入（见 `docs/PROVIDERS.md`）
 - 测试素材：Blender 开源电影 Sintel（约 15 分钟）与 Tears of Steel（约 12 分钟），CC-BY 授权
 
 ---
@@ -25,16 +26,16 @@
 
 | 里程碑 | 名称 | 目标一句话 | 估时 | 依赖 |
 |-------|------|-----------|------|------|
-| **M0** | 工程地基 | 仓库、工具链、数据契约骨架就位 | 4.5 天 | — |
-| **M1** | 最小闭环（CLI） | 一条命令把电影变成能看的解说视频 | 10.25 天 | M0 |
+| **M0** | 工程地基 | 仓库、工具链、数据契约骨架就位 | 4.75 天 | — |
+| **M1** | 最小闭环（CLI） | 一条命令把电影变成能看的解说视频 | 11.25 天 | M0 |
 | **M2** | 作业系统 + API + UI 骨架 | 在浏览器里走通 M1 的流程 | 6 天 | M1 |
-| **M3** | 影片理解 | 影片索引质量足以支撑好文案和好选镜 | 15.5 天 | M2 |
+| **M3** | 影片理解 | 影片索引质量足以支撑好文案和好选镜 | 16 天 | M2 |
 | **M4** | 文案系统 | 文案可控、可编辑、可追溯 | 8.5 天 | M3 |
 | **M5** | 剪辑计划与选镜 | 自动选镜 ≥ 70% 可用，人工替换高效 | 10.5 天 | M4 |
-| **M6** | 声音 | 配音自然、混音干净、响度合规 | 7 天 | M5 |
+| **M6** | 声音 | 配音自然、混音干净、响度合规 | 7.5 天 | M5 |
 | **M7** | 渲染与导出 | 成片稳定、可导入专业软件精修 | 7.75 天 | M6 |
 | **M8** | 质量与打磨 | 回归、成本、性能、健壮性 | 6.25 天 | M7 |
-| | | **合计** | **约 76.25 人天** | |
+| | | **合计** | **约 78.5 人天** | |
 
 ```
 M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► M8
@@ -63,14 +64,14 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M0-01 | 仓库目录骨架 | 目录与 ARCHITECTURE §4.1 一致；`.gitignore`（含 `data/`）、`.editorconfig`、`README.md` | — | 0.25 |
 | M0-02 | Python 工程初始化 | `backend/pyproject.toml`（uv、py3.11、依赖组 `dev`/`gpu`）；ruff、mypy（`domain`/`algo` 用 strict）、pytest；`Makefile` 提供 `fmt / lint / type / test / check` | M0-01 | 0.5 |
 | M0-03 | 依赖规则契约 | import-linter 配置覆盖 ARCHITECTURE §4.2 的 R1–R6；加一个故意违规的测试样例验证能拦住后删除 | M0-02 | 0.5 |
-| M0-04 | 配置系统 | pydantic-settings 读取 `config.yaml` + `.env`（密钥）；`data_dir`、媒体根目录、按任务的 provider 配置；`offscreen config show`（密钥打码） | M0-02 | 0.5 |
+| M0-04 | 配置系统 | pydantic-settings 读取 `config.yaml` + 环境变量（结构同 `config.example.yaml`）：`data_dir`、媒体根目录、`providers`（base_url、`api_key_env`、并发）、`tasks` 映射；`base_url` 含 `/api/coding` 时启动报错；`offscreen config show`（密钥打码） | M0-02 | 0.75 |
 | M0-05 | 日志 | 结构化日志（JSON 行）写 `data/logs/`；支持绑定 `job_id` 上下文 | M0-02 | 0.25 |
 | M0-06 | domain 公共类型 | `common.py`：带前缀的 ULID、`TimeMs`、`TimeRange`（校验 start < end）、`Rational`（帧率）、`Versioned` 基类；规范化 JSON 读写 + 原子写入；单测 | M0-02 | 0.5 |
 | M0-07 | domain schema v0 | `asset / index / script / plan / timeline / job` 的最小字段（按 ARCHITECTURE §5）；每个 schema 一份 fixture；round-trip 测试；`make schemas` 导出 JSON Schema 到 `docs/schemas/` | M0-06 | 1 |
 | M0-08 | FFmpeg 封装 | `media/ffmpeg.py`：子进程运行、`-progress pipe:1` 解析进度、超时、stderr 捕获为结构化错误；`media/probe.py`：ffprobe → `MediaAsset` 字段 | M0-06 | 0.5 |
 | M0-09 | 测试素材脚本 | `scripts/fetch_fixtures.sh` 下载 Sintel、Tears of Steel；生成 30 秒测试切片（单测用）；注明授权 | M0-01 | 0.25 |
 | M0-10 | CI | GitHub Actions 跑 `make check`；重模型测试打 `@pytest.mark.heavy` 标记，CI 默认跳过 | M0-03 | 0.25 |
-| | | | **小计** | **4.5** |
+| | | | **小计** | **4.75** |
 
 ---
 
@@ -94,16 +95,16 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M1-04 | 阶段 proxy | 540p H.264（GOP 0.5s、faststart）+ 16k 单声道 wav + 48k 立体声 wav；进度上报 | M1-03 | 0.5 |
 | M1-05 | 阶段 shots + keyframes v0 | PySceneDetect AdaptiveDetector → shots.json；每镜头取中间帧缩略图 | M1-04 | 0.5 |
 | M1-06 | 阶段 transcript v0 | 有外挂 srt/ass 则解析导入；否则 faster-whisper（适配器）→ transcript.json | M1-04 | 1 |
-| M1-07 | LLM 端口 + 首个适配器 | `providers/ports.py` 定义 `LLM`；实现一个真实适配器（Anthropic 或 OpenAI 兼容二选一）+ 一个测试用假适配器；结构化输出 → Pydantic；`llm_calls` 记账（token、费用、耗时）；解析失败带错误重试 1 次 | M0 | 1 |
+| M1-07 | LLM 端口 + OpenAI 兼容适配器 | `providers/ports.py` 定义 `LLM`；OpenAI 兼容适配器（默认 MiniMax-M3，按 `docs/PROVIDERS.md` §2.3）+ 测试用假适配器；JSON 降级模式（schema 入提示词 → 提取 JSON → Pydantic 校验 → 带错误重试 1 次）；`reasoning_content` 单独记录；`llm_calls` 记账；429 退避重试、额度耗尽快速失败；一个 `heavy` 集成测试真实调用 MiniMax 与 DeepSeek 各一次 | M0 | 1.5 |
 | M1-08 | 阶段 story v0 | 台词按时间分块 → LLM 分块摘要 → 合并为 story.json（梗概 + 按时间段划分的粗场景） | M1-06, M1-07 | 1 |
 | M1-09 | 阶段 script v0 | story → Script：按目标时长控制字数（默认 4.5 字/秒），每段带源时间范围引用 | M1-08 | 0.5 |
-| M1-10 | TTS 端口 + Edge-TTS 适配器 | 每段合成 wav，返回时长；缓存键 = 文本 + 音色 + 语速；附测试用假适配器 | M0 | 0.5 |
+| M1-10 | TTS 端口 + MiniMax 适配器 | 按 `docs/PROVIDERS.md` §2.5：流式请求、hex 解码、`timestamped_words` → `char_timings`；返回时长；缓存键 = 文本 + 音色 + 语速 + 模型；附测试用假适配器 | M0 | 1 |
 | M1-11 | 朴素选镜 | 每段取其引用时间范围内的镜头，按顺序填满配音时长 → EditPlan | M1-05, M1-09, M1-10 | 0.5 |
 | M1-12 | 编译器 v0 | `compile(plan) -> Timeline`：顺序排布、对齐帧网格、生成 video/narration/source_audio/subtitles 轨；输出保持源片画幅；单测：总帧数 = 各段帧数之和 | M1-11 | 0.5 |
 | M1-13 | 渲染器 v0 | 逐段渲染无声视频 → concat；整片混音（配音 + 原声 -20dB）；烧录字幕 → mp4 | M1-12 | 1.5 |
 | M1-14 | CLI | `offscreen run-all` 与 `offscreen stage <name> --asset …`；30 秒切片端到端测试（假 LLM / 假 TTS） | M1-13 | 0.5 |
 | M1-15 | 复盘 | 在 Sintel 上跑完整流程，记录问题清单；据此调整 M3–M7 任务优先级；新想法写进停车场 | M1-14 | 0.25 |
-| | | | **小计** | **10.25** |
+| | | | **小计** | **11.25** |
 
 ---
 
@@ -153,9 +154,9 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M3-01 | 切点标注与评估工具 | 小工具：在测试片上标注真实切点（导出 JSON）；评估脚本输出 P / R / F1（容差 ±2 帧） | M2 | 0.5 |
 | M3-02 | 镜头检测 v2 | `ShotDetector` 端口 + TransNetV2 适配器；后处理：合并 < 0.5s、切分 > 8s；与 PySceneDetect 对比评估报告 | M3-01 | 1 |
 | M3-03 | 关键帧 v2 | 每镜头 3 帧（10% / 50% / 90%）+ UI 用雪碧图；清晰度、亮度指标写入 shots.json | M3-02 | 0.5 |
-| M3-04 | ASR v2 | VAD + 词级时间戳；语言自动检测；可选 FunASR 适配器；说话人分离（pyannote）放在开关后 | M2 | 1.5 |
+| M3-04 | ASR v2 | VAD + 词级时间戳；语言自动检测；可选 MiniMax `asr-1.0` 适配器（按静音点切成 ≤ 480 秒的块，识别后按偏移拼接）；可选 FunASR；说话人分离（pyannote）放在开关后 | M2 | 2 |
 | M3-05 | 人声分离 | `Separator` 端口 + Demucs 适配器 → vocals / no_vocals（48k） | M2 | 0.5 |
-| M3-06 | 镜头视觉描述 | LLM 端口支持图像输入；每请求批量 N 个镜头（3 帧缩略图 + 附近台词）；结构化输出 `ShotCaption`；分批落盘可断点续跑；运行前估价；支持批量接口 | M3-03 | 1.5 |
+| M3-06 | 镜头视觉描述 | LLM 端口支持图像输入（base64 data URL）；默认 MiniMax-M3，每请求打包 8 个镜头（3 帧缩略图 + 附近台词）；结构化输出 `ShotCaption`；分批落盘，额度窗口耗尽后可续跑；运行前估算 token | M3-03 | 1.5 |
 | M3-07 | 人脸检测与特征 | `FaceAnalyzer` 端口 + InsightFace 适配器；关键帧上检测 + 特征 → faces.json | M3-03 | 1 |
 | M3-08 | 人脸聚类 → 人物 | HDBSCAN / 层次聚类；输出人物簇、代表缩略图、每个镜头的主要人物及面积占比 | M3-07 | 1 |
 | M3-09 | 人物命名 | LLM 结合台词上下文提议名字（`name_source=ai`）；可选 TMDB 演员表辅助；overrides 存人工修订；重聚类后按簇中心相似度重新映射修订 | M3-08, M3-04 | 1 |
@@ -165,7 +166,7 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M3-13 | 影片分析页 | 代理播放器 + 镜头条（虚拟滚动、雪碧图悬停）+ 台词面板（随播放高亮、点击跳转）+ 场景列表 | M3-11 | 2 |
 | M3-14 | 人物面板 | 人物簇网格；改名 / 合并 / 忽略；修改即写 overrides | M3-09, M3-13 | 1 |
 | M3-15 | 分析报告 | 每部片：各阶段耗时、LLM 费用、镜头 / 场景 / 人物数量 | M3-12 | 0.5 |
-| | | | **小计** | **15.5** |
+| | | | **小计** | **16** |
 
 ---
 
@@ -188,7 +189,7 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M4-04 | 大纲步骤 | story + 场景 → `ScriptOutline`（节拍、场景、时长分配）；可单独编辑后再成稿 | M4-02 | 1 |
 | M4-05 | 成稿步骤 | 大纲 + 场景详情（摘要 + 关键台词）→ 段落（文本、scene_refs、kind、beat）；MovieIndex 上下文作稳定前缀以复用提示词缓存 | M4-04 | 1 |
 | M4-06 | 规则校验器 | 纯函数：总字数、段长（15–80 字）、scene_refs 存在、禁用词、人名与已确认人物一致；不通过则带错误自动修正（≤ 2 轮）；单测 | M4-05 | 0.5 |
-| M4-07 | 事实审查 | LLM 对照 story / scenes 检查，输出 annotations（只标注不改写） | M4-05 | 1 |
+| M4-07 | 事实审查 | LLM 对照 story / scenes 检查，输出 annotations（只标注不改写）；默认用 DeepSeek，与写稿模型不同源 | M4-05 | 1 |
 | M4-08 | 单段重写 | 带指令（"更口语化""加悬念"）重写一段，相邻段作上下文；产生新版本 | M4-03, M4-05 | 0.5 |
 | M4-09 | 文案编辑页 | 参数表单；大纲视图；段落列表（编辑文本 / 类型，场景引用芯片点击预览）；审查标注；字数与预估时长；版本历史与对比 | M4-03, M4-07 | 2 |
 | M4-10 | 文案评估集 | 评分表文档 + 批量生成脚本（风格 × 影片矩阵）+ 打分记录表 | M4-06 | 0.5 |
@@ -240,14 +241,14 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 |----|------|------------------|------|------|
 | M6-01 | 音色库 | 音色注册表（voice_id、provider、克隆参考音频、默认语速）；每个音色自动标定语速（合成标准文本测字 / 秒）并回写文案时长估算 | M5 | 0.5 |
 | M6-02 | 文本规范化 | 数字、英文、符号、单位的读法处理；单测覆盖常见情况 | M5 | 0.5 |
-| M6-03 | CosyVoice 侧车 + 适配器 | `sidecars/cosyvoice/` 独立环境 + HTTP 服务；适配器支持参考音频克隆 | M6-01 | 1 |
-| M6-04 | 云端 TTS 适配器 | 接一家云端 TTS（火山 / MiniMax / Azure 任选）用于质量对比 | M6-01 | 0.5 |
-| M6-05 | 字级时间对齐 | TTS 不返回时间戳时，对合成音频跑 ASR 词级对齐，映射回原文字符 | M6-02 | 1 |
+| M6-03 | CosyVoice 侧车 + 适配器 | `sidecars/cosyvoice/` 独立环境 + HTTP 服务；适配器支持参考音频克隆（MiniMax Token Plan 不含音色复刻，克隆走这里） | M6-01 | 1 |
+| M6-04 | 火山豆包语音适配器 | 用 `VOLC_SPEECH_API_KEY`：先实测接口版本、鉴权、音色与是否返回时间戳并补充 `docs/PROVIDERS.md` §5；再实现适配器；与 MiniMax 音色做盲听对比 | M6-01 | 1 |
+| M6-05 | 字级时间对齐 | 仅用于不返回时间戳的引擎（Edge-TTS、CosyVoice 等）：对合成音频跑 ASR 词级对齐，映射回原文字符 | M6-02 | 1 |
 | M6-06 | 混音器 | `algo/mixing.py` + `media/audio.py`：按采样点摆放配音 / 原声 stem / BGM；增益与闪避包络（attack / release 可配）；片段边界 10–20ms 淡入淡出；单测 | M5 | 1.5 |
 | M6-07 | 响度处理 | 配音逐段响度归一 + 全片两遍 loudnorm；输出测量报告 | M6-06 | 0.5 |
 | M6-08 | BGM 库 | 本地音乐文件夹 + 标签（情绪、速度）；项目选择；循环 / 裁剪 / 淡出 | M6-06 | 0.5 |
 | M6-09 | 声音设置 UI | 音色选择与试听、每段语速、原声策略（压低 / 去人声 / 静音）、BGM 选择、音量滑块 | M6-01, M6-08 | 1 |
-| | | | **小计** | **7** |
+| | | | **小计** | **7.5** |
 
 ---
 
@@ -299,7 +300,7 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4 ─► M5 ─► M6 ─► M7 ─► 
 | M8-06 | 项目打包 | 导出 / 导入项目包（文档 + 产物引用 + 清单），便于备份迁移 | M7 | 0.5 |
 | M8-07 | 使用文档 | 安装、配置、常见问题、排障 | M7 | 0.5 |
 | M8-08 | 架构复盘 | 对照实现更新 ARCHITECTURE 与 ADR；评审停车场 | M8-01 | 0.25 |
-| M8-09 | 侧车 / 依赖安装脚本 | 一键安装 GPU 依赖组与侧车环境；环境自检命令 `offscreen doctor`（ffmpeg、CUDA、模型、密钥） | M7 | 0.5 |
+| M8-09 | 侧车 / 依赖安装脚本 | 一键安装 GPU 依赖组与侧车环境；环境自检命令 `offscreen doctor`（ffmpeg、CUDA、模型、各供应商连通性；识别 Coding Plan 类 Key 并警告） | M7 | 0.5 |
 | | | | **小计** | **6.25** |
 
 ---

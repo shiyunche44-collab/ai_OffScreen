@@ -171,7 +171,7 @@ Script v4（seg_07 文本变了）
 
 - **GPU 通道并发恒为 1。** 单卡机器上并发跑两个 GPU 模型只会 OOM 或互相拖慢。
 - **模型懒加载 + LRU 卸载**：Worker 维护模型注册表，最多常驻 1–2 个模型，空闲 5 分钟卸载，释放显存。
-- **api 通道**：云端调用有限流和重试（指数退避，最多 3 次）。
+- **api 通道**：按供应商分别限并发（见 §8.2 `max_concurrency`），瞬时限流指数退避重试最多 3 次；订阅额度耗尽直接失败，不重试（§8.4）。
 - 没有 GPU 的机器：在配置里把 ASR / 视觉 / TTS 全切到云端适配器即可，架构不变。
 
 ---
@@ -185,10 +185,12 @@ ai_OffScreen/
 ├── CLAUDE.md                  # AI 编码助手的守则（防跑偏）
 ├── README.md
 ├── Makefile                   # fmt / lint / type / test / check / api-types
-├── config.example.yaml
+├── config.example.yaml        # 配置示例（密钥只写环境变量名）
+├── .env.example
 ├── docs/
 │   ├── ARCHITECTURE.md        # 本文档
 │   ├── IMPLEMENTATION_PLAN.md # 实施方案与任务拆分
+│   ├── PROVIDERS.md           # 模型供应商实测说明
 │   ├── PARKING_LOT.md         # 想法停车场
 │   ├── adr/                   # 架构决策记录
 │   └── schemas/               # 由代码导出的 JSON Schema（生成物，勿手改）
@@ -524,9 +526,9 @@ AI 作业和人工编辑可能同时修改同一文档。规则：写文档必�
 | **proxy** | 原片 → 540p 代理 + 16k 单声道 wav + 48k 立体声 wav | ffmpeg | 代理用 H.264、GOP=0.5 秒、`faststart`，保证浏览器拖动流畅 |
 | **shots** | 代理 → shots.json | PySceneDetect（M1）→ TransNetV2（M3） | 后处理：合并 < 0.5s 的碎镜头；> 8s 的长镜头切成子镜头（便于选镜） |
 | **keyframes** | 镜头 → 每镜头 3 帧（10% / 50% / 90%）+ 雪碧图 | ffmpeg | 同时算清晰度（拉普拉斯方差）和亮度，用于过滤糊帧和黑帧 |
-| **transcript** | 音频 → transcript.json | 优先导入外挂字幕；否则 faster-whisper large-v3；中文片可选 FunASR | VAD + 词级时间戳；说话人分离（pyannote）可选 |
+| **transcript** | 音频 → transcript.json | 优先导入外挂字幕；否则 faster-whisper large-v3；云端可选 MiniMax `asr-1.0`；中文片可选 FunASR | VAD + 词级时间戳；说话人分离（pyannote）可选；MiniMax ASR 单次 ≤ 500 秒，按静音点切成 ≤ 480 秒的块再拼接 |
 | **stems** | 48k 音频 → vocals.wav / no_vocals.wav | Demucs (htdemucs) | 解说时垫 `no_vocals`：保留环境声和配乐，去掉对白，效果远好于整体压低原声 |
-| **captions** | 关键帧 + 附近台词 → captions.json | VLM（云端或本地 Qwen-VL） | 一次请求批量描述 N 个镜头；结构化输出；运行前先估算 token 和费用 |
+| **captions** | 关键帧 + 附近台词 → captions.json | MiniMax-M3 图片理解（已实测）；备选 DeepSeek-V4.1-Flash、本地 Qwen-VL | 一次请求批量描述 N 个镜头；结构化输出；运行前先估算 token 用量；订阅额度有窗口限制，分批落盘可跨窗口续跑 |
 | **faces** | 关键帧 → 人脸框 + 特征向量 | InsightFace（SCRFD + ArcFace） | 只在关键帧上跑，不逐帧 |
 | **characters** | 人脸特征 → 人物簇 | HDBSCAN / 层次聚类（余弦距离） | 命名：LLM 根据台词上下文提议 + 可选 TMDB 演员表 → 人工确认；人工修订存 overrides，重聚类后按簇中心相似度重新映射 |
 | **embeddings** | 关键帧 + 描述 → 向量索引 | 图像：Chinese-CLIP / SigLIP 多语言；文本：bge-m3；存储：LanceDB | 提供 `search_shots(text, filters)` |
@@ -555,7 +557,7 @@ AI 作业和人工编辑可能同时修改同一文档。规则：写文档必�
 **配音（TTS）**
 - 每段独立合成，缓存键 = 文本 + 音色 + 语速 + 引擎版本
 - 合成前做文本规范化（数字、英文、符号读法）
-- 需要字级时间戳：TTS 引擎提供则直接用；不提供则对合成音频跑一次 ASR 对齐
+- 需要字级时间戳：MiniMax TTS 流式模式直接返回逐字时间戳（已实测）；其他不提供时间戳的引擎，对合成音频跑一次 ASR 对齐
 
 **选镜（Matching）—— 全系统最难的部分，分四步，前两步召回，后两步决策：**
 
@@ -611,43 +613,84 @@ AI 作业和人工编辑可能同时修改同一文档。规则：写文档必�
 
 ## 8. 模型 Provider 抽象
 
+> 已验证的接口细节、请求格式和各家坑点见 [`PROVIDERS.md`](./PROVIDERS.md)。
+
 ### 8.1 接口（`providers/ports.py`）
 
 | 端口 | 方法（示意） | 默认适配器 | 备选 |
 |------|-------------|-----------|------|
-| `LLM` | `generate(messages, schema: type[BaseModel], images=None) -> BaseModel` | Anthropic（官方 SDK） | OpenAI 兼容端点（DeepSeek / 通义千问 / 本地 vLLM、Ollama） |
-| `ASR` | `transcribe(wav, language=None) -> Transcript` | faster-whisper | FunASR、云端 ASR |
-| `TTS` | `synthesize(text, voice, speed) -> (wav, char_timings?)` | Edge-TTS（M1） | CosyVoice（侧车）、GPT-SoVITS（侧车）、火山 / MiniMax 等云端 |
+| `LLM` | `generate(messages, schema: type[BaseModel], images=None) -> BaseModel` | OpenAI 兼容适配器 → **MiniMax**（MiniMax-M3，文本 + 图片理解） | 同一适配器换 base_url：DeepSeek、火山方舟（按量 Key）、本地 vLLM / Ollama；Anthropic 适配器（可选） |
+| `ASR` | `transcribe(wav, language=None) -> Transcript` | faster-whisper（本地，免费，词级时间戳） | MiniMax `asr-1.0`（单次 ≤ 500 秒，需切块）、FunASR |
+| `TTS` | `synthesize(text, voice, speed) -> (audio, char_timings?)` | **MiniMax** `speech-2.8-hd`（流式模式直接返回字级时间戳） | 火山豆包语音、Edge-TTS（免费兜底）、CosyVoice 侧车（音色克隆） |
 | `Embedder` | `embed_images(paths)`, `embed_texts(texts)` | Chinese-CLIP / SigLIP + bge-m3 | 云端 embedding |
 | `FaceAnalyzer` | `detect_and_embed(image) -> list[Face]` | InsightFace | — |
 | `ShotDetector` | `detect(video) -> list[TimeRange]` | PySceneDetect | TransNetV2 |
 | `Separator` | `separate(wav) -> (vocals, no_vocals)` | Demucs | UVR 系 |
 
-### 8.2 配置：按任务选模型
+### 8.2 配置：供应商与任务分开配
+
+密钥**只从环境变量读取**，配置文件里只写变量名。完整示例见仓库根目录 `config.example.yaml`。
 
 ```yaml
-# config.yaml
+# config.yaml（节选）
+providers:
+  minimax:                                   # Token Plan 订阅 Key
+    kind: openai_compat
+    base_url: https://api.minimaxi.com/v1
+    api_key_env: MINIMAX_API_KEY
+    max_concurrency: 2                       # 订阅套餐有 RPM/TPM 限流
+  deepseek:                                  # 按量付费
+    kind: openai_compat
+    base_url: https://api.deepseek.com
+    api_key_env: DEEPSEEK_API_KEY
+    max_concurrency: 4
+  ark:                                       # 火山方舟：只接受「按量付费」Key，见 8.4
+    kind: openai_compat
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    api_key_env: ARK_PAYG_API_KEY
+    enabled: false
+
 tasks:
-  scene_segment:   { provider: anthropic, model: claude-opus-5-5 }
-  story:           { provider: anthropic, model: claude-opus-5-5 }
-  script_outline:  { provider: anthropic, model: claude-opus-5-5 }
-  script_write:    { provider: anthropic, model: claude-opus-5-5 }
-  script_critic:   { provider: anthropic, model: claude-opus-5-5 }
-  shot_caption:    { provider: anthropic, model: claude-opus-5-5, batch: true }   # 可换本地 VLM
-  match_rerank:    { provider: anthropic, model: claude-opus-5-5 }
-asr:  { provider: faster_whisper, model: large-v3, device: cuda }
-tts:  { provider: edge_tts, default_voice: zh-CN-YunxiNeural }
+  scene_segment:   { provider: minimax, model: MiniMax-M3 }
+  story:           { provider: minimax, model: MiniMax-M3 }
+  script_outline:  { provider: minimax, model: MiniMax-M3 }
+  script_write:    { provider: minimax, model: MiniMax-M3 }
+  script_critic:   { provider: deepseek, model: deepseek-v4-pro }   # 换一家模型审稿，减少同源偏差
+  shot_caption:    { provider: minimax, model: MiniMax-M3 }         # 图片理解
+  match_rerank:    { provider: minimax, model: MiniMax-M3 }
+
+asr: { provider: faster_whisper, model: large-v3, device: cuda }
+tts: { provider: minimax, model: speech-2.8-hd, default_voice: male-qn-qingse }
 ```
 
-每个任务独立配置，可以随时把某个任务切到更便宜的模型、国内模型或本地模型，业务代码不变。
+每个任务独立配置，可以随时把某个任务切到别的供应商或本地模型，业务代码不变。
 
 ### 8.3 LLM 调用规范
 
-- **只接受结构化输出**：用 Pydantic 模型生成 JSON Schema，通过结构化输出能力约束返回格式；解析失败 → 带错误信息重试 1 次 → 仍失败则作业失败
-- **全量记账**：每次调用记录到 `llm_calls` 表：任务、模型、提示词版本、输入/输出 token、缓存命中 token、费用、耗时、请求/响应文件路径
-- **提示词缓存**：同一部片的 MovieIndex 上下文放在提示词稳定前缀，多次生成复用
-- **批量接口**：镜头描述这类不急的大批量任务走 Batch API（异步、费用约减半）
-- **预算闸门**：每个作业运行前估算费用，超过配置阈值需要确认
+- **结构化输出，两档实现**：供应商支持 JSON Schema 约束时用原生能力；不支持时（如 MiniMax 的 OpenAI 兼容接口）走 **JSON 降级模式**：提示词内附 schema → 从回复中提取 JSON → Pydantic 校验 → 失败则把校验错误回传重试 1 次 → 仍失败则作业失败。对上层透明，`generate()` 永远返回校验过的对象
+- **思考内容与正文分离**：推理模型的思考内容（如 MiniMax `reasoning_split: true` 返回的 `reasoning_content`）单独记日志，不参与解析
+- **全量记账**：每次调用记录到 `llm_calls` 表：任务、供应商、模型、提示词版本、输入/输出 token、缓存命中 token、费用（订阅套餐记为 0 但保留 token 数）、耗时、请求/响应文件路径
+- **提示词缓存**：同一部片的 MovieIndex 上下文放在提示词稳定前缀，多次生成复用（MiniMax 实测有自动缓存命中）
+- **批量**：镜头描述这类大批量任务，一个请求打包多个镜头；供应商有批量接口时再走批量接口
+- **预算闸门**：每个作业运行前估算 token 用量，超过配置阈值需要确认
+
+### 8.4 订阅类 Key 的使用边界
+
+当前云环境里的 Key 有两种性质，架构上区别对待：
+
+| Key | 性质 | 平台是否使用 | 依据 |
+|-----|------|-------------|------|
+| `MINIMAX_API_KEY` | MiniMax Token Plan 订阅 Key（`sk-cp-`） | ✅ 默认使用 | 官方 FAQ：套餐覆盖文本、图像、语音；"面向个人开发者的交互式使用场景"，生产环境建议按量付费；受 5 小时窗口 + 周窗口额度和 RPM/TPM 限流约束 |
+| `DEEPSEEK_API_KEY` | 按量付费 Key | ✅ 备选 / 审稿 | 普通开放平台 Key |
+| `VOLC_SPEECH_API_KEY` | 火山豆包语音 Key | ✅ TTS 备选 | 普通语音服务 Key |
+| `ARK_API_KEY` | 火山方舟 **Coding Plan** Key | ❌ **不接入** | 火山方舟说明：Coding Plan 额度仅限 AI 编程工具中使用，在非指定工具中使用可能被识别为滥用，导致暂停订阅或封号 |
+
+工程约束：
+
+1. **适配器拒绝编程套餐端点**：`base_url` 含 `/api/coding` 时启动即报错，防止误把 Coding Plan 当平台后端
+2. 火山方舟如需接入（例如用豆包视觉模型），使用控制台创建的**按量付费 Key**，放在单独的环境变量 `ARK_PAYG_API_KEY`，不复用 `ARK_API_KEY`
+3. 订阅额度耗尽（区别于瞬时限流 429）时，作业直接失败并提示"额度耗尽、预计刷新时间"，不做重试风暴；瞬时限流按指数退避重试
+4. MiniMax 的音色快速复刻、音色设计不在 Token Plan 内 → 音色克隆走 CosyVoice 侧车或按量 Key
 
 ---
 
@@ -761,8 +804,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。
 | 人声分离 | Demucs htdemucs | 质量好，易用 |
 | 人脸 | InsightFace | 检测 + 特征一体 |
 | 向量 | LanceDB（嵌入式） | 无服务进程，支持过滤 |
-| LLM / VLM | Anthropic 官方 SDK；OpenAI 兼容适配器 | 结构化输出、提示词缓存、批量接口；兼容国内与本地模型 |
-| TTS | Edge-TTS → CosyVoice（侧车）/ 云端 | 先免费快速，再追求质量与音色克隆 |
+| LLM / VLM | OpenAI 兼容适配器（MiniMax 默认，DeepSeek / 火山方舟按量 / 本地模型同一适配器） | 一个适配器覆盖国内主流供应商；结构化输出由 JSON 降级模式兜底 |
+| TTS | MiniMax speech-2.8（默认）→ 火山豆包语音 / Edge-TTS / CosyVoice 侧车 | 现有 Key 可直接用且自带字级时间戳；音色克隆走侧车 |
 | 音频处理 | numpy + soundfile；ffmpeg loudnorm | 混音逻辑可测、可控 |
 | 时间线交换 | OpenTimelineIO；pyJianYingDraft | 对接专业剪辑软件 |
 | 前端 | React + TypeScript + Vite + TanStack Query + Tailwind | 主流、生态全 |
@@ -787,6 +830,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。
 | 010 | GPU 通道串行；模型懒加载 + 空闲卸载 | 并发 GPU 任务 | 单卡显存有限 |
 | 011 | 依赖冲突的本地模型以侧车进程运行（HTTP） | 全部塞进主环境 | 保持主工程依赖干净 |
 | 012 | 音频全片整体混音，不分段编码 | 分段带音频渲染再拼接 | 避免编码前导采样导致的接缝与漂移 |
+| 013 | 默认模型供应商 MiniMax（Token Plan），DeepSeek 备选；火山方舟 Coding Plan Key 不接入平台 | 用 Coding Plan Key 作平台后端 | 用现有 Key 快速起步；Coding Plan 条款限定编程工具，存在封号风险（§8.4） |
 
 详细 ADR 以后按需写在 `docs/adr/NNNN-*.md`，模板见 `docs/adr/0000-template.md`。
 
@@ -802,7 +846,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。
 | 本地显存不足 | 跑不动 | 云端适配器兜底；模型按需加载卸载 |
 | 音画不同步 | 成片不可用 | 帧网格对齐；音频整体混音；自动化同步测试（合成哔声 + 闪帧素材检测偏移） |
 | 渲染慢 | 迭代慢 | 段级缓存；预览档；NVENC |
-| 模型费用失控 | 钱包 | `llm_calls` 记账；运行前估价与预算闸门；缓存；批量接口 |
+| 模型费用 / 订阅额度失控 | 钱包、额度窗口被耗尽 | `llm_calls` 记账；运行前估算 token；缓存；多镜头打包请求；额度耗尽快速失败 |
+| 订阅 Key 条款变化 | 默认供应商不可用 | 供应商与任务解耦，改配置即可切到 DeepSeek / 按量 Key |
 | 依赖地狱（各模型库冲突） | 环境装不上 | 可选依赖组；冲突模型走侧车 |
 | 功能蔓延 / 架构跑偏 | 项目烂尾 | 见第 15 节 |
 

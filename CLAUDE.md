@@ -6,6 +6,7 @@
 - 实施方案与任务拆分：`docs/IMPLEMENTATION_PLAN.md`
 - 想法停车场：`docs/PARKING_LOT.md`
 - 架构决策记录：`docs/adr/`
+- 模型供应商实测说明：`docs/PROVIDERS.md`（写适配器前必读）
 
 ## 工作方式
 
@@ -31,6 +32,13 @@
 - 厂商 SDK（anthropic、openai、faster_whisper、insightface、edge_tts 等）只能出现在 `providers/adapters/`
 - 只有 `media/` 可以调用 ffmpeg / ffprobe
 - `api/` 和 `cli.py` 只调用 `services/`
+
+## 模型供应商与密钥
+
+- 默认供应商 MiniMax（`MINIMAX_API_KEY`，Token Plan 订阅 Key），备选 DeepSeek（`DEEPSEEK_API_KEY`），TTS 备选火山豆包语音（`VOLC_SPEECH_API_KEY`）
+- **禁止**在平台代码或配置中使用 `ARK_API_KEY`（火山方舟 Coding Plan Key，仅限编程工具）或任何含 `/api/coding` 的 base_url；火山方舟只接受 `ARK_PAYG_API_KEY`
+- 密钥只从环境变量读取；不得写入代码、配置文件、fixture、日志或 `llm_calls` 记录
+- 测试默认用假适配器；真实调用的测试标记 `@pytest.mark.heavy`，请求尽量小
 
 ## 编码约定
 
