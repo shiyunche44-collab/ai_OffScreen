@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ArtifactFile": {
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "pattern": "^sha256:[0-9a-f]{8,64}$",
+          "title": "Hash",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size",
+        "hash"
+      ],
+      "title": "ArtifactFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`manifest.json` inside every artifact directory. Its presence marks the artifact\ncomplete. Deliberately holds no timestamps, so the same inputs give the same bytes.",
+  "properties": {
+    "cache_key": {
+      "pattern": "^sha256:[0-9a-f]{8,64}$",
+      "title": "Cache Key",
+      "type": "string"
+    },
+    "files": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ArtifactFile"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Meta",
+      "type": "object"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "scope": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "title": "Scope",
+      "type": "object"
+    },
+    "stage": {
+      "title": "Stage",
+      "type": "string"
+    },
+    "stage_version": {
+      "minimum": 1,
+      "title": "Stage Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "stage",
+    "stage_version",
+    "cache_key"
+  ],
+  "title": "Manifest",
+  "type": "object"
+}

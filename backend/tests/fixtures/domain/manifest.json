@@ -1,0 +1,24 @@
+{
+  "cache_key": "sha256:abababababababababababababababababababababababababababababababab",
+  "files": [
+    {
+      "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "path": "shots.json",
+      "size": 2048
+    },
+    {
+      "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "path": "thumbs/sh_demo01.jpg",
+      "size": 18342
+    }
+  ],
+  "meta": {
+    "shot_count": 2
+  },
+  "schema_version": 1,
+  "scope": {
+    "asset_id": "ast_sintel01"
+  },
+  "stage": "analysis.shots",
+  "stage_version": 1
+}

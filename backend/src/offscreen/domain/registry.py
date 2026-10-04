@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from offscreen.domain.artifact import Manifest
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import (
     Captions,
@@ -34,4 +35,5 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "plan": EditPlan,
     "timeline": Timeline,
     "job": Job,
+    "manifest": Manifest,
 }
