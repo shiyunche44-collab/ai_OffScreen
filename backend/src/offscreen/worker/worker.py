@@ -30,6 +30,7 @@ from offscreen.log import bind_job
 from offscreen.providers.ports import LLMRateLimited, TTSRateLimited
 from offscreen.store.models import utcnow
 from offscreen.store.repos import JobRepo
+from offscreen.worker.progress import DEFAULT_INTERVAL_S, ProgressThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class WorkerSettings:
     max_api_retries: int = 3
     retry_base_s: float = 2.0
     retry_max_s: float = 60.0
+    progress_interval_s: float = DEFAULT_INTERVAL_S
+    """Job progress reaches the database at most once per interval."""
 
     def __post_init__(self) -> None:
         if self.lane_limits.get("gpu", 1) != 1:
@@ -77,14 +80,27 @@ class WorkerSettings:
 class JobContext:
     """What an executor sees of its own job."""
 
-    def __init__(self, job: Job, run: _Run, repo: JobRepo, log_file: Path | None) -> None:
+    def __init__(
+        self,
+        job: Job,
+        run: _Run,
+        repo: JobRepo,
+        log_file: Path | None,
+        progress_interval_s: float = DEFAULT_INTERVAL_S,
+    ) -> None:
         self.job = job
         self._run = run
-        self._repo = repo
         self._log_file = log_file
+        self._progress = ProgressThrottle(
+            lambda frac, msg: repo.report_progress(job.id, job.attempt, frac, msg),
+            progress_interval_s,
+        )
 
     def progress(self, frac: float, msg: str = "") -> None:
-        self._repo.report_progress(self.job.id, self.job.attempt, frac, msg)
+        self._progress.report(frac, msg)
+
+    def flush_progress(self, *, force: bool = False) -> None:
+        self._progress.flush(force=force)
 
     def is_canceled(self) -> bool:
         return self._run.stop.is_set()
@@ -104,6 +120,7 @@ class _Run:
         self.stop = threading.Event()
         self.reason: Literal["cancel", "shutdown", "lost"] = "cancel"
         self.thread: threading.Thread | None = None
+        self.ctx: JobContext | None = None
 
 
 class Worker:
@@ -194,6 +211,8 @@ class Worker:
         with self._lock:
             runs = list(self._runs.values())
         for run in runs:
+            if run.ctx is not None:
+                run.ctx.flush_progress()
             flag = self.jobs.heartbeat(run.job.id, run.job.attempt, now=now)
             if flag is None:  # requeued or finished elsewhere: this run no longer counts
                 run.reason = "lost"
@@ -215,12 +234,16 @@ class Worker:
     def _run(self, run: _Run) -> None:
         job = run.job
         log = self._log_file(job)
-        ctx = JobContext(job, run, self.jobs, log)
+        ctx = JobContext(job, run, self.jobs, log, self.settings.progress_interval_s)
+        run.ctx = ctx
         try:
             with bind_job(job.id):
                 _append_log(log, f"start {job.stage} {job.scope} (attempt {job.attempt})")
                 try:
-                    self.execute(job, ctx)
+                    try:
+                        self.execute(job, ctx)
+                    finally:  # the last progress survives a failure or cancel
+                        ctx.flush_progress(force=True)
                 except JobCanceled:
                     self._interrupted(run, "canceled", None)
                 except Exception as exc:
