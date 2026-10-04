@@ -122,9 +122,11 @@ forbidden_modules = [
   "anthropic", "openai", "faster_whisper", "insightface", "edge_tts", "demucs",
   "scenedetect", "lancedb",
 ]
+allow_indirect_imports = true  # importing an adapter (services wiring) is fine; the SDK itself is not
 
 [[tool.importlinter.contracts]]
 name = "R6: api/cli/worker go through services"
 type = "forbidden"
 source_modules = ["offscreen.api", "offscreen.cli"]
 forbidden_modules = ["offscreen.stages", "offscreen.store", "offscreen.engine"]
+allow_indirect_imports = true  # R6 forbids *direct* use; going through services is the point

@@ -84,6 +84,18 @@ def test_miss_runs_then_hit_skips(store: ArtifactStore) -> None:
     assert second.dir == first.dir
 
 
+def test_on_resolved_reports_each_stage_upstream_first_with_cache_status(
+    store: ArtifactStore,
+) -> None:
+    seen: list[tuple[str, bool]] = []
+    stages = [Source(), Upper()]
+    Engine(store, stages, on_resolved=lambda n, hit: seen.append((n, hit))).ensure("t.upper", SCOPE)
+    assert seen == [("t.source", False), ("t.upper", False)]
+    seen.clear()
+    Engine(store, stages, on_resolved=lambda n, hit: seen.append((n, hit))).ensure("t.upper", SCOPE)
+    assert seen == [("t.source", True), ("t.upper", True)]
+
+
 def test_manifest_lists_files_with_hashes_and_meta(store: ArtifactStore) -> None:
     art = Engine(store, [Source(), Upper()]).ensure("t.source", SCOPE)
     assert [f.path for f in art.manifest.files] == ["out.txt"]

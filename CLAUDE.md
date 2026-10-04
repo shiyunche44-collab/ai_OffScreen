@@ -59,4 +59,6 @@
 make check        # fmt + lint + type + test + import 契约
 make api-types    # 由 OpenAPI 生成前端类型
 offscreen --help
+offscreen run-all movie.mkv --minutes 3          # 电影 -> 解说视频，命中缓存的阶段自动跳过
+offscreen stage analysis.shots --asset ast_…     # 只跑某个阶段（--asset 也可直接给电影路径）
 ```

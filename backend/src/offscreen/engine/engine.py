@@ -15,6 +15,8 @@ from offscreen.engine.stage import (
 )
 
 ProgressFn = Callable[[str, float, str], None]
+ResolvedFn = Callable[[str, bool], None]
+"""Called with `(stage name, cache hit)` once a stage's artifact is available, upstream first."""
 
 
 class UnknownStage(KeyError):
@@ -37,6 +39,7 @@ class Engine:
         *,
         progress: ProgressFn | None = None,
         is_canceled: Callable[[], bool] | None = None,
+        on_resolved: ResolvedFn | None = None,
     ) -> None:
         self.store = store
         self.stages: dict[str, Stage] = {}
@@ -46,6 +49,7 @@ class Engine:
             self.stages[s.name] = s
         self._progress = progress
         self._is_canceled = is_canceled
+        self._on_resolved = on_resolved
 
     def ensure(self, target: str, scope: Scope) -> Artifact:
         """The artifact of `target` for `scope`, running missing stages (upstream first)."""
@@ -78,9 +82,12 @@ class Engine:
             stage.params(ref.scope),
             stage.provider_info(ref.scope),
         )
-        artifact = self.store.get(stage.name, cache_key) or self._run(
-            stage, ref.scope, upstream, cache_key
-        )
+        artifact = self.store.get(stage.name, cache_key)
+        hit = artifact is not None
+        if artifact is None:
+            artifact = self._run(stage, ref.scope, upstream, cache_key)
+        if self._on_resolved is not None:
+            self._on_resolved(stage.name, hit)
         done[key] = artifact
         return artifact
 
