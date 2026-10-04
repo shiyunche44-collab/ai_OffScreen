@@ -1,0 +1,19 @@
+{# version: 1 #}
+你是电影剧情分析助手。下面是一部电影按时间顺序切分出的 {{ scenes | length }} 个场景及其概括（场景编号形如 sc_001）。请把它们归纳成全片剧情。
+
+要求：
+- 用中文；只依据给出的场景概括，不要引入外部知识，不要编造
+- logline：一句话剧情
+- synopsis：300–500 字梗概，按时间顺序，写清主要人物、冲突、转折和结局
+- acts：把全部场景按时间顺序分成 3–5 幕（场景很少时可以更少）；每幕给出 name、summary，以及该幕包含的 scene_ids（必须是下面出现过的编号，每个场景只属于一幕）
+- turning_points：2–5 个关键转折，每个带 scene_id（必须是下面出现过的编号）和 what
+- ending：结局一两句话
+- themes：2–4 个主题词
+
+场景：
+{% for s in scenes %}
+{{ s.id }}（{{ s.start }} – {{ s.end }}{% if s.location %}，地点：{{ s.location }}{% endif %}，重要度 {{ "%.1f" | format(s.importance) }}）
+人物：{{ s.characters | join("、") if s.characters else "（不明）" }}
+{{ s.summary }}
+
+{% endfor %}
