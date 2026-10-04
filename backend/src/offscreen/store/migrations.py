@@ -9,6 +9,7 @@ database at the previous version.
 from __future__ import annotations
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,6 +71,20 @@ def current_version(conn: sqlite3.Connection) -> int:
     return int(row[0])
 
 
+def _enable_wal(conn: sqlite3.Connection, attempts: int = 100) -> None:
+    """Switching the journal mode needs an exclusive lock that SQLite's busy handler does not
+    always wait for, so racing first-time openers retry. WAL is persistent: once one process
+    has set it, this is a no-op for everyone else."""
+    for i in range(attempts):
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) or i == attempts - 1:
+                raise
+            time.sleep(0.05)
+
+
 def migrate(path: Path, migrations: tuple[Migration, ...] = MIGRATIONS) -> int:
     """Bring the database at `path` up to the latest version (creating it if needed).
     Returns the resulting version. Safe to call from several processes at once."""
@@ -77,7 +92,7 @@ def migrate(path: Path, migrations: tuple[Migration, ...] = MIGRATIONS) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=30, isolation_level=None)  # we manage BEGIN ourselves
     try:
-        conn.execute("PRAGMA journal_mode=WAL")
+        _enable_wal(conn)
         # IMMEDIATE takes the write lock first, so two processes cannot both see "v0".
         conn.execute("BEGIN IMMEDIATE")
         try:
