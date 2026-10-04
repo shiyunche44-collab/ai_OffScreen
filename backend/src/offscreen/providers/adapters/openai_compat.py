@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import random
-import re
 import threading
 import time
 from collections.abc import Callable
@@ -23,6 +21,14 @@ from pydantic import ValidationError
 from offscreen.algo.jsonreply import NoJsonFound, extract_json
 from offscreen.config import AppConfig, ProviderCfg
 from offscreen.domain.llm import LlmCallRecord
+from offscreen.providers.adapters.http_util import (
+    MAX_RETRIES,
+    FailureKind,
+    backoff_delay,
+    classify_failure,
+    error_text,
+    parse_retry_after,
+)
 from offscreen.providers.ports import (
     LLMAuthError,
     LLMError,
@@ -34,45 +40,7 @@ from offscreen.providers.ports import (
     Recorder,
 )
 
-MAX_RETRIES = 3  # transient failures only; so up to 4 requests per chat
-BACKOFF_BASE_S = 2.0
-BACKOFF_CAP_S = 60.0
 TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=60.0)
-
-FailureKind = Literal["quota", "auth", "transient", "fatal"]
-
-# MiniMax reports errors in `base_resp`, sometimes with HTTP 200.
-_MINIMAX_QUOTA = {1008, 2056}  # insufficient balance; token-plan usage window exhausted
-_MINIMAX_AUTH = {1004, 2049}
-_MINIMAX_TRANSIENT = {1000, 1001, 1002, 1013, 1033, 1039, 1041}  # timeout, RPM/TPM, internal
-# Deliberately excludes plain "rate limit", which is transient.
-_QUOTA_WORDS = re.compile(
-    r"insufficient|balance|quota|usage[ _]limit|exhaust|billing|额度|余额|用量", re.IGNORECASE
-)
-
-
-def classify_failure(status: int, body: Any, text: str = "") -> FailureKind:
-    """Decide how to react to an error response. `body` is the parsed JSON, if any."""
-    base = body.get("base_resp") if isinstance(body, dict) else None
-    code = base.get("status_code") if isinstance(base, dict) else None
-    if isinstance(code, int) and code != 0:
-        if code in _MINIMAX_QUOTA:
-            return "quota"
-        if code in _MINIMAX_AUTH:
-            return "auth"
-        if code in _MINIMAX_TRANSIENT:
-            return "transient"
-    if status in (401, 403):
-        return "auth"
-    if status == 402:  # DeepSeek: Insufficient Balance
-        return "quota"
-    if status == 429:
-        return "quota" if _QUOTA_WORDS.search(text) else "transient"
-    if status in (408, 409, 425) or status >= 500:
-        return "transient"
-    if isinstance(code, int) and code != 0:
-        return "fatal"
-    return "fatal"
 
 
 def usage_of(usage: dict[str, Any]) -> tuple[int, int, int]:
@@ -183,20 +151,20 @@ class ProviderClient:
                     if resp.status_code < 400 and not base_code:
                         return self._parse(body, attempt)
                     kind = classify_failure(resp.status_code, body, text)
-                    last = f"HTTP {resp.status_code}: {_error_text(body, text)}"
-                    retry_after = _retry_after(resp.headers.get("retry-after"))
+                    last = f"HTTP {resp.status_code}: {error_text(body, text)}"
+                    retry_after = parse_retry_after(resp.headers.get("retry-after"))
             if kind == "quota":
                 raise LLMQuotaExhausted(
                     f"{self.name}: quota or balance exhausted ({last}); not retrying",
                     provider=self.name,
-                    reset_hint=_error_text(body, "") or None,
+                    reset_hint=error_text(body, "") or None,
                 )
             if kind == "auth":
                 raise LLMAuthError(f"{self.name}: authentication failed ({last})")
             if kind == "fatal":
                 raise LLMError(f"{self.name}: request rejected ({last})")
             if attempt < MAX_RETRIES:
-                self._sleep(retry_after if retry_after is not None else _backoff(attempt))
+                self._sleep(retry_after if retry_after is not None else backoff_delay(attempt))
         raise LLMRateLimited(f"{self.name}: still failing after {MAX_RETRIES} retries ({last})")
 
     def _parse(self, body: Any, attempt: int) -> ChatResult:
@@ -228,29 +196,6 @@ class ProviderClient:
                 "usage": body.get("usage"),
             },
         )
-
-
-def _error_text(body: Any, text: str) -> str:
-    if isinstance(body, dict):
-        err = body.get("error")
-        base = body.get("base_resp")
-        if isinstance(err, dict) and err.get("message"):
-            return str(err["message"])[:300]
-        if isinstance(base, dict) and base.get("status_msg"):
-            return f"{base.get('status_code')} {base['status_msg']}"[:300]
-    return text[:300]
-
-
-def _retry_after(value: str | None) -> float | None:
-    try:
-        return min(float(value), BACKOFF_CAP_S) if value else None
-    except ValueError:
-        return None
-
-
-def _backoff(attempt: int) -> float:
-    delay: float = min(BACKOFF_CAP_S, BACKOFF_BASE_S * 2**attempt)
-    return delay * (0.75 + random.random() / 2)
 
 
 _SCHEMA_PROMPT = (

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import wave
 from collections import defaultdict, deque
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -9,8 +11,9 @@ from typing import Any
 from pydantic import BaseModel
 
 from offscreen.algo.jsonreply import extract_json
+from offscreen.algo.tts import WordSpan, char_timings_from_spans
 from offscreen.domain.llm import LlmCallRecord
-from offscreen.providers.ports import LLMError, M, Message, Recorder
+from offscreen.providers.ports import LLMError, M, Message, Recorder, SynthesizedAudio
 
 Reply = BaseModel | dict[str, Any] | str | Exception
 """A model instance or dict (validated against the requested schema), a string (parsed
@@ -78,3 +81,51 @@ class FakeLLM:
                 )
             )
         return value
+
+
+class FakeTTS:
+    """Offline TTS: a silent wav whose length follows the text (`chars_per_s`, scaled by
+    `speed`), with evenly spread character timings. Deterministic; records its calls."""
+
+    def __init__(
+        self,
+        *,
+        chars_per_s: float = 4.5,
+        sample_rate: int = 16000,
+        fail_with: Exception | None = None,
+    ) -> None:
+        self.chars_per_s = chars_per_s
+        self.sample_rate = sample_rate
+        self.fail_with = fail_with
+        self.calls: list[tuple[str, str, float]] = []
+        """(text, voice_id, speed) for every synthesize() call."""
+
+    @property
+    def id(self) -> str:
+        return f"fake-tts:wav@{self.sample_rate}:{self.chars_per_s}"
+
+    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> SynthesizedAudio:
+        self.calls.append((text, voice_id, speed))
+        if self.fail_with is not None:
+            raise self.fail_with
+        spoken = [i for i, c in enumerate(text) if not c.isspace()]
+        if not spoken:
+            raise ValueError("cannot synthesize empty text")
+        duration_ms = max(1, round(len(spoken) / self.chars_per_s / speed * 1000))
+        n_samples = round(duration_ms * self.sample_rate / 1000)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(self.sample_rate)
+            w.writeframes(b"\x00\x00" * n_samples)
+        step = duration_ms / len(spoken)
+        spans = [WordSpan(k * step, (k + 1) * step, i, i + 1) for k, i in enumerate(spoken)]
+        return SynthesizedAudio(
+            data=buf.getvalue(),
+            format="wav",
+            sample_rate=self.sample_rate,
+            duration_ms=duration_ms,
+            char_timings=char_timings_from_spans(len(text), spans, duration_ms),
+            billed_chars=len(spoken),
+        )

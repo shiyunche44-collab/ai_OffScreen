@@ -133,3 +133,49 @@ class LLM(Protocol):
         that passed `schema` validation. Raises LLMError subclasses; never returns
         unvalidated data."""
         ...
+
+
+# ---- TTS ---------------------------------------------------------------------------------
+class TTSError(RuntimeError):
+    """Synthesis failed and retrying the same request will not help (or retries ran out)."""
+
+
+class TTSAuthError(TTSError):
+    """Missing, invalid or unauthorized key."""
+
+
+class TTSQuotaExhausted(TTSError):
+    """Balance or subscription window used up. Not retried."""
+
+    def __init__(self, message: str, *, provider: str = "", reset_hint: str | None = None) -> None:
+        super().__init__(message)
+        self.provider = provider
+        self.reset_hint = reset_hint
+
+
+class TTSRateLimited(TTSError):
+    """Still rate limited (or a 5xx / network failure) after the backoff retries."""
+
+
+@dataclass(frozen=True)
+class SynthesizedAudio:
+    data: bytes
+    format: str
+    """Container of `data`, e.g. "mp3"."""
+    sample_rate: int
+    duration_ms: int
+    char_timings: list[tuple[int, int]]
+    """`(start_ms, end_ms)` inside the audio for each character of the input text, or an
+    empty list when the engine gives no timestamps. Never partial: all or nothing."""
+    billed_chars: int | None = None
+
+
+class TTS(Protocol):
+    @property
+    def id(self) -> str:
+        """Engine, model and audio settings; part of the cache key of anything synthesized."""
+        ...
+
+    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> SynthesizedAudio:
+        """Speak `text`. Raises TTSError subclasses; never returns empty audio."""
+        ...

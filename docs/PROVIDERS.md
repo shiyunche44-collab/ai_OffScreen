@@ -102,6 +102,16 @@
     { "word": "个", "time_begin": 170.7, "time_end": 341.3, "word_begin": 1, "word_end": 2 } ] }
 ```
 
+流式响应的实测细节（2026-10-04，M1-10 适配器按此实现）：
+
+- 每个 SSE 事件的 `data.status`：`1` 为中间分块，`2` 为最后一个事件
+- **最后一个事件（`status: 2`）带有完整音频**（字节数等于 `extra_info.audio_size`）以及 `data.subtitles`；`extra_info` 也只在这个事件里。中间分块的拼接结果与完整音频**字节不同**（少了文件头 / 尾部），所以以最后一个事件的音频为准，仅在它为空时才回退到拼接分块
+- `data.subtitle`（单数）出现在中间事件里，`data.subtitles`（复数、数组）出现在最后一个事件里，内容相同；整段文本（实测 30 字）只有一个 subtitle 条目，`word_begin` / `word_end` 是整段输入文本里的全局字符偏移（按 Unicode 码点）
+- 时间戳**不是逐字符**的：中日文逐字；英文按词片（`Hello` → `He` + `llo`）；数字按读法重复同一偏移（`2024` 出现 6 次，偏移都是 17–21，时间依次排开）；空格、标签没有条目。因此适配器用 `algo.tts.char_timings_from_spans` 合并同偏移条目、把多字符条目的时间均分，再补齐成「每个输入字符一个区间」
+- `extra_info.audio_length`（实测 4969 ms）比最后一个词的 `time_end`（4736 ms）长，含尾部静音；时长以 `audio_length` 为准
+- HTTP 200 的流里也可能出现 `base_resp.status_code != 0` 的错误事件，要按错误码分类处理
+- 单次文本上限 10000 字符（官方文档）；`speed` 取值 0.5–2.0
+
 ### 2.6 语音识别 `POST /v1/speech_to_text`（未实测）
 
 - `multipart/form-data`：`model=asr-1.0`、`file=<音频>`
