@@ -582,9 +582,9 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/assets": {
+    "/api/assets": {
       "get": {
-        "operationId": "list_assets_assets_get",
+        "operationId": "list_assets_api_assets_get",
         "responses": {
           "200": {
             "content": {
@@ -593,7 +593,7 @@
                   "items": {
                     "$ref": "#/components/schemas/MediaAsset"
                   },
-                  "title": "Response List Assets Assets Get",
+                  "title": "Response List Assets Api Assets Get",
                   "type": "array"
                 }
               }
@@ -638,7 +638,7 @@
       },
       "post": {
         "description": "Register a movie. Importing the same file again returns the same asset.",
-        "operationId": "import_asset_assets_post",
+        "operationId": "import_asset_api_assets_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -697,10 +697,10 @@
         ]
       }
     },
-    "/assets/{asset_id}": {
+    "/api/assets/{asset_id}": {
       "get": {
         "description": "The asset and which analysis stages are already built.",
-        "operationId": "get_asset_assets__asset_id__get",
+        "operationId": "get_asset_api_assets__asset_id__get",
         "parameters": [
           {
             "in": "path",
@@ -760,10 +760,10 @@
         ]
       }
     },
-    "/assets/{asset_id}/analyze": {
+    "/api/assets/{asset_id}/analyze": {
       "post": {
         "description": "Queue the analysis. Returns the job (the already active one, if there is one).",
-        "operationId": "analyze_asset_assets__asset_id__analyze_post",
+        "operationId": "analyze_asset_api_assets__asset_id__analyze_post",
         "parameters": [
           {
             "in": "path",
@@ -823,10 +823,10 @@
         ]
       }
     },
-    "/events": {
+    "/api/events": {
       "get": {
         "description": "Live job progress.",
-        "operationId": "events_events_get",
+        "operationId": "events_api_events_get",
         "responses": {
           "200": {
             "content": {
@@ -845,10 +845,10 @@
         ]
       }
     },
-    "/files/{path}": {
+    "/api/files/{path}": {
       "get": {
         "description": "A file under the data directory (videos, keyframes, audio, ...). Supports HTTP Range, so\nplayers can seek. Nothing outside the data directory is reachable.",
-        "operationId": "get_file_files__path__get",
+        "operationId": "get_file_api_files__path__get",
         "parameters": [
           {
             "in": "path",
@@ -910,10 +910,10 @@
         ]
       }
     },
-    "/jobs": {
+    "/api/jobs": {
       "get": {
         "description": "Newest first.",
-        "operationId": "list_jobs_jobs_get",
+        "operationId": "list_jobs_api_jobs_get",
         "parameters": [
           {
             "in": "query",
@@ -968,7 +968,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Job"
                   },
-                  "title": "Response List Jobs Jobs Get",
+                  "title": "Response List Jobs Api Jobs Get",
                   "type": "array"
                 }
               }
@@ -1012,9 +1012,9 @@
         ]
       }
     },
-    "/jobs/{job_id}": {
+    "/api/jobs/{job_id}": {
       "get": {
-        "operationId": "get_job_jobs__job_id__get",
+        "operationId": "get_job_api_jobs__job_id__get",
         "parameters": [
           {
             "in": "path",
@@ -1074,10 +1074,10 @@
         ]
       }
     },
-    "/jobs/{job_id}/log": {
+    "/api/jobs/{job_id}/log": {
       "get": {
         "description": "The end of the job's log file, as plain text.",
-        "operationId": "get_job_log_jobs__job_id__log_get",
+        "operationId": "get_job_log_api_jobs__job_id__log_get",
         "parameters": [
           {
             "in": "path",
@@ -1140,10 +1140,10 @@
         ]
       }
     },
-    "/jobs/{job_id}:cancel": {
+    "/api/jobs/{job_id}:cancel": {
       "post": {
         "description": "Queued jobs are canceled at once; a running job stops at its next checkpoint.",
-        "operationId": "cancel_job_jobs__job_id__cancel_post",
+        "operationId": "cancel_job_api_jobs__job_id__cancel_post",
         "parameters": [
           {
             "in": "path",
@@ -1203,10 +1203,10 @@
         ]
       }
     },
-    "/jobs/{job_id}:retry": {
+    "/api/jobs/{job_id}:retry": {
       "post": {
         "description": "Only failed jobs can be retried.",
-        "operationId": "retry_job_jobs__job_id__retry_post",
+        "operationId": "retry_job_api_jobs__job_id__retry_post",
         "parameters": [
           {
             "in": "path",
@@ -1266,9 +1266,9 @@
         ]
       }
     },
-    "/projects": {
+    "/api/projects": {
       "get": {
-        "operationId": "list_projects_projects_get",
+        "operationId": "list_projects_api_projects_get",
         "responses": {
           "200": {
             "content": {
@@ -1277,7 +1277,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Project"
                   },
-                  "title": "Response List Projects Projects Get",
+                  "title": "Response List Projects Api Projects Get",
                   "type": "array"
                 }
               }
@@ -1321,7 +1321,7 @@
         ]
       },
       "post": {
-        "operationId": "create_project_projects_post",
+        "operationId": "create_project_api_projects_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1380,10 +1380,10 @@
         ]
       }
     },
-    "/projects/{project_id}": {
+    "/api/projects/{project_id}": {
       "get": {
         "description": "The project, which stages are built for its options, and the finished video if any.",
-        "operationId": "get_project_projects__project_id__get",
+        "operationId": "get_project_api_projects__project_id__get",
         "parameters": [
           {
             "in": "path",
@@ -1443,9 +1443,9 @@
         ]
       }
     },
-    "/projects/{project_id}/plan:build": {
+    "/api/projects/{project_id}/plan:build": {
       "post": {
-        "operationId": "build_plan_projects__project_id__plan_build_post",
+        "operationId": "build_plan_api_projects__project_id__plan_build_post",
         "parameters": [
           {
             "in": "path",
@@ -1505,9 +1505,9 @@
         ]
       }
     },
-    "/projects/{project_id}/render": {
+    "/api/projects/{project_id}/render": {
       "post": {
-        "operationId": "render_projects__project_id__render_post",
+        "operationId": "render_api_projects__project_id__render_post",
         "parameters": [
           {
             "in": "path",
@@ -1567,9 +1567,9 @@
         ]
       }
     },
-    "/projects/{project_id}/script:generate": {
+    "/api/projects/{project_id}/script:generate": {
       "post": {
-        "operationId": "generate_script_projects__project_id__script_generate_post",
+        "operationId": "generate_script_api_projects__project_id__script_generate_post",
         "parameters": [
           {
             "in": "path",

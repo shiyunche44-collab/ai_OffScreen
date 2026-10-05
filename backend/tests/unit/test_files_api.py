@@ -1,4 +1,4 @@
-"""/files/{path}: HTTP Range for players, and nothing outside the data directory."""
+"""/api/files/{path}: HTTP Range for players, and nothing outside the data directory."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def config(data_dir: Path) -> AppConfig:
     return AppConfig.model_validate({"data_dir": str(data_dir), "tts": {"provider": "edge_tts"}})
 
 
-VIDEO = "/files/artifacts/output.render/abc123/final.mp4"
+VIDEO = "/api/files/artifacts/output.render/abc123/final.mp4"
 
 
 # --- serving ----------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def test_serves_a_file_with_type_and_range_support(client: TestClient) -> None:
 
 def test_artifacts_are_cacheable_forever_other_files_are_not(client: TestClient) -> None:
     assert "immutable" in client.get(VIDEO).headers["cache-control"]
-    assert "cache-control" not in client.get("/files/logs/job_1.log").headers
+    assert "cache-control" not in client.get("/api/files/logs/job_1.log").headers
 
 
 def test_head_returns_headers_without_a_body(client: TestClient) -> None:
@@ -73,7 +73,7 @@ def test_head_returns_headers_without_a_body(client: TestClient) -> None:
 
 
 def test_names_with_spaces_work(client: TestClient) -> None:
-    assert client.get("/files/notes/a%20b.txt").text == "spaced name"
+    assert client.get("/api/files/notes/a%20b.txt").text == "spaced name"
 
 
 @pytest.mark.parametrize(
@@ -137,7 +137,11 @@ def test_check_range(header: str, size: int, verdict: str) -> None:
 
 
 def test_missing_file_and_directory_are_404(client: TestClient) -> None:
-    for path in ("/files/nope.mp4", "/files/artifacts", "/files/artifacts/output.render/abc123"):
+    for path in (
+        "/api/files/nope.mp4",
+        "/api/files/artifacts",
+        "/api/files/artifacts/output.render/abc123",
+    ):
         r = client.get(path)
         assert r.status_code == 404 and r.json()["error"]["code"] == "not_found", path
 
@@ -148,20 +152,20 @@ def test_missing_file_and_directory_are_404(client: TestClient) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/files/../secret.txt",
-        "/files/%2e%2e/secret.txt",
-        "/files/%2E%2E/%2E%2E/etc/passwd",
-        "/files/logs/../../secret.txt",
-        "/files/logs/%2e%2e/%2e%2e/secret.txt",
-        "/files/..%2fsecret.txt",
-        "/files/%2e%2e%2fsecret.txt",
-        "/files/../data_evil/secret.txt",
-        "/files/%2e%2e/data_evil/secret.txt",
-        "/files//etc/passwd",  # absolute path smuggled through the double slash
-        "/files/%2fetc/passwd",
-        "/files/logs%5c..%5c..%5csecret.txt",  # backslashes
-        "/files/logs/job_1.log%00.png",  # NUL byte
-        "/files/%00",
+        "/api/files/../secret.txt",
+        "/api/files/%2e%2e/secret.txt",
+        "/api/files/%2E%2E/%2E%2E/etc/passwd",
+        "/api/files/logs/../../secret.txt",
+        "/api/files/logs/%2e%2e/%2e%2e/secret.txt",
+        "/api/files/..%2fsecret.txt",
+        "/api/files/%2e%2e%2fsecret.txt",
+        "/api/files/../data_evil/secret.txt",
+        "/api/files/%2e%2e/data_evil/secret.txt",
+        "/api/files//etc/passwd",  # absolute path smuggled through the double slash
+        "/api/files/%2fetc/passwd",
+        "/api/files/logs%5c..%5c..%5csecret.txt",  # backslashes
+        "/api/files/logs/job_1.log%00.png",  # NUL byte
+        "/api/files/%00",
     ],
 )
 def test_nothing_outside_the_data_directory_is_reachable(client: TestClient, path: str) -> None:
@@ -175,19 +179,19 @@ def test_a_symlink_pointing_out_of_the_data_directory_is_refused(
 ) -> None:
     os.symlink(tmp_path / "secret.txt", data / "link.txt")
     os.symlink(tmp_path / "data_evil", data / "linkdir")
-    assert client.get("/files/link.txt").status_code == 404
-    assert client.get("/files/linkdir/secret.txt").status_code == 404
+    assert client.get("/api/files/link.txt").status_code == 404
+    assert client.get("/api/files/linkdir/secret.txt").status_code == 404
 
 
 def test_a_symlink_staying_inside_is_fine(client: TestClient, data: Path) -> None:
     os.symlink(data / "logs" / "job_1.log", data / "alias.log")
-    assert client.get("/files/alias.log").text == "hello\n"
+    assert client.get("/api/files/alias.log").text == "hello\n"
 
 
 def test_the_database_is_never_served(client: TestClient, data: Path) -> None:
     for name in ("offscreen.db", "offscreen.db-wal", "offscreen.db-shm", "x.SQLITE"):
         (data / name).write_bytes(b"SQLite format 3\0")
-        assert client.get(f"/files/{name}").status_code == 404, name
+        assert client.get(f"/api/files/{name}").status_code == 404, name
 
 
 def test_resolve_unit_cases(data: Path) -> None:

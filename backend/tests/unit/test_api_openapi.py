@@ -23,21 +23,21 @@ def test_committed_openapi_is_up_to_date() -> None:
 def test_the_documented_routes() -> None:
     paths = set(spec()["paths"])
     assert paths == {
-        "/assets",
-        "/assets/{asset_id}",
-        "/assets/{asset_id}/analyze",
-        "/projects",
-        "/projects/{project_id}",
-        "/projects/{project_id}/script:generate",
-        "/projects/{project_id}/plan:build",
-        "/projects/{project_id}/render",
-        "/jobs",
-        "/jobs/{job_id}",
-        "/jobs/{job_id}/log",
-        "/jobs/{job_id}:cancel",
-        "/jobs/{job_id}:retry",
-        "/files/{path}",
-        "/events",
+        "/api/assets",
+        "/api/assets/{asset_id}",
+        "/api/assets/{asset_id}/analyze",
+        "/api/projects",
+        "/api/projects/{project_id}",
+        "/api/projects/{project_id}/script:generate",
+        "/api/projects/{project_id}/plan:build",
+        "/api/projects/{project_id}/render",
+        "/api/jobs",
+        "/api/jobs/{job_id}",
+        "/api/jobs/{job_id}/log",
+        "/api/jobs/{job_id}:cancel",
+        "/api/jobs/{job_id}:retry",
+        "/api/files/{path}",
+        "/api/events",
     }
 
 
@@ -45,7 +45,7 @@ def test_error_responses_are_documented_with_the_shared_model() -> None:
     s = spec()
     assert {"ErrorResponse", "ErrorBody"} <= set(s["components"]["schemas"])
     for path, ops in s["paths"].items():
-        if path == "/events":  # a stream: it never answers with an error body
+        if path == "/api/events":  # a stream: it never answers with an error body
             continue
         for method, op in ops.items():
             for code in ("404", "409", "422"):
@@ -57,3 +57,12 @@ def test_operation_ids_are_unique() -> None:
     """Generated clients name their functions after them."""
     ids = [op["operationId"] for ops in spec()["paths"].values() for op in ops.values()]
     assert len(ids) == len(set(ids))
+
+
+def test_nothing_answers_outside_the_api_prefix() -> None:
+    """ADR-0002: every other path belongs to the front end."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(create_app())
+    for path in ("/assets", "/jobs", "/projects/prj_1", "/events", "/files/x"):
+        assert client.get(path).status_code == 404, path

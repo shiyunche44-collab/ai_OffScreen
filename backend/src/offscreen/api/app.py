@@ -13,6 +13,7 @@ from offscreen.api.sse import EventSettings
 from offscreen.config import load_config
 from offscreen.services.app import AppServices
 
+API_PREFIX = "/api"
 TITLE = "AI OffScreen"
 VERSION = "0.1.0"
 
@@ -40,5 +41,5 @@ def create_app(
     app.state.event_settings = events_settings or EventSettings()
     install_error_handlers(app)
     for module in (assets, projects, jobs, files, events):
-        app.include_router(module.router)
+        app.include_router(module.router, prefix=API_PREFIX)
     return app

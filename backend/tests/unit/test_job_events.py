@@ -236,7 +236,7 @@ def test_events_endpoint_streams_snapshot_and_changes(services: AppServices) -> 
     settings = EventSettings(poll_s=0.05, keepalive_s=5, max_lifetime_s=1.2, retry_ms=500)
     timer.start()
     with TestClient(create_app(services, events_settings=settings)) as client:
-        r = client.get("/events")
+        r = client.get("/api/events")
     timer.join()
 
     assert r.status_code == 200
@@ -253,5 +253,5 @@ def test_events_endpoint_streams_snapshot_and_changes(services: AppServices) -> 
 
 def test_events_endpoint_is_documented_as_event_stream() -> None:
     spec = create_app().openapi()
-    ok = spec["paths"]["/events"]["get"]["responses"]["200"]
+    ok = spec["paths"]["/api/events"]["get"]["responses"]["200"]
     assert "text/event-stream" in ok["content"] and "snapshot" in ok["description"]
