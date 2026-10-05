@@ -73,6 +73,15 @@ class BudgetCfg(_Cfg):
     confirm_above_tokens: int = Field(default=2_000_000, ge=0)
 
 
+class WorkerCfg(_Cfg):
+    """Job worker (the gpu lane always runs one job at a time)."""
+
+    cpu_concurrency: int = Field(default=2, ge=1)
+    api_concurrency: int = Field(default=4, ge=1)
+    heartbeat_timeout_s: float = Field(default=30.0, gt=2)
+    """A running job without a heartbeat for this long is requeued (its worker died)."""
+
+
 class AppConfig(_Cfg):
     data_dir: Path = Path("./data")
     media_roots: list[Path] = []
@@ -81,6 +90,7 @@ class AppConfig(_Cfg):
     asr: AsrCfg = AsrCfg()
     tts: TtsCfg = TtsCfg()
     budget: BudgetCfg = BudgetCfg()
+    worker: WorkerCfg = WorkerCfg()
 
     @model_validator(mode="after")
     def _references(self) -> Self:

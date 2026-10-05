@@ -62,3 +62,8 @@ tts:
 
 budget:
   confirm_above_tokens: 2000000   # 单个作业预估 token 超过此值需确认
+
+worker:                         # 作业 Worker（gpu 通道恒为 1 个并发）
+  cpu_concurrency: 2
+  api_concurrency: 4
+  heartbeat_timeout_s: 30       # 运行中的作业超过这么久没有心跳 → 视为 Worker 已崩溃，重新排队

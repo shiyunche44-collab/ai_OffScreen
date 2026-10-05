@@ -13,6 +13,7 @@ dependencies = [
   "scenedetect>=0.6.5",
   "sqlmodel>=0.0.47",
   "typer>=0.12",
+  "uvicorn>=0.54.0",
 ]
 
 [project.optional-dependencies]
@@ -76,7 +77,9 @@ include_external_packages = true
 name = "R-layers: dependency direction"
 type = "layers"
 layers = [
-  "offscreen.cli | offscreen.api | offscreen.worker",
+  "offscreen.cli",
+  "offscreen.server",
+  "offscreen.api | offscreen.worker",
   "offscreen.services",
   "offscreen.stages",
   "offscreen.engine",
@@ -117,7 +120,7 @@ type = "forbidden"
 source_modules = [
   "offscreen.domain", "offscreen.algo", "offscreen.engine", "offscreen.stages",
   "offscreen.media", "offscreen.store", "offscreen.services", "offscreen.worker",
-  "offscreen.api", "offscreen.cli",
+  "offscreen.api", "offscreen.cli", "offscreen.server",
 ]
 forbidden_modules = [
   "anthropic", "openai", "faster_whisper", "insightface", "edge_tts", "demucs",
@@ -128,6 +131,6 @@ allow_indirect_imports = true  # importing an adapter (services wiring) is fine;
 [[tool.importlinter.contracts]]
 name = "R6: api/cli/worker go through services"
 type = "forbidden"
-source_modules = ["offscreen.api", "offscreen.cli"]
+source_modules = ["offscreen.api", "offscreen.cli", "offscreen.server"]
 forbidden_modules = ["offscreen.stages", "offscreen.store", "offscreen.engine"]
 allow_indirect_imports = true  # R6 forbids *direct* use; going through services is the point

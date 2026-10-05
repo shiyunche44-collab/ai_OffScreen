@@ -220,6 +220,7 @@ ai_OffScreen/
 │   │   ├── store/             # SQLite 仓储、版本化文档库、文件布局
 │   │   ├── services/          # 用例编排（API 与 CLI 共用）：AnalyzeAsset、GenerateScript、BuildPlan、Render…
 │   │   ├── worker/            # 作业队列、通道调度、模型生命周期
+│   │   ├── server.py          # 组装层：API + Worker 一个进程，托管前端静态文件（ADR-0003）
 │   │   ├── api/               # FastAPI 路由（薄层）
 │   │   └── cli.py             # Typer CLI（薄层）
 │   └── tests/
@@ -239,7 +240,13 @@ ai_OffScreen/
 ### 4.2 依赖方向（由 import-linter 在 CI 中强制）
 
 ```
-api / cli / worker
+        cli
+         │
+         ▼
+      server       ← 组装层：把 api 与 worker 接成一个进程（ADR-0003）
+         │
+         ▼
+   api   /   worker
         │
         ▼
      services
@@ -263,7 +270,7 @@ api / cli / worker
 | R3 | `stages` 只通过 `providers.ports` 使用模型，**禁止** import `providers.adapters` |
 | R4 | 厂商 SDK（`anthropic`、`openai`、`faster_whisper`、`insightface`、`edge_tts`…）**只能**出现在 `providers/adapters/` |
 | R5 | 只有 `media/` 可以调用 ffmpeg / ffprobe 子进程 |
-| R6 | `api/` 和 `cli.py` 只调用 `services`，不直接调 `stages` / `store` |
+| R6 | `api/`、`cli.py`、`server.py` 只调用 `services`（与下层的 `api` / `worker`），不直接调 `stages` / `store` / `engine` |
 | R7 | 前端类型只能从 OpenAPI 生成，不手写后端数据结构 |
 
 ---

@@ -31,7 +31,7 @@
 - `stages/` 只通过 `providers/ports.py` 用模型，禁止 import `providers/adapters/`
 - 厂商 SDK（anthropic、openai、faster_whisper、insightface、edge_tts 等）只能出现在 `providers/adapters/`
 - 只有 `media/` 可以调用 ffmpeg / ffprobe
-- `api/` 和 `cli.py` 只调用 `services/`
+- `api/` 和 `cli.py` 只调用 `services/`；`server.py` 是唯一把 `api` 与 `worker` 接在一起的组装层（ADR-0003），`cli.py` 通过它启动服务
 
 ## 模型供应商与密钥
 

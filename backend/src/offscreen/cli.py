@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from offscreen.config import ConfigError, load_config
+from offscreen.server import default_web_dir, run_worker, serve
 from offscreen.services.config_view import show_config
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
@@ -98,6 +99,48 @@ def stage(
 ) -> None:
     """Run one stage (and whatever it depends on) for an asset."""
     _execute(config, name, asset, RunOptions(minutes, voice, style, not no_spoilers))
+
+
+@app.command("serve")
+def serve_command(
+    host: Annotated[
+        str, typer.Option(help="Address to listen on (no authentication: keep it local)")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
+    web_dir: Annotated[
+        Path | None,
+        typer.Option("--web-dir", help="Built front end (default: frontend/dist if built)"),
+    ] = None,
+    no_worker: Annotated[
+        bool, typer.Option("--no-worker", help="API only; run `offscreen worker` elsewhere")
+    ] = False,
+    config: ConfigOpt = None,
+) -> None:
+    """Start the web app: API, front end and job worker in one process."""
+    try:
+        cfg = load_config(config)
+    except ConfigError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    dist = web_dir or default_web_dir()
+    if dist is None:
+        typer.echo(
+            "note: no built front end (run `npm run build` in frontend/); serving the API only",
+            err=True,
+        )
+    typer.echo(f"offscreen: http://{host}:{port}", err=True)
+    serve(cfg, host=host, port=port, web_dir=dist, with_worker=not no_worker)
+
+
+@app.command("worker")
+def worker_command(config: ConfigOpt = None) -> None:
+    """Run the job worker alone (for use with `serve --no-worker`)."""
+    try:
+        cfg = load_config(config)
+    except ConfigError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    run_worker(cfg)
 
 
 if __name__ == "__main__":

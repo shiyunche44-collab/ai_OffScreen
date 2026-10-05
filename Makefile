@@ -1,4 +1,4 @@
-.PHONY: sync fmt lint type test contracts schemas openapi api-types api-types-check web-install web-check check
+.PHONY: sync fmt lint type test contracts schemas openapi api-types api-types-check web-install web-build web-check serve check
 BE = cd backend &&
 
 sync:
@@ -37,6 +37,13 @@ api-types-check:
 
 web-install:
 	cd frontend && npm ci
+
+web-build:
+	cd frontend && npm run build
+
+# Build the front end, then start API + front end + worker on http://127.0.0.1:8000
+serve: web-build
+	uv run --project backend offscreen serve --config config.yaml   # run from the repo root: ./data is <repo>/data
 
 web-check: api-types-check
 	@test -d frontend/node_modules || { echo "run make web-install first"; exit 1; }
