@@ -1,11 +1,13 @@
-"""keyframes: shots + proxy -> shots.json with 3 frames per shot, quality metrics and sprite sheets.
+"""keyframes: shots + proxy -> shots.json with 3 frames per shot, quality metrics, colour
+signatures and sprite sheets.
 
 Per shot, frames at 10 % / 50 % / 90 % of its duration are written to `kf/<shot_id>_a|b|c.jpg`.
 Each is measured (sharpness: Laplacian variance squashed to 0..1; brightness: mean luma) and the
 shot's `quality` is the mean over its frames, so later stages can avoid blurry and black footage.
-The middle frames are also packed into sprite sheets (`sprites/sheet_NNN.jpg`, indexed by
-`sprites.json`) for the shot strip of the analysis page. Paths are relative to this artifact's
-directory."""
+Each frame's colour histogram goes to `signatures.json`, so later stages (scene segmentation) can
+measure how much the picture changes between shots without decoding images again. The middle
+frames are also packed into sprite sheets (`sprites/sheet_NNN.jpg`, indexed by `sprites.json`)
+for the shot strip of the analysis page. Paths are relative to this artifact's directory."""
 
 from __future__ import annotations
 
@@ -16,17 +18,32 @@ import numpy as np
 from numpy.typing import NDArray
 
 from offscreen.algo.frames import (
+    HIST_BINS,
     KEYFRAME_POSITIONS,
+    color_histogram,
     frame_quality,
     frame_times,
     shot_quality,
     sprite_slot,
 )
-from offscreen.domain.index import Shot, Shots, SpriteSheets, SpriteTile
+from offscreen.domain.index import (
+    Shot,
+    Shots,
+    ShotSignature,
+    SpriteSheets,
+    SpriteTile,
+    VisualSignatures,
+)
 from offscreen.domain.job import Lane
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.media.ffmpeg import FFmpegCanceled
-from offscreen.media.transcode import GRAY_WIDTH, THUMB_HEIGHT, extract_frame, make_sprite_sheets
+from offscreen.media.transcode import (
+    GRAY_WIDTH,
+    RGB_SIZE,
+    THUMB_HEIGHT,
+    extract_frame,
+    make_sprite_sheets,
+)
 from offscreen.stages.analysis.proxy import PROXY_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
 from offscreen.store.files import write_model
@@ -34,6 +51,7 @@ from offscreen.store.files import write_model
 KEYFRAME_DIR = "kf"
 SPRITE_DIR = "sprites"
 SPRITES_FILE = "sprites.json"
+SIGNATURES_FILE = "signatures.json"
 SUFFIXES = "abc"
 SPRITE_TILE = (160, 90)
 SPRITE_GRID = (10, 10)
@@ -44,7 +62,7 @@ FRAMES_SHARE = 0.95
 
 class KeyframesStage(Stage):
     name = "analysis.keyframes"
-    version = 2
+    version = 3
     lane: Lane = "cpu"
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
@@ -56,6 +74,8 @@ class KeyframesStage(Stage):
             "height": THUMB_HEIGHT,
             "positions": list(KEYFRAME_POSITIONS),
             "gray_width": GRAY_WIDTH,
+            "rgb_size": list(RGB_SIZE),
+            "hist_bins": HIST_BINS,
             "sprite_tile": list(SPRITE_TILE),
             "sprite_grid": list(SPRITE_GRID),
         }
@@ -66,12 +86,15 @@ class KeyframesStage(Stage):
         (ctx.out_dir / KEYFRAME_DIR).mkdir()
         (ctx.out_dir / SPRITE_DIR).mkdir()
         gray_file = ctx.out_dir / ".gray"
+        rgb_file = ctx.out_dir / ".rgb"
+        signatures: list[ShotSignature] = []
 
         shots: list[Shot] = []
         try:
             for i, shot in enumerate(doc.shots):
                 paths: list[str] = []
                 measured: list[tuple[float, float]] = []
+                hists: list[list[int]] = []
                 for suffix, at_ms in zip(
                     SUFFIXES, frame_times(shot.start_ms, shot.end_ms), strict=True
                 ):
@@ -81,15 +104,19 @@ class KeyframesStage(Stage):
                         ctx.out_dir / rel,
                         at_ms=at_ms,
                         gray_to=gray_file,
+                        rgb_to=rgb_file,
                         should_cancel=ctx.is_canceled,
                     )
                     measured.append(frame_quality(_read_gray(gray_file)))
+                    hists.append(color_histogram(_read_rgb(rgb_file)))
                     paths.append(rel)
+                signatures.append(ShotSignature(shot_id=shot.id, frames=hists))
                 shots.append(
                     shot.model_copy(update={"keyframes": paths, "quality": shot_quality(measured)})
                 )
                 ctx.progress(FRAMES_SHARE * (i + 1) / len(doc.shots), shot.id)
             gray_file.unlink(missing_ok=True)
+            rgb_file.unlink(missing_ok=True)
 
             sprites = self._sprite_sheets(ctx, doc.asset_id, shots)
         except FFmpegCanceled as e:
@@ -97,6 +124,12 @@ class KeyframesStage(Stage):
 
         write_model(ctx.out_dir / SHOTS_FILE, doc.model_copy(update={"shots": shots}))
         write_model(ctx.out_dir / SPRITES_FILE, sprites)
+        write_model(
+            ctx.out_dir / SIGNATURES_FILE,
+            VisualSignatures(
+                asset_id=doc.asset_id, bins_per_channel=HIST_BINS, signatures=signatures
+            ),
+        )
         ctx.progress(1.0, "done")
         return StageOutput(
             meta={
@@ -140,3 +173,9 @@ def _read_gray(path: Path) -> NDArray[np.uint8]:
     """The raw grayscale frame ffmpeg wrote, as a (height, GRAY_WIDTH) array."""
     data = np.fromfile(path, dtype=np.uint8)
     return data.reshape(-1, GRAY_WIDTH)
+
+
+def _read_rgb(path: Path) -> NDArray[np.uint8]:
+    """The raw rgb24 frame ffmpeg wrote, as a (height, width, 3) array."""
+    w, h = RGB_SIZE
+    return np.fromfile(path, dtype=np.uint8).reshape(h, w, 3)

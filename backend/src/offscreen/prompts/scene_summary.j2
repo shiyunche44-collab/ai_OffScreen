@@ -1,0 +1,19 @@
+{# version: 1 #}
+你是电影剧情分析助手。下面是一部电影里按时间顺序排列的 {{ scenes | length }} 个场景（编号 1 开始）。请只根据给出的画面描述和台词，为每个场景写摘要。
+
+要求：
+- summary：用中文 2–3 句话，写清「谁、在哪、做了什么、结果如何」；是剧情而不是画面的罗列。画面和台词没写明的不要编造，人物不知道名字就用外貌或身份指代
+- location：地点，几个字（如「雪山」「酒馆」）；看不出就留空
+- importance：0 到 1，这个场景对整部电影主线有多关键；过场、重复的赶路、片头片尾字幕低（0.1 以下），转折、冲突、高潮高
+- 场景编号 scene 照抄，每个场景都要输出
+
+{% for sc in scenes %}
+场景 {{ loop.index }}（{{ sc.start }}–{{ sc.end }}，{{ sc.shots }} 个镜头）{% if sc.credits %}【多为片头 / 片尾字幕画面】{% endif %}
+
+画面：
+{% for c in sc.captions %}
+- [{{ c.at }}] {{ c.text }}
+{% endfor %}
+台词：{{ sc.dialogue if sc.dialogue else "（无台词）" }}
+
+{% endfor %}

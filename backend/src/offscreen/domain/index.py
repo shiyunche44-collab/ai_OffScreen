@@ -108,6 +108,33 @@ class SpriteSheets(Versioned):
         return self
 
 
+class ShotSignature(Strict):
+    shot_id: ShotId
+    frames: list[list[int]]
+    """One colour histogram per keyframe (same order as `Shot.keyframes`), in per-mille: bin
+    `r * n * n + g * n + b` (n = bins_per_channel) holds the share of pixels (sums to ~1000)."""
+
+
+class VisualSignatures(Versioned):
+    """A compact colour fingerprint of every keyframe, so later stages can tell how much the
+    picture changes from one shot to the next without decoding images again."""
+
+    asset_id: AssetId
+    bins_per_channel: int = Field(gt=0)
+    signatures: list[ShotSignature]
+
+    @model_validator(mode="after")
+    def _bins_match(self) -> Self:
+        want = self.bins_per_channel**3
+        for sig in self.signatures:
+            if any(len(h) != want or min(h, default=0) < 0 for h in sig.frames):
+                raise ValueError(f"signature of {sig.shot_id} does not have {want} bins")
+        ids = [x.shot_id for x in self.signatures]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate shot ids in signatures")
+        return self
+
+
 ShotSize = Literal["extreme_close_up", "close_up", "medium", "wide", "extreme_wide", "other"]
 
 

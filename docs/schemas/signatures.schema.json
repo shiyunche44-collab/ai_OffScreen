@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "ShotSignature": {
+      "additionalProperties": false,
+      "properties": {
+        "frames": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "title": "Frames",
+          "type": "array"
+        },
+        "shot_id": {
+          "pattern": "^sh_[0-9A-Za-z]+$",
+          "title": "Shot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shot_id",
+        "frames"
+      ],
+      "title": "ShotSignature",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A compact colour fingerprint of every keyframe, so later stages can tell how much the\npicture changes from one shot to the next without decoding images again.",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "bins_per_channel": {
+      "exclusiveMinimum": 0,
+      "title": "Bins Per Channel",
+      "type": "integer"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "signatures": {
+      "items": {
+        "$ref": "#/$defs/ShotSignature"
+      },
+      "title": "Signatures",
+      "type": "array"
+    }
+  },
+  "required": [
+    "asset_id",
+    "bins_per_channel",
+    "signatures"
+  ],
+  "title": "VisualSignatures",
+  "type": "object"
+}

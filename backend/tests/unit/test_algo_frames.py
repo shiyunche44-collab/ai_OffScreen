@@ -8,8 +8,10 @@ from hypothesis import strategies as st
 from offscreen.algo.frames import (
     SHARPNESS_SCALE,
     brightness_score,
+    color_histogram,
     frame_quality,
     frame_times,
+    histogram_similarity,
     laplacian_variance,
     sharpness_score,
     shot_quality,
@@ -128,3 +130,70 @@ def test_sprite_slots_are_unique_and_inside_the_sheet(n: int, cols: int, rows: i
     sheet, col, row = sprite_slot(n, cols, rows)
     assert 0 <= col < cols and 0 <= row < rows
     assert sheet * cols * rows + row * cols + col == n  # a bijection, so no two shots collide
+
+
+# --- colour histograms ------------------------------------------------------------------
+
+
+def solid(r: int, g: int, b: int, h: int = 9, w: int = 16) -> np.ndarray:
+    img = np.zeros((h, w, 3), dtype=np.uint8)
+    img[...] = (r, g, b)
+    return img
+
+
+def test_a_solid_colour_fills_one_bin() -> None:
+    hist = color_histogram(solid(255, 0, 0))
+    assert sum(hist) == 1000 and len(hist) == 64
+    assert hist[3 * 16 + 0 * 4 + 0] == 1000  # r=3, g=0, b=0
+    assert sum(1 for v in hist if v) == 1
+
+
+def test_histogram_sums_to_1000_whatever_the_pixel_count() -> None:
+    rng = np.random.default_rng(7)
+    for h, w in [(1, 1), (3, 7), (36, 64), (5, 11)]:
+        img = rng.integers(0, 256, size=(h, w, 3), dtype=np.uint8)
+        assert sum(color_histogram(img)) == 1000
+
+
+def test_similarity_is_one_for_the_same_picture_and_zero_for_disjoint_colours() -> None:
+    red, blue = color_histogram(solid(255, 0, 0)), color_histogram(solid(0, 0, 255))
+    assert histogram_similarity(red, red) == 1.0
+    assert histogram_similarity(red, blue) == 0.0
+    half = color_histogram(np.concatenate([solid(255, 0, 0, 9, 8), solid(0, 0, 255, 9, 8)], axis=1))
+    assert histogram_similarity(half, red) == pytest.approx(0.5)
+
+
+def test_similar_lighting_scores_higher_than_a_different_place() -> None:
+    rng = np.random.default_rng(3)
+    day = rng.integers(60, 220, size=(36, 64, 3)).astype(np.uint8)  # a varied picture
+    dimmer = (day.astype(np.float64) * 0.92).astype(np.uint8)  # same place, slightly darker
+    night = rng.integers(0, 70, size=(36, 64, 3)).astype(np.uint8)  # a different place
+    base = color_histogram(day)
+    assert histogram_similarity(base, color_histogram(dimmer)) > 0.6
+    assert (
+        histogram_similarity(base, color_histogram(dimmer))
+        > histogram_similarity(base, color_histogram(night)) + 0.3
+    )
+
+
+def test_histogram_rejects_bad_input() -> None:
+    with pytest.raises(ValueError):
+        color_histogram(np.zeros((4, 4), dtype=np.uint8))
+    with pytest.raises(ValueError):
+        histogram_similarity([1, 2], [1])
+
+
+@given(
+    st.integers(0, 255),
+    st.integers(0, 255),
+    st.integers(0, 255),
+    st.integers(0, 255),
+    st.integers(0, 255),
+    st.integers(0, 255),
+)
+def test_similarity_is_symmetric_and_bounded(
+    r1: int, g1: int, b1: int, r2: int, g2: int, b2: int
+) -> None:
+    a, b = color_histogram(solid(r1, g1, b1)), color_histogram(solid(r2, g2, b2))
+    assert histogram_similarity(a, b) == histogram_similarity(b, a)
+    assert 0.0 <= histogram_similarity(a, b) <= 1.0

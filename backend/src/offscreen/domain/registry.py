@@ -16,6 +16,7 @@ from offscreen.domain.index import (
     SpriteSheets,
     Story,
     Transcript,
+    VisualSignatures,
 )
 from offscreen.domain.job import Job
 from offscreen.domain.plan import EditPlan
@@ -27,6 +28,7 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "asset": MediaAsset,
     "transcript": Transcript,
     "shots": Shots,
+    "signatures": VisualSignatures,
     "sprites": SpriteSheets,
     "captions": Captions,
     "faces": Faces,

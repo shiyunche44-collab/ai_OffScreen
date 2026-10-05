@@ -6,14 +6,15 @@ from pathlib import Path
 
 import pytest
 
+from offscreen.algo.frames import histogram_similarity
 from offscreen.domain.common import TimeRange
-from offscreen.domain.index import Shots, SpriteSheets
+from offscreen.domain.index import Shots, SpriteSheets, VisualSignatures
 from offscreen.engine import Artifact, ArtifactStore, Engine, StageCanceled
 from offscreen.media.probe import probe
 from offscreen.providers.adapters.scenedetect_adapter import SceneDetectShots
 from offscreen.providers.ports import DetectionCanceled
 from offscreen.stages.analysis.ingest import ingest
-from offscreen.stages.analysis.keyframes import SPRITES_FILE, KeyframesStage
+from offscreen.stages.analysis.keyframes import SIGNATURES_FILE, SPRITES_FILE, KeyframesStage
 from offscreen.stages.analysis.proxy import ProxyError, ProxyStage
 from offscreen.stages.analysis.shots import SHOTS_FILE, ShotsStage
 from offscreen.store.db import Database
@@ -196,6 +197,23 @@ def test_sharp_blurred_and_black_shots_are_told_apart(quality_clip: Path, tmp_pa
     assert blurred.sharpness > black.sharpness
     assert black.sharpness < 0.02 and black.brightness < 0.1  # a black frame is both
     assert sharp.brightness > 0.3 and blurred.brightness > 0.3
+
+
+def test_signatures_tell_a_cut_between_different_colours_from_no_cut(
+    cut_clip: Path, tmp_path: Path
+) -> None:
+    repo, engine = build(tmp_path, SceneDetectShots())
+    art = engine.ensure("analysis.keyframes", {"asset_id": ingest(cut_clip, repo).asset.id})
+    sigs = art.read_model(SIGNATURES_FILE, VisualSignatures)
+    assert sigs.bins_per_channel == 4
+    assert [s.shot_id for s in sigs.signatures] == ["sh_0001", "sh_0002", "sh_0003"]
+    assert all(
+        len(s.frames) == 3 and all(sum(f) == 1000 for f in s.frames) for s in sigs.signatures
+    )
+    red, blue, green = (s.frames for s in sigs.signatures)
+    assert histogram_similarity(red[0], red[2]) == 1.0  # a solid shot looks the same throughout
+    assert histogram_similarity(red[2], blue[0]) == 0.0  # across the cut: nothing in common
+    assert histogram_similarity(blue[2], green[0]) == 0.0
 
 
 def test_sprite_sheet_holds_every_shots_middle_frame(cut_clip: Path, tmp_path: Path) -> None:

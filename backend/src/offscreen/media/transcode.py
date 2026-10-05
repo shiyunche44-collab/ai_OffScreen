@@ -69,6 +69,8 @@ def extract_audio(
 THUMB_HEIGHT = 360
 GRAY_WIDTH = 320
 """Width of the grayscale copy of a keyframe that quality metrics are measured on."""
+RGB_SIZE = (64, 36)
+"""Size of the small colour copy of a keyframe that colour histograms are taken from."""
 
 
 def extract_frame(
@@ -79,26 +81,34 @@ def extract_frame(
     height: int = THUMB_HEIGHT,
     gray_to: Path | None = None,
     gray_width: int = GRAY_WIDTH,
+    rgb_to: Path | None = None,
+    rgb_size: tuple[int, int] = RGB_SIZE,
     should_cancel: Callable[[], bool] | None = None,
 ) -> None:
     """One jpeg frame at `at_ms`, at most `height` pixels tall (never upscaled).
 
-    With `gray_to`, the same frame is also written there as raw 8-bit grayscale, `gray_width`
-    pixels wide (height follows the aspect ratio): the input for sharpness / brightness metrics,
-    produced in the same decode."""
-    scale = f"scale=-2:trunc(min({height}\\,ih)/2)*2"
-    if gray_to is None:
+    `gray_to` additionally gets the same frame as raw 8-bit grayscale, `gray_width` pixels wide
+    (height follows the aspect ratio), `rgb_to` as raw rgb24 squeezed to `rgb_size` (width,
+    height): the inputs of the image metrics, produced in the same decode."""
+    jpeg_scale = f"scale=-2:trunc(min({height}\\,ih)/2)*2"
+    if gray_to is None and rgb_to is None:
         args = [
             "-ss", f"{at_ms / 1000:.3f}", "-i", str(src), "-map", "0:v:0", "-frames:v", "1",
-            "-vf", scale, "-q:v", "3", str(dst),
+            "-vf", jpeg_scale, "-q:v", "3", str(dst),
         ]  # fmt: skip
     else:
-        graph = f"[0:v:0]split=2[a][b];[a]{scale}[j];[b]scale={gray_width}:-2,format=gray[g]"
-        args = [
-            "-ss", f"{at_ms / 1000:.3f}", "-i", str(src), "-filter_complex", graph,
-            "-map", "[j]", "-frames:v", "1", "-q:v", "3", str(dst),
-            "-map", "[g]", "-frames:v", "1", "-f", "rawvideo", str(gray_to),
-        ]  # fmt: skip
+        # One decode, several outputs: (filter chain, destination, extra output options).
+        outputs: list[tuple[str, Path, list[str]]] = [(jpeg_scale, dst, ["-q:v", "3"])]
+        if gray_to is not None:
+            outputs.append((f"scale={gray_width}:-2,format=gray", gray_to, ["-f", "rawvideo"]))
+        if rgb_to is not None:
+            rgb = f"scale={rgb_size[0]}:{rgb_size[1]},format=rgb24"
+            outputs.append((rgb, rgb_to, ["-f", "rawvideo"]))
+        graph = f"[0:v:0]split={len(outputs)}" + "".join(f"[s{i}]" for i in range(len(outputs)))
+        graph += "".join(f";[s{i}]{flt}[o{i}]" for i, (flt, _, _) in enumerate(outputs))
+        args = ["-ss", f"{at_ms / 1000:.3f}", "-i", str(src), "-filter_complex", graph]
+        for i, (_, path, extra) in enumerate(outputs):
+            args += ["-map", f"[o{i}]", "-frames:v", "1", *extra, str(path)]
     run_ffmpeg(args, should_cancel=should_cancel)
 
 

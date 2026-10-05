@@ -63,6 +63,38 @@ def frame_quality(gray: Gray) -> tuple[float, float]:
     return sharpness_score(laplacian_variance(gray)), brightness_score(gray)
 
 
+HIST_BINS = 4
+"""Colour histogram bins per channel: 4 x 4 x 4 = 64 bins, coarse enough that lighting changes
+inside a scene barely move it, fine enough that a change of place usually does."""
+
+
+def color_histogram(rgb: NDArray[np.uint8], bins: int = HIST_BINS) -> list[int]:
+    """Share of pixels in each colour bin, in per-mille (the bins sum to 1000 up to rounding).
+    `rgb` has shape `(height, width, 3)`; bin index is `r * bins * bins + g * bins + b`."""
+    if rgb.ndim != 3 or rgb.shape[2] != 3 or rgb.size == 0:
+        raise ValueError("expected a non-empty (height, width, 3) array")
+    q = (rgb.astype(np.int64) * bins) // 256  # 0 .. bins-1 per channel
+    index = (q[..., 0] * bins + q[..., 1]) * bins + q[..., 2]
+    counts = np.bincount(index.ravel(), minlength=bins**3)
+    per_mille = counts * 1000 / counts.sum()
+    out = np.floor(per_mille).astype(np.int64)
+    out[int(np.argmax(counts))] += 1000 - int(
+        out.sum()
+    )  # give the rounding loss to the biggest bin
+    return [int(v) for v in out]
+
+
+def histogram_similarity(a: Sequence[int], b: Sequence[int]) -> float:
+    """Histogram intersection of two per-mille histograms: 1.0 for the same colour distribution,
+    0.0 for completely different ones."""
+    if len(a) != len(b):
+        raise ValueError("histograms of different sizes")
+    total = max(sum(a), sum(b))
+    if total <= 0:
+        return 0.0
+    return sum(min(x, y) for x, y in zip(a, b, strict=True)) / total
+
+
 def shot_quality(frames: Sequence[tuple[float, float]]) -> ShotQuality:
     """A shot's quality is the mean of its frames' `(sharpness, brightness)`."""
     if not frames:
