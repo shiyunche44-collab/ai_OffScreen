@@ -8,6 +8,7 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
 from offscreen.services.library import AssetDetail, MediaListing
+from offscreen.services.report import AnalysisReport
 
 router = APIRouter(prefix="/assets", tags=["assets"], responses=ERROR_RESPONSES)
 
@@ -45,3 +46,9 @@ def get_asset(asset_id: str, services: Services) -> AssetDetail:
 def analyze_asset(asset_id: str, services: Services) -> Job:
     """Queue the analysis. Returns the job (the already active one, if there is one)."""
     return services.library.analyze(asset_id)
+
+
+@router.get("/{asset_id}/report")
+def analysis_report(asset_id: str, services: Services) -> AnalysisReport:
+    """What the analysis cost: time and model usage per stage, and what it found."""
+    return services.report.analysis(asset_id)

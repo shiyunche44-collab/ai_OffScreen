@@ -88,6 +88,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analysis Report
+         * @description What the analysis cost: time and model usage per stage, and what it found.
+         */
+        get: operations["analysis_report_api_assets__asset_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -339,6 +359,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisReport */
+        AnalysisReport: {
+            asset: components["schemas"]["MediaAsset"];
+            /** Complete */
+            complete: boolean;
+            counts: components["schemas"]["ReportCounts"];
+            llm: components["schemas"]["LlmUsage"];
+            /** Stages */
+            stages: components["schemas"]["StageCost"][];
+            /** Total Ms */
+            total_ms: number;
+        };
         /** Annotation */
         Annotation: {
             /** Message */
@@ -471,6 +503,39 @@ export interface components {
              */
             status: "queued" | "running" | "succeeded" | "failed" | "canceled";
         };
+        /** LlmUsage */
+        LlmUsage: {
+            /**
+             * Cached Tokens
+             * @default 0
+             */
+            cached_tokens: number;
+            /**
+             * Calls
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
+            /**
+             * Failed Calls
+             * @default 0
+             */
+            failed_calls: number;
+            /**
+             * In Tokens
+             * @default 0
+             */
+            in_tokens: number;
+            /**
+             * Out Tokens
+             * @default 0
+             */
+            out_tokens: number;
+        };
         /** MediaAsset */
         MediaAsset: {
             /** Audio */
@@ -592,6 +657,20 @@ export interface components {
             /** Num */
             num: number;
         };
+        /**
+         * ReportCounts
+         * @description What the analysis found; None where the stage is not built (or does not exist yet).
+         */
+        ReportCounts: {
+            /** Characters */
+            characters?: number | null;
+            /** Scenes */
+            scenes?: number | null;
+            /** Shots */
+            shots?: number | null;
+            /** Transcript Lines */
+            transcript_lines?: number | null;
+        };
         /** Script */
         Script: {
             /**
@@ -674,6 +753,22 @@ export interface components {
             scene_refs: string[];
             /** Text */
             text: string;
+        };
+        /** StageCost */
+        StageCost: {
+            /** Cached */
+            cached: boolean;
+            /** Failed Runs */
+            failed_runs: number;
+            /** Last Run Ms */
+            last_run_ms: number | null;
+            llm: components["schemas"]["LlmUsage"];
+            /** Runs */
+            runs: number;
+            /** Stage */
+            stage: string;
+            /** Total Ms */
+            total_ms: number;
         };
         /** StageStatus */
         StageStatus: {
@@ -915,6 +1010,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analysis_report_api_assets__asset_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisReport"];
                 };
             };
             /** @description Not found */

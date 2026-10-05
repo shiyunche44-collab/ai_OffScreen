@@ -127,6 +127,30 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX ix_projects_created_at ON projects (created_at)",
         ),
     ),
+    Migration(
+        5,
+        (
+            """
+            CREATE TABLE stage_runs (
+                id TEXT NOT NULL PRIMARY KEY,
+                asset_id TEXT,
+                stage TEXT NOT NULL,
+                cache_key TEXT NOT NULL,
+                job_id TEXT,
+                status TEXT NOT NULL,
+                error TEXT,
+                duration_ms INTEGER NOT NULL,
+                started_at DATETIME NOT NULL
+            )
+            """,
+            "CREATE INDEX ix_stage_runs_asset_id ON stage_runs (asset_id)",
+            "CREATE INDEX ix_stage_runs_stage ON stage_runs (stage)",
+            "CREATE INDEX ix_stage_runs_job_id ON stage_runs (job_id)",
+            "ALTER TABLE llm_calls ADD COLUMN stage TEXT",
+            "ALTER TABLE llm_calls ADD COLUMN asset_id TEXT",
+            "CREATE INDEX ix_llm_calls_asset_id ON llm_calls (asset_id)",
+        ),
+    ),
 )
 
 LATEST_VERSION = MIGRATIONS[-1].version

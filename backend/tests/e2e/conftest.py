@@ -10,6 +10,7 @@ import pytest
 from offscreen.config import AppConfig
 from offscreen.domain.common import TimeRange
 from offscreen.providers.adapters.fake import FakeLLM, FakeTTS
+from offscreen.providers.ports import Recorder
 from offscreen.services.pipeline import Providers
 
 SRT = """1
@@ -64,7 +65,7 @@ class FixedShots:
                 [(0, 8000), (8000, 16000), (16000, 24000), (24000, 30000)]]  # fmt: skip
 
 
-def scripted_llm() -> FakeLLM:
+def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
     """Answers like a model would, from what the prompts contain: scene ids, length target."""
 
     def ids(messages: list[Any]) -> list[str]:
@@ -130,7 +131,8 @@ def scripted_llm() -> FakeLLM:
             "scene_segment": scene_segment,
             "story": story,
             "script_write": script,
-        }
+        },
+        recorder=recorder,
     )
 
 

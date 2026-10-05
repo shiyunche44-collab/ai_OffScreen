@@ -738,7 +738,8 @@ data/
 | `documents` | id, project_id, kind(script/plan), version, parent_version, author(ai/human), path, created_at |
 | `artifacts` | cache_key, stage, stage_version, scope, path, content_hash, size, created_at, last_used_at |
 | `jobs` | id, stage, scope_json, lane, status, progress, message, cache_key, attempt, error, log_path, cancel_requested, not_before（重试退避）, heartbeat_at, 时间戳 |
-| `llm_calls` | id, job_id, task, provider, model, prompt_version, in_tokens, out_tokens, cached_tokens, cost_usd, latency_ms, req_path, resp_path |
+| `llm_calls` | id, job_id, stage, asset_id, task, provider, model, prompt_version, in_tokens, out_tokens, cached_tokens, cost_usd, latency_ms, req_path, resp_path；`stage` / `asset_id` 由引擎绑定的运行上下文填入，用于按阶段归集费用 |
+| `stage_runs` | id, asset_id, stage, cache_key, job_id, status(ok/error/canceled), error, duration_ms, started_at；每次**真正执行**的阶段一行（缓存命中不记），分析报告的耗时来源 |
 
 - 文档内容存文件，数据库只存索引和指针
 - 缓存清理：`offscreen gc` 按 `last_used_at` 和容量上限做 LRU，被当前文档引用的产物不清
@@ -754,6 +755,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | POST | `/assets` | 按本地路径导入（限定在配置的媒体根目录内） |
 | GET | `/assets`, `/assets/{id}` | 列表 / 详情（含各分析阶段状态） |
 | POST | `/assets/{id}/analyze` | 提交分析（可指定目标阶段） |
+| GET | `/assets/{id}/report` | 分析报告：各阶段耗时、模型调用与 token / 费用、镜头 / 台词 / 场景 / 人物数量 |
 | GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / characters / story（已合并 overrides） |
 | PATCH | `/assets/{id}/characters/{cid}` | 改名 / 合并 / 忽略（写 overrides） |
 | GET | `/assets/{id}/shots/search?q=` | 文本检索镜头 |

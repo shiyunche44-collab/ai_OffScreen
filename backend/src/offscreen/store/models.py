@@ -85,6 +85,8 @@ class LlmCallRow(SQLModel, table=True):
     provider: str
     model: str
     prompt_version: str
+    stage: str | None = None  # the stage run that made the call, with its asset (None: outside one)
+    asset_id: str | None = Field(default=None, index=True)
     status: str  # "ok" | "error"
     error: str | None = None
     retries: int = 0
@@ -96,3 +98,20 @@ class LlmCallRow(SQLModel, table=True):
     req_path: str | None = None  # request / response bodies, relative to data_dir
     resp_path: str | None = None
     created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+
+
+class StageRunRow(SQLModel, table=True):
+    """One execution of a stage that was not served from the cache (a cache hit costs nothing and
+    is not recorded). `asset_id` is the stage scope's asset, if it has one."""
+
+    __tablename__ = "stage_runs"
+
+    id: str = Field(primary_key=True)
+    asset_id: str | None = Field(default=None, index=True)
+    stage: str = Field(index=True)
+    cache_key: str
+    job_id: str | None = Field(default=None, index=True)
+    status: str  # "ok" | "error" | "canceled"
+    error: str | None = None
+    duration_ms: int
+    started_at: NaiveDatetime

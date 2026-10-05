@@ -1,6 +1,44 @@
 {
   "components": {
     "schemas": {
+      "AnalysisReport": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/MediaAsset"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ReportCounts"
+          },
+          "llm": {
+            "$ref": "#/components/schemas/LlmUsage"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageCost"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "total_ms": {
+            "title": "Total Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset",
+          "complete",
+          "stages",
+          "counts",
+          "total_ms",
+          "llm"
+        ],
+        "title": "AnalysisReport",
+        "type": "object"
+      },
       "Annotation": {
         "additionalProperties": false,
         "properties": {
@@ -359,6 +397,42 @@
         "title": "Job",
         "type": "object"
       },
+      "LlmUsage": {
+        "properties": {
+          "cached_tokens": {
+            "default": 0,
+            "title": "Cached Tokens",
+            "type": "integer"
+          },
+          "calls": {
+            "default": 0,
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost_usd": {
+            "default": 0.0,
+            "title": "Cost Usd",
+            "type": "number"
+          },
+          "failed_calls": {
+            "default": 0,
+            "title": "Failed Calls",
+            "type": "integer"
+          },
+          "in_tokens": {
+            "default": 0,
+            "title": "In Tokens",
+            "type": "integer"
+          },
+          "out_tokens": {
+            "default": 0,
+            "title": "Out Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "LlmUsage",
+        "type": "object"
+      },
       "MediaAsset": {
         "additionalProperties": false,
         "properties": {
@@ -680,6 +754,57 @@
         "title": "Rational",
         "type": "object"
       },
+      "ReportCounts": {
+        "description": "What the analysis found; None where the stage is not built (or does not exist yet).",
+        "properties": {
+          "characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Characters"
+          },
+          "scenes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenes"
+          },
+          "shots": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shots"
+          },
+          "transcript_lines": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript Lines"
+          }
+        },
+        "title": "ReportCounts",
+        "type": "object"
+      },
       "Script": {
         "additionalProperties": false,
         "properties": {
@@ -860,6 +985,55 @@
           "text"
         ],
         "title": "ScriptSegment",
+        "type": "object"
+      },
+      "StageCost": {
+        "properties": {
+          "cached": {
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "failed_runs": {
+            "title": "Failed Runs",
+            "type": "integer"
+          },
+          "last_run_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Ms"
+          },
+          "llm": {
+            "$ref": "#/components/schemas/LlmUsage"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "total_ms": {
+            "title": "Total Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "cached",
+          "runs",
+          "failed_runs",
+          "last_run_ms",
+          "total_ms",
+          "llm"
+        ],
+        "title": "StageCost",
         "type": "object"
       },
       "StageStatus": {
@@ -1225,6 +1399,69 @@
           }
         },
         "summary": "Analyze Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/report": {
+      "get": {
+        "description": "What the analysis cost: time and model usage per stage, and what it found.",
+        "operationId": "analysis_report_api_assets__asset_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Analysis Report",
         "tags": [
           "assets"
         ]

@@ -18,6 +18,8 @@ class LlmCallRecord(Strict):
     prompt_version: str
     status: Literal["ok", "error"]
     job_id: str | None = None
+    stage: str | None = None
+    asset_id: str | None = None
     error: str | None = None
     retries: int = 0
     in_tokens: int = 0

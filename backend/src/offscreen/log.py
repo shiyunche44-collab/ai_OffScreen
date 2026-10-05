@@ -12,6 +12,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 _job_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("job_id", default=None)
+_stage: contextvars.ContextVar[tuple[str, str | None] | None] = contextvars.ContextVar(
+    "stage", default=None
+)
 REDACTED = "***"
 
 
@@ -23,6 +26,26 @@ def bind_job(job_id: str) -> Iterator[None]:
         yield
     finally:
         _job_id.reset(token)
+
+
+def current_job_id() -> str | None:
+    return _job_id.get()
+
+
+@contextmanager
+def bind_stage(stage: str, asset_id: str | None) -> Iterator[None]:
+    """Mark the code inside the block as running `stage` for `asset_id`, so model calls made
+    from it can be attributed (`current_stage`). Not inherited by threads the stage starts."""
+    token = _stage.set((stage, asset_id))
+    try:
+        yield
+    finally:
+        _stage.reset(token)
+
+
+def current_stage() -> tuple[str, str | None] | None:
+    """`(stage, asset_id)` of the stage run in progress, if any."""
+    return _stage.get()
 
 
 class _Scrub(logging.Filter):

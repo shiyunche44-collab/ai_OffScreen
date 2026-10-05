@@ -11,8 +11,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from offscreen.config import AppConfig, ConfigError
-from offscreen.engine import Artifact, ArtifactStore, Engine
+from offscreen.engine import Artifact, ArtifactStore, Engine, StageRun
 from offscreen.engine.stage import Stage
+from offscreen.log import current_job_id
 from offscreen.media.ffmpeg import FFmpegCanceled, FFmpegError
 from offscreen.media.probe import ProbeError
 from offscreen.providers.adapters.faster_whisper_asr import FasterWhisperAsr
@@ -40,7 +41,7 @@ from offscreen.stages.creation.script import ScriptError, ScriptSettings, Script
 from offscreen.stages.output.compile import CompileStage, CompileStageError
 from offscreen.stages.output.render import FINAL_FILE, RenderError, RenderStage
 from offscreen.store.db import Database
-from offscreen.store.repos import AssetRepo
+from offscreen.store.repos import AssetRepo, StageRunRepo
 
 FINAL_STAGE = "output.render"
 DEFAULT_STYLE = "neutral"
@@ -195,12 +196,27 @@ class Pipeline:
             if self._on_resolved is not None:
                 self._on_resolved(stage, hit)
 
+        runs = StageRunRepo(self.db)
+
+        def ran(run: StageRun) -> None:
+            runs.add(
+                stage=run.stage,
+                cache_key=run.cache_key,
+                asset_id=run.scope.get("asset_id"),
+                job_id=current_job_id(),
+                status=run.status,
+                error=run.error,
+                started_at=run.started_at,
+                duration_ms=run.duration_ms,
+            )
+
         return Engine(
             self._store,
             self._stages(opts),
             progress=self._progress,
             is_canceled=self._is_canceled,
             on_resolved=resolved,
+            on_run=ran,
         )
 
     # ---- use cases ---------------------------------------------------------------------

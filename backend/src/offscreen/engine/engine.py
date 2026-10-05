@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Literal
 
 from offscreen.engine.artifacts import Artifact, ArtifactStore
 from offscreen.engine.cache import compute_cache_key
@@ -13,10 +18,28 @@ from offscreen.engine.stage import (
     StageCanceled,
     StageContext,
 )
+from offscreen.log import bind_stage
 
 ProgressFn = Callable[[str, float, str], None]
 ResolvedFn = Callable[[str, bool], None]
 """Called with `(stage name, cache hit)` once a stage's artifact is available, upstream first."""
+RunFn = Callable[["StageRun"], None]
+"""Called after a stage ran (a cache hit is not a run), whether it succeeded or not."""
+
+
+@dataclass(frozen=True)
+class StageRun:
+    stage: str
+    scope: Scope
+    cache_key: str
+    status: Literal["ok", "error", "canceled"]
+    error: str | None
+    started_at: datetime
+    """Naive UTC."""
+    duration_ms: int
+
+
+log = logging.getLogger(__name__)
 
 
 class UnknownStage(KeyError):
@@ -40,6 +63,7 @@ class Engine:
         progress: ProgressFn | None = None,
         is_canceled: Callable[[], bool] | None = None,
         on_resolved: ResolvedFn | None = None,
+        on_run: RunFn | None = None,
     ) -> None:
         self.store = store
         self.stages: dict[str, Stage] = {}
@@ -50,6 +74,7 @@ class Engine:
         self._progress = progress
         self._is_canceled = is_canceled
         self._on_resolved = on_resolved
+        self._on_run = on_run
 
     def ensure(self, target: str, scope: Scope) -> Artifact:
         """The artifact of `target` for `scope`, running missing stages (upstream first)."""
@@ -127,6 +152,10 @@ class Engine:
         if self._is_canceled is not None and self._is_canceled():
             raise StageCanceled(stage.name)
         staging = self.store.begin(stage.name)
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        clock = time.monotonic()
+        status: Literal["ok", "error", "canceled"] = "error"
+        error: str | None = None
         try:
             ctx = StageContext(
                 stage=stage.name,
@@ -137,7 +166,8 @@ class Engine:
                 _is_canceled=self._is_canceled or (lambda: False),
                 _work_dir=lambda: self.store.work_dir(stage.name, cache_key),
             )
-            output = stage.run(ctx)
+            with bind_stage(stage.name, scope.get("asset_id")):
+                output = stage.run(ctx)
             if ctx.is_canceled():
                 raise StageCanceled(stage.name)
             artifact = self.store.commit(
@@ -149,7 +179,33 @@ class Engine:
                 meta=output.meta,
             )
             self.store.clear_work(stage.name, cache_key)
+            status = "ok"
             return artifact
-        except BaseException:
+        except StageCanceled:
+            status = "canceled"
             self.store.discard(staging)
             raise
+        except BaseException as e:
+            error = str(e) or type(e).__name__
+            self.store.discard(staging)
+            raise
+        finally:
+            self._report_run(
+                StageRun(
+                    stage=stage.name,
+                    scope=dict(scope),
+                    cache_key=cache_key,
+                    status=status,
+                    error=error,
+                    started_at=started_at,
+                    duration_ms=round((time.monotonic() - clock) * 1000),
+                )
+            )
+
+    def _report_run(self, run: StageRun) -> None:
+        if self._on_run is None:
+            return
+        try:
+            self._on_run(run)
+        except Exception:  # bookkeeping must not turn a finished stage into a failure
+            log.warning("could not record the run of %s", run.stage, exc_info=True)

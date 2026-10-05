@@ -2,7 +2,7 @@
 
 from offscreen.engine.artifacts import Artifact, ArtifactStore
 from offscreen.engine.cache import compute_cache_key
-from offscreen.engine.engine import DependencyCycle, Engine, UnknownStage
+from offscreen.engine.engine import DependencyCycle, Engine, StageRun, UnknownStage
 from offscreen.engine.stage import (
     ArtifactRef,
     Scope,
@@ -23,6 +23,7 @@ __all__ = [
     "StageCanceled",
     "StageContext",
     "StageOutput",
+    "StageRun",
     "UnknownStage",
     "compute_cache_key",
 ]

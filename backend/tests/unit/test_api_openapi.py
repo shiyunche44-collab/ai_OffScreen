@@ -27,6 +27,7 @@ def test_the_documented_routes() -> None:
         "/api/assets/browse",
         "/api/assets/{asset_id}",
         "/api/assets/{asset_id}/analyze",
+        "/api/assets/{asset_id}/report",
         "/api/projects",
         "/api/projects/{project_id}",
         "/api/projects/{project_id}/script",

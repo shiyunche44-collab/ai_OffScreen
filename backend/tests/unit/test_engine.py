@@ -19,6 +19,7 @@ from offscreen.engine import (
     StageCanceled,
     StageContext,
     StageOutput,
+    StageRun,
     UnknownStage,
     compute_cache_key,
 )
@@ -242,6 +243,62 @@ def test_failed_stage_leaves_no_artifact_or_staging(store: ArtifactStore) -> Non
     ok = Source()
     Engine(store, [ok]).ensure("t.source", SCOPE)
     assert ok.runs == 1
+
+
+def test_on_run_reports_runs_but_not_cache_hits(store: ArtifactStore) -> None:
+    runs: list[StageRun] = []
+    stages = [Source(), Upper()]
+    Engine(store, stages, on_run=runs.append).ensure("t.upper", SCOPE)
+    assert [(r.stage, r.status, r.error, r.scope) for r in runs] == [
+        ("t.source", "ok", None, SCOPE),
+        ("t.upper", "ok", None, SCOPE),
+    ]
+    assert all(r.duration_ms >= 0 and r.cache_key.startswith("sha256:") for r in runs)
+    assert runs[0].started_at.tzinfo is None  # naive UTC, like the database's datetimes
+
+    Engine(store, stages, on_run=runs.append).ensure("t.upper", SCOPE)
+    assert len(runs) == 2  # served from the cache: nothing ran
+
+
+def test_on_run_reports_failures_and_cancellation(store: ArtifactStore) -> None:
+    class Boom(Source):
+        def run(self, ctx: StageContext) -> StageOutput:
+            raise RuntimeError("boom")
+
+    class Cancels(Source):
+        def run(self, ctx: StageContext) -> StageOutput:
+            raise StageCanceled(self.name)
+
+    runs: list[StageRun] = []
+    with pytest.raises(RuntimeError, match="boom"):
+        Engine(store, [Boom()], on_run=runs.append).ensure("t.source", SCOPE)
+    with pytest.raises(StageCanceled):
+        Engine(store, [Cancels()], on_run=runs.append).ensure("t.source", SCOPE)
+    assert [(r.status, r.error) for r in runs] == [("error", "boom"), ("canceled", None)]
+
+
+def test_a_failing_on_run_does_not_fail_the_stage(store: ArtifactStore) -> None:
+    def broken(_run: StageRun) -> None:
+        raise OSError("disk full")
+
+    src = Source()
+    art = Engine(store, [src], on_run=broken).ensure("t.source", SCOPE)
+    assert art.path("out.txt").read_text() == "hello"
+
+
+def test_the_running_stage_is_bound_for_model_calls_made_inside_it(store: ArtifactStore) -> None:
+    from offscreen.log import current_stage
+
+    seen: list[tuple[str, str | None] | None] = []
+
+    class Peeks(Source):
+        def run(self, ctx: StageContext) -> StageOutput:
+            seen.append(current_stage())
+            return super().run(ctx)
+
+    Engine(store, [Peeks()]).ensure("t.source", SCOPE)
+    assert seen == [("t.source", "ast_demo")]
+    assert current_stage() is None  # unbound again afterwards
 
 
 def test_damaged_artifact_is_rebuilt(store: ArtifactStore) -> None:

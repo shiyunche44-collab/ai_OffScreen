@@ -7,13 +7,16 @@ import typer
 
 from offscreen.config import ConfigError, load_config
 from offscreen.server import default_web_dir, run_worker, serve
+from offscreen.services.app import AppServices
 from offscreen.services.config_view import show_config
+from offscreen.services.errors import NotFound
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
     EXPECTED_ERRORS,
     Pipeline,
     RunOptions,
 )
+from offscreen.services.report import format_report
 
 app = typer.Typer(help="AI OffScreen: movie commentary pipeline", no_args_is_help=True)
 config_app = typer.Typer(help="Configuration commands", no_args_is_help=True)
@@ -99,6 +102,21 @@ def stage(
 ) -> None:
     """Run one stage (and whatever it depends on) for an asset."""
     _execute(config, name, asset, RunOptions(minutes, voice, style, not no_spoilers))
+
+
+@app.command("report")
+def report_command(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    config: ConfigOpt = None,
+) -> None:
+    """What analyzing a movie cost: time and model usage per stage, and what it found."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            typer.echo(format_report(services.report.analysis(asset)))
+    except (ConfigError, NotFound) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
 
 
 @app.command("serve")

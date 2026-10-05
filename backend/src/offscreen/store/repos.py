@@ -19,7 +19,15 @@ from offscreen.domain.llm import LlmCallRecord
 from offscreen.domain.project import Project, ProjectOptions
 from offscreen.store.db import Database
 from offscreen.store.files import atomic_write_bytes
-from offscreen.store.models import ArtifactRow, AssetRow, JobRow, LlmCallRow, ProjectRow, utcnow
+from offscreen.store.models import (
+    ArtifactRow,
+    AssetRow,
+    JobRow,
+    LlmCallRow,
+    ProjectRow,
+    StageRunRow,
+    utcnow,
+)
 
 
 class AssetRepo:
@@ -464,6 +472,8 @@ class LlmCallRepo:
             provider=rec.provider,
             model=rec.model,
             prompt_version=rec.prompt_version,
+            stage=rec.stage,
+            asset_id=rec.asset_id,
             status=rec.status,
             error=rec.error,
             retries=rec.retries,
@@ -479,13 +489,21 @@ class LlmCallRepo:
             s.add(row)
         return row
 
-    def list(self, *, task: str | None = None, job_id: str | None = None) -> list[LlmCallRow]:
+    def list(
+        self,
+        *,
+        task: str | None = None,
+        job_id: str | None = None,
+        asset_id: str | None = None,
+    ) -> list[LlmCallRow]:
         with self.db.session() as s:
             q = select(LlmCallRow).order_by(col(LlmCallRow.created_at), LlmCallRow.id)
             if task is not None:
                 q = q.where(LlmCallRow.task == task)
             if job_id is not None:
                 q = q.where(LlmCallRow.job_id == job_id)
+            if asset_id is not None:
+                q = q.where(LlmCallRow.asset_id == asset_id)
             return list(s.exec(q).all())
 
     def totals(self) -> dict[str, int]:
@@ -497,3 +515,46 @@ class LlmCallRepo:
             "out_tokens": sum(r.out_tokens for r in rows),
             "cached_tokens": sum(r.cached_tokens for r in rows),
         }
+
+
+class StageRunRepo:
+    """`stage_runs` rows: when a stage actually ran (not a cache hit) and for how long."""
+
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    def add(
+        self,
+        *,
+        stage: str,
+        cache_key: str,
+        asset_id: str | None,
+        job_id: str | None,
+        status: str,
+        error: str | None,
+        started_at: datetime,
+        duration_ms: int,
+    ) -> StageRunRow:
+        row = StageRunRow(
+            id=new_id("run"),
+            asset_id=asset_id,
+            stage=stage,
+            cache_key=cache_key,
+            job_id=job_id,
+            status=status,
+            error=error,
+            duration_ms=duration_ms,
+            started_at=started_at,
+        )
+        with self.db.session() as s:
+            s.add(row)
+        return row
+
+    def list(self, *, asset_id: str) -> list[StageRunRow]:
+        with self.db.session() as s:
+            q = (
+                select(StageRunRow)
+                .where(StageRunRow.asset_id == asset_id)
+                .order_by(col(StageRunRow.started_at), StageRunRow.id)
+            )
+            return list(s.exec(q).all())
