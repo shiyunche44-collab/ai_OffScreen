@@ -8,7 +8,7 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Job
-from offscreen.services.characters import CharactersView
+from offscreen.services.characters import CharacterEdit, CharactersView
 from offscreen.services.index import ShotsView
 from offscreen.services.library import AssetDetail, MediaListing
 from offscreen.services.report import AnalysisReport
@@ -85,3 +85,19 @@ def index_story(asset_id: str, services: Services) -> Story:
 def index_characters(asset_id: str, services: Services) -> CharactersView:
     """The characters with human edits applied (404 until the characters stage is built)."""
     return services.characters.view(asset_id)
+
+
+@router.post("/{asset_id}/characters:build", status_code=202)
+def build_characters(asset_id: str, services: Services) -> Job:
+    """Queue face detection, grouping into people and naming (with the analysis it needs).
+    Returns the job (the already active one, if there is one)."""
+    return services.library.identify_characters(asset_id)
+
+
+@router.patch("/{asset_id}/characters/{character_id}")
+def edit_character(
+    asset_id: str, character_id: str, change: CharacterEdit, services: Services
+) -> CharactersView:
+    """Rename, ignore, merge or reset one character. Edits go to the revision layer; the AI
+    output is untouched. Returns the characters as they now read."""
+    return services.characters.edit(asset_id, character_id, change)

@@ -156,6 +156,9 @@ class LibraryService:
     def analyze(self, asset_id: str) -> Job:
         return self.jobs.analyze(asset_id)
 
+    def identify_characters(self, asset_id: str) -> Job:
+        return self.jobs.identify_characters(asset_id)
+
     # ---- projects --------------------------------------------------------------------------
     def create_project(
         self, asset_id: str, name: str | None = None, options: ProjectOptions | None = None

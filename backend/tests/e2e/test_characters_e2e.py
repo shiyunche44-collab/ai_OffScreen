@@ -308,3 +308,50 @@ def test_the_characters_route(client: TestClient, services: AppServices, movie: 
     assert [c["name"] for c in body["characters"]] == ["Sintel", None]
     thumb = body["characters"][0]["face_cluster"]["thumbnails"][0]
     assert client.get(f"/api/files/{thumb}").status_code == 200
+
+
+def test_a_button_builds_the_characters_and_the_panel_edits_them(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    from offscreen.worker import Worker, WorkerSettings
+
+    asset = services.library.import_asset(str(movie)).id
+    r = client.post(f"/api/assets/{asset}/characters:build")
+    assert r.status_code == 202
+    job = r.json()
+    assert (job["status"], job["stage"], job["lane"]) == ("queued", "analysis.naming", "cpu")
+    assert (
+        client.post(f"/api/assets/{asset}/characters:build").json()["id"] == job["id"]
+    )  # no duplicate
+
+    Worker(
+        services.jobs.jobs,
+        services.jobs.execute,
+        services.cfg.data_dir,
+        WorkerSettings(poll_interval_s=0.02, heartbeat_timeout_s=1.0, progress_interval_s=0.0),
+    ).drain(timeout_s=120)
+    assert client.get(f"/api/jobs/{job['id']}").json()["status"] == "succeeded"
+
+    body = client.get(f"/api/assets/{asset}/index/characters").json()
+    assert [c["name"] for c in body["characters"]] == ["Sintel", None]
+
+    r = client.patch(f"/api/assets/{asset}/characters/ch_02", json={"name": "Dragon"})
+    assert r.status_code == 200
+    assert [c["name"] for c in r.json()["characters"]] == ["Sintel", "Dragon"]
+    assert r.json()["characters"][1]["name_source"] == "human"
+
+    r = client.patch(f"/api/assets/{asset}/characters/ch_02", json={"merged_into": "ch_01"})
+    assert [c["id"] for c in r.json()["characters"]] == ["ch_01"]
+    assert r.json()["merged"] == {"ch_02": "ch_01"}
+    r = client.patch(f"/api/assets/{asset}/characters/ch_02", json={"reset": True})
+    assert [c["id"] for c in r.json()["characters"]] == ["ch_01", "ch_02"]
+
+    bad = client.patch(f"/api/assets/{asset}/characters/ch_09", json={"name": "X"})
+    assert bad.status_code == 404 and bad.json()["error"]["code"] == "not_found"
+    bad = client.patch(f"/api/assets/{asset}/characters/ch_01", json={"merged_into": "ch_01"})
+    assert bad.status_code == 422, bad.text
+    assert (
+        client.patch(f"/api/assets/{asset}/characters/ch_01", json={"ignored": "maybe"}).status_code
+        == 422
+    )
+    assert client.post("/api/assets/ast_missing/characters:build").status_code == 404

@@ -33,6 +33,8 @@ def test_the_documented_routes() -> None:
         "/api/assets/{asset_id}/index/scenes",
         "/api/assets/{asset_id}/index/story",
         "/api/assets/{asset_id}/index/characters",
+        "/api/assets/{asset_id}/characters:build",
+        "/api/assets/{asset_id}/characters/{character_id}",
         "/api/projects",
         "/api/projects/{project_id}",
         "/api/projects/{project_id}/script",

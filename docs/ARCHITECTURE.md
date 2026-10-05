@@ -766,7 +766,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | POST | `/assets/{id}/analyze` | 提交分析（可指定目标阶段） |
 | GET | `/assets/{id}/report` | 分析报告：各阶段耗时、模型调用与 token / 费用、镜头 / 台词 / 场景 / 人物数量 |
 | GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / story（四个独立路由，各有类型；未构建 404）。`shots` 是展示视图：关键帧、雪碧图位置、镜头描述、代理视频路径（相对 data 目录，经 `/files` 取）。`characters` 是已合并人工修订的视图（名字、忽略、合并；见 §7 命名与修订） |
-| PATCH | `/assets/{id}/characters/{cid}` | 改名 / 合并 / 忽略（写 overrides） |
+| POST | `/assets/{id}/characters:build` | 人脸检测 → 聚类 → 命名（连同它需要的分析）→ job；不在「分析」按钮的链里，因为人脸检测慢（CPU 上两小时电影约 25 分钟） |
+| PATCH | `/assets/{id}/characters/{cid}` | 改名 / 别名 / 忽略 / 合并 / 还原（写 overrides），返回合并后的人物视图 |
 | GET | `/assets/{id}/shots/search?q=` | 文本检索镜头 |
 | POST | `/projects` | 新建项目（绑定一个资产） |
 | POST | `/projects/{id}/script:generate` | 生成文案 → job |

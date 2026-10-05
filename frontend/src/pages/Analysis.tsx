@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAsset, useScenes, useShots, useStory, useTranscript } from "../api/queries";
+import { CharacterPanel } from "../components/CharacterPanel";
 import { QueryState } from "../components/Query";
 import { SceneList } from "../components/SceneList";
 import { ShotStrip } from "../components/ShotStrip";
@@ -83,6 +84,10 @@ export function AnalysisPage() {
                   </div>
                 ) : null}
               </QueryState>
+            </Panel>
+
+            <Panel title="人物">
+              <CharacterPanel assetId={assetId} />
             </Panel>
 
             <div className="grid gap-8 lg:grid-cols-2">

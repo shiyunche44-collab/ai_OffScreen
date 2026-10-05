@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { mergeJobs } from "./events";
-import type { Job } from "./types";
+import type { CharacterEdit, CharactersView, Job } from "./types";
 
 export const keys = {
   assets: ["assets"] as const,
@@ -59,6 +59,40 @@ export function useStory(assetId: string) {
     queryKey: indexKey(assetId, "story"),
     queryFn: async () =>
       unwrap(await api.GET("/api/assets/{asset_id}/index/story", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+export function useCharacters(assetId: string) {
+  return useQuery({
+    queryKey: indexKey(assetId, "characters"),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/index/characters", { params: { path: { asset_id: assetId } } })),
+    retry: false, // a 404 just means "not built yet"
+  });
+}
+
+/** Queue face detection, grouping and naming; the job then shows up through /api/events. */
+export function useBuildCharacters(assetId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<Job> =>
+      unwrap(await api.POST("/api/assets/{asset_id}/characters:build", { params: { path: { asset_id: assetId } } })),
+    onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}
+
+/** Rename, ignore, merge or reset one character; the answer is the characters as they now read. */
+export function useEditCharacter(assetId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, change }: { id: string; change: Partial<CharacterEdit> }): Promise<CharactersView> =>
+      unwrap(
+        await api.PATCH("/api/assets/{asset_id}/characters/{character_id}", {
+          params: { path: { asset_id: assetId, character_id: id } },
+          body: { reset: false, ...change }, // only the fields present are touched
+        }),
+      ),
+    onSuccess: (view) => client.setQueryData(indexKey(assetId, "characters"), view),
   });
 }
 

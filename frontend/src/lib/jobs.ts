@@ -2,6 +2,7 @@ import type { Job } from "../api/types";
 
 const STAGE_LABELS: Record<string, string> = {
   "analysis.story": "分析影片",
+  "analysis.naming": "识别人物",
   "creation.script": "生成文案",
   "creation.plan": "构建剪辑计划",
   "output.render": "渲染成片",

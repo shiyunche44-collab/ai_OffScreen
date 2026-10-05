@@ -22,3 +22,6 @@ export type TranscriptLine = Transcript["lines"][number];
 export type Scenes = Schemas["Scenes"];
 export type Scene = Scenes["scenes"][number];
 export type Story = Schemas["Story"];
+export type CharactersView = Schemas["CharactersView"];
+export type Character = CharactersView["characters"][number];
+export type CharacterEdit = Schemas["CharacterEdit"];

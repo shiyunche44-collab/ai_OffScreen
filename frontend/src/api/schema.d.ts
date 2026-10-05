@@ -88,6 +88,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/characters/{character_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Character
+         * @description Rename, ignore, merge or reset one character. Edits go to the revision layer; the AI
+         *     output is untouched. Returns the characters as they now read.
+         */
+        patch: operations["edit_character_api_assets__asset_id__characters__character_id__patch"];
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/characters:build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build Characters
+         * @description Queue face detection, grouping into people and naming (with the analysis it needs).
+         *     Returns the job (the already active one, if there is one).
+         */
+        post: operations["build_characters_api_assets__asset_id__characters_build_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/index/characters": {
         parameters: {
             query?: never;
@@ -527,6 +569,25 @@ export interface components {
             name_source?: ("ai" | "human" | "tmdb") | null;
             /** Role */
             role?: string | null;
+        };
+        /**
+         * CharacterEdit
+         * @description What to change about one character; only the fields present are touched.
+         */
+        CharacterEdit: {
+            /** Aliases */
+            aliases?: string[] | null;
+            /** Ignored */
+            ignored?: boolean | null;
+            /** Merged Into */
+            merged_into?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Reset
+             * @default false
+             */
+            reset: boolean;
         };
         /** CharactersView */
         CharactersView: {
@@ -1368,6 +1429,109 @@ export interface operations {
         };
     };
     analyze_asset_api_assets__asset_id__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    edit_character_api_assets__asset_id__characters__character_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+                character_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CharacterEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharactersView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    build_characters_api_assets__asset_id__characters_build_post: {
         parameters: {
             query?: never;
             header?: never;
