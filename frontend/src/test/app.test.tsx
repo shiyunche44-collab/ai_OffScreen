@@ -1,16 +1,14 @@
 import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
-import { FakeEventSource, job, json, renderWithProviders, stubApi, stubEventSource } from "./helpers";
+import { FakeEventSource, assetDetail, job, json, renderWithProviders, stubApi, stubEventSource } from "./helpers";
 
 beforeEach(() => stubEventSource());
 afterEach(() => vi.unstubAllGlobals());
 
-const asset = { id: "ast_1", title: "Sintel" };
-
 describe("routing and layout", () => {
   it("redirects / to the library and shows the navigation", async () => {
-    stubApi({ "GET /api/assets": () => json([asset]) });
+    stubApi({ "GET /api/assets": () => json([assetDetail()]) });
     renderWithProviders(<App />, "/");
     expect(await screen.findByRole("heading", { name: "素材库" })).toBeInTheDocument();
     expect(await screen.findByText("Sintel")).toBeInTheDocument();

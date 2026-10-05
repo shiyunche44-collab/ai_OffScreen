@@ -398,6 +398,100 @@
         "title": "MediaAsset",
         "type": "object"
       },
+      "MediaEntry": {
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "kind": {
+            "enum": [
+              "dir",
+              "file"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "kind"
+        ],
+        "title": "MediaEntry",
+        "type": "object"
+      },
+      "MediaListing": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MediaEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "entries"
+        ],
+        "title": "MediaListing",
+        "type": "object"
+      },
       "Project": {
         "additionalProperties": false,
         "properties": {
@@ -584,6 +678,7 @@
   "paths": {
     "/api/assets": {
       "get": {
+        "description": "Every asset with which analysis stages are already built.",
         "operationId": "list_assets_api_assets_get",
         "responses": {
           "200": {
@@ -591,7 +686,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MediaAsset"
+                    "$ref": "#/components/schemas/AssetDetail"
                   },
                   "title": "Response List Assets Api Assets Get",
                   "type": "array"
@@ -692,6 +787,76 @@
           }
         },
         "summary": "Import Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/browse": {
+      "get": {
+        "description": "Folders and video files under the media roots (no `path`: the roots), for picking a movie.",
+        "operationId": "browse_media_api_assets_browse_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaListing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Browse Media",
         "tags": [
           "assets"
         ]

@@ -9,14 +9,14 @@ export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-/** Replace `fetch` with a router of `{"GET /api/jobs": () => Response}` handlers. */
-export function stubApi(routes: Record<string, () => Response>) {
+/** Replace `fetch` with a router of `{"GET /api/jobs": (request) => Response}` handlers. */
+export function stubApi(routes: Record<string, (request: Request) => Response | Promise<Response>>) {
   const fetchMock = vi.fn(async (input: Request | string) => {
     const req = typeof input === "string" ? new Request(new URL(input, "http://localhost")) : input;
     const key = `${req.method} ${new URL(req.url).pathname}`;
     const handler = routes[key];
     if (!handler) return json({ error: { code: "not_found", message: `no stub for ${key}` } }, 404);
-    return handler();
+    return handler(req);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -30,6 +30,26 @@ export function renderWithProviders(ui: ReactElement, path = "/") {
     </QueryClientProvider>,
   );
   return { client, ...result };
+}
+
+export function assetDetail(overrides: { id?: string; title?: string; cached?: boolean[]; subtitles?: boolean } = {}) {
+  const { id = "ast_1", title = "Sintel", cached = [false, false, false, false], subtitles = true } = overrides;
+  const names = ["analysis.proxy", "analysis.transcript", "analysis.shots", "analysis.story"];
+  return {
+    asset: {
+      id,
+      title,
+      source_path: `/movies/${title}.mkv`,
+      fingerprint: "sha256:00",
+      duration_ms: 888032,
+      video: { width: 1280, height: 544, fps: { num: 24, den: 1 }, codec: "h264" },
+      audio: [],
+      subtitles_external: subtitles ? `/movies/${title}.srt` : null,
+      derived: {},
+      schema_version: 1,
+    },
+    stages: names.map((stage, i) => ({ stage, cached: cached[i] ?? false })),
+  };
 }
 
 export function job(overrides: Partial<Job> = {}): Job {

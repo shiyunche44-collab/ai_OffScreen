@@ -7,7 +7,7 @@ from offscreen.api.deps import Services
 from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
-from offscreen.services.library import AssetDetail
+from offscreen.services.library import AssetDetail, MediaListing
 
 router = APIRouter(prefix="/assets", tags=["assets"], responses=ERROR_RESPONSES)
 
@@ -24,8 +24,15 @@ def import_asset(body: ImportAsset, services: Services) -> MediaAsset:
 
 
 @router.get("")
-def list_assets(services: Services) -> list[MediaAsset]:
+def list_assets(services: Services) -> list[AssetDetail]:
+    """Every asset with which analysis stages are already built."""
     return services.library.list_assets()
+
+
+@router.get("/browse")
+def browse_media(services: Services, path: str | None = None) -> MediaListing:
+    """Folders and video files under the media roots (no `path`: the roots), for picking a movie."""
+    return services.library.browse(path)
 
 
 @router.get("/{asset_id}")

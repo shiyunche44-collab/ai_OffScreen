@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Assets */
+        /**
+         * List Assets
+         * @description Every asset with which analysis stages are already built.
+         */
         get: operations["list_assets_api_assets_get"];
         put?: never;
         /**
@@ -19,6 +22,26 @@ export interface paths {
          * @description Register a movie. Importing the same file again returns the same asset.
          */
         post: operations["import_asset_api_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Browse Media
+         * @description Folders and video files under the media roots (no `path`: the roots), for picking a movie.
+         */
+        get: operations["browse_media_api_assets_browse_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -441,6 +464,36 @@ export interface components {
             title: string;
             video: components["schemas"]["VideoInfo"];
         };
+        /** MediaEntry */
+        MediaEntry: {
+            /** Asset Id */
+            asset_id?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "dir" | "file";
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /** Size */
+            size?: number | null;
+        };
+        /** MediaListing */
+        MediaListing: {
+            /** Entries */
+            entries: components["schemas"]["MediaEntry"][];
+            /** Parent */
+            parent: string | null;
+            /** Path */
+            path: string | null;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
         /** Project */
         Project: {
             /** Asset Id */
@@ -539,7 +592,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MediaAsset"][];
+                    "application/json": components["schemas"]["AssetDetail"][];
                 };
             };
             /** @description Not found */
@@ -591,6 +644,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MediaAsset"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    browse_media_api_assets_browse_get: {
+        parameters: {
+            query?: {
+                path?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaListing"];
                 };
             };
             /** @description Not found */

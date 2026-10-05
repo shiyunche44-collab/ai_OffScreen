@@ -24,6 +24,7 @@ def test_the_documented_routes() -> None:
     paths = set(spec()["paths"])
     assert paths == {
         "/api/assets",
+        "/api/assets/browse",
         "/api/assets/{asset_id}",
         "/api/assets/{asset_id}/analyze",
         "/api/projects",

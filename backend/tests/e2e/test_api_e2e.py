@@ -60,7 +60,9 @@ def test_import_list_and_get_an_asset(client: TestClient, movie: Path) -> None:
     assert asset["id"].startswith("ast_") and asset["title"]
     again = import_movie(client, movie)
     assert again["id"] == asset["id"]  # same file, same asset
-    assert [a["id"] for a in client.get("/api/assets").json()] == [asset["id"]]
+    listed = client.get("/api/assets").json()
+    assert [a["asset"]["id"] for a in listed] == [asset["id"]]
+    assert not any(s["cached"] for s in listed[0]["stages"])  # status comes with the list
 
     detail = client.get(f"/api/assets/{asset['id']}").json()
     assert detail["asset"]["id"] == asset["id"]
@@ -71,6 +73,74 @@ def test_import_list_and_get_an_asset(client: TestClient, movie: Path) -> None:
         "analysis.story",
     ]
     assert not any(s["cached"] for s in detail["stages"])
+
+
+# --- browsing the media roots -----------------------------------------------------------
+
+
+def test_browse_lists_the_roots_then_folders_and_video_files(
+    client: TestClient, movie: Path, tmp_path: Path
+) -> None:
+    root = movie.parent
+    (root / "Extras").mkdir()
+    (root / "Extras" / "clip.MKV").write_bytes(b"x")
+    (root / "Aardvark").mkdir()
+    (root / "notes.txt").write_text("not a video")
+    (root / ".hidden.mp4").write_bytes(b"x")
+    (root / "Sample.srt").write_text("subtitles are not listed")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "leak.mp4").write_bytes(b"x")
+    (root / "escape").symlink_to(outside)  # a link out of the roots
+    (root / "leak.mp4").symlink_to(outside / "leak.mp4")
+
+    top = client.get("/api/assets/browse").json()
+    assert top["path"] is None and top["parent"] is None
+    assert [e["path"] for e in top["entries"]] == [str(root.resolve())]
+    assert top["entries"][0]["kind"] == "dir"
+
+    inside = client.get("/api/assets/browse", params={"path": str(root)}).json()
+    assert inside["path"] == str(root.resolve())
+    assert inside["parent"] is None  # up from a root is the top level
+    assert [(e["name"], e["kind"]) for e in inside["entries"]] == [
+        ("Aardvark", "dir"),
+        ("Extras", "dir"),
+        ("Sample.mp4", "file"),  # dirs first, then files; no hidden, non-video or escaping links
+    ]
+    sample = inside["entries"][2]
+    assert sample["size"] == movie.stat().st_size and sample["asset_id"] is None
+
+    sub = client.get("/api/assets/browse", params={"path": str(root / "Extras")}).json()
+    assert sub["parent"] == str(root.resolve())
+    assert [e["name"] for e in sub["entries"]] == ["clip.MKV"]
+
+
+def test_browse_marks_files_that_are_already_imported(client: TestClient, movie: Path) -> None:
+    asset = import_movie(client, movie)
+    listing = client.get("/api/assets/browse", params={"path": str(movie.parent)}).json()
+    (entry,) = [e for e in listing["entries"] if e["name"] == movie.name]
+    assert entry["asset_id"] == asset["id"]
+
+
+def test_browse_cannot_leave_the_media_roots(
+    client: TestClient, movie: Path, tmp_path: Path
+) -> None:
+    for path in (str(tmp_path), str(movie.parent / ".."), "/", "/etc"):
+        err(client.get("/api/assets/browse", params={"path": path}), 422, "invalid_input")
+    err(client.get("/api/assets/browse", params={"path": str(movie)}), 404, "not_found")  # a file
+    err(
+        client.get("/api/assets/browse", params={"path": str(movie.parent / "nope")}),
+        404,
+        "not_found",
+    )
+
+
+def test_browse_without_media_roots_says_what_to_configure(
+    cfg: AppConfig, fakes: Providers
+) -> None:
+    with AppServices(cfg, providers=fakes) as s, TestClient(create_app(s)) as c:
+        e = err(c.get("/api/assets/browse"), 422, "invalid_input")
+        assert "media_roots" in e["message"]
 
 
 def test_import_is_limited_to_the_media_roots(

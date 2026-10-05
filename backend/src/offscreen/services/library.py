@@ -6,6 +6,7 @@ anything, so these calls are cheap and never need a model key."""
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -33,6 +34,29 @@ class AssetDetail(BaseModel):
     asset: MediaAsset
     stages: list[StageStatus]
     """What analysis builds (the chain behind its target stage), upstream first."""
+
+
+VIDEO_EXTS = (".mkv", ".mp4", ".mov", ".avi", ".webm", ".m4v", ".ts", ".m2ts", ".wmv", ".flv")
+MAX_LISTING = 1000
+
+
+class MediaEntry(BaseModel):
+    name: str
+    path: str
+    """Absolute path; pass it back to `browse` (directories) or to import (files)."""
+    kind: Literal["dir", "file"]
+    size: int | None = None
+    asset_id: str | None = None
+    """For a file: the asset it was already imported as."""
+
+
+class MediaListing(BaseModel):
+    path: str | None
+    """The directory listed; None for the top level (the configured media roots)."""
+    parent: str | None
+    """Where "up" leads; None for the top level, and for a root itself (up = the top level)."""
+    entries: list[MediaEntry]
+    truncated: bool = False
 
 
 class ProjectDetail(BaseModel):
@@ -65,15 +89,67 @@ class LibraryService:
         except (IngestError, ProbeError) as e:
             raise InvalidInput(str(e)) from e
 
-    def list_assets(self) -> list[MediaAsset]:
-        return self.assets.list()
+    def list_assets(self) -> list[AssetDetail]:
+        """Every asset with its analysis status, oldest first."""
+        with self._pipeline() as p:
+            return [self._detail(p, a) for a in self.assets.list()]
 
     def asset(self, asset_id: str) -> AssetDetail:
         asset = self._asset(asset_id)
         with self._pipeline() as p:
-            names = p.stage_chain(ANALYZE, asset_id)
-            stages = [StageStatus(stage=n, cached=p.peek(n, asset_id) is not None) for n in names]
+            return self._detail(p, asset)
+
+    def _detail(self, p: Pipeline, asset: MediaAsset) -> AssetDetail:
+        names = p.stage_chain(ANALYZE, asset.id)
+        stages = [StageStatus(stage=n, cached=p.peek(n, asset.id) is not None) for n in names]
         return AssetDetail(asset=asset, stages=stages)
+
+    def browse(self, path: str | None = None) -> MediaListing:
+        """Directories and video files under the media roots, for picking a movie to import.
+        Without `path`: the roots themselves."""
+        roots = self._roots()
+        if not path:
+            entries = [
+                MediaEntry(name=r.name or str(r), path=str(r), kind="dir")
+                for r in roots
+                if r.is_dir()
+            ]
+            return MediaListing(path=None, parent=None, entries=entries)
+        directory = self._resolve_inside(path, roots)
+        if not directory.is_dir():
+            raise NotFound(f"not a directory: {path}")
+        imported = {a.source_path: a.id for a in self.assets.list()}
+        dirs: list[MediaEntry] = []
+        files: list[MediaEntry] = []
+        for child in sorted(directory.iterdir(), key=lambda c: c.name.lower()):
+            if child.name.startswith("."):
+                continue
+            try:
+                real = child.resolve()
+                if not any(real.is_relative_to(r) for r in roots):
+                    continue  # a symlink leading out of the roots
+                if real.is_dir():
+                    dirs.append(MediaEntry(name=child.name, path=str(real), kind="dir"))
+                elif real.is_file() and real.suffix.lower() in VIDEO_EXTS:
+                    files.append(
+                        MediaEntry(
+                            name=child.name,
+                            path=str(real),
+                            kind="file",
+                            size=real.stat().st_size,
+                            asset_id=imported.get(str(real)),
+                        )
+                    )
+            except OSError:
+                continue  # vanished or unreadable: not worth failing the listing
+        entries = [*dirs, *files]
+        parent = directory.parent
+        return MediaListing(
+            path=str(directory),
+            parent=str(parent) if any(parent.is_relative_to(r) for r in roots) else None,
+            entries=entries[:MAX_LISTING],
+            truncated=len(entries) > MAX_LISTING,
+        )
 
     def analyze(self, asset_id: str) -> Job:
         return self.jobs.analyze(asset_id)
@@ -133,13 +209,21 @@ class LibraryService:
             raise NotFound(f"unknown project {project_id}")
         return project
 
-    def _inside_media_roots(self, path: str) -> Path:
+    def _roots(self) -> list[Path]:
         roots = [r.expanduser().resolve() for r in self.cfg.media_roots]
         if not roots:
             raise InvalidInput("no media_roots configured; add the folder holding your movies")
-        file = Path(path).expanduser().resolve()  # resolves symlinks and `..`
-        if not any(file.is_relative_to(r) for r in roots):
-            raise InvalidInput("the file is outside the configured media roots")
+        return roots
+
+    @staticmethod
+    def _resolve_inside(path: str, roots: list[Path]) -> Path:
+        resolved = Path(path).expanduser().resolve()  # resolves symlinks and `..`
+        if not any(resolved.is_relative_to(r) for r in roots):
+            raise InvalidInput("the path is outside the configured media roots")
+        return resolved
+
+    def _inside_media_roots(self, path: str) -> Path:
+        file = self._resolve_inside(path, self._roots())
         if not file.is_file():
             raise InvalidInput(f"not a file: {path}")
         return file
