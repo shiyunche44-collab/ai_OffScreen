@@ -111,6 +111,22 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX ix_jobs_created_at ON jobs (created_at)",
         ),
     ),
+    Migration(
+        4,
+        (
+            """
+            CREATE TABLE projects (
+                id TEXT NOT NULL PRIMARY KEY,
+                asset_id TEXT NOT NULL REFERENCES assets (id),
+                name TEXT NOT NULL,
+                options_json TEXT NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """,
+            "CREATE INDEX ix_projects_asset_id ON projects (asset_id)",
+            "CREATE INDEX ix_projects_created_at ON projects (created_at)",
+        ),
+    ),
 )
 
 LATEST_VERSION = MIGRATIONS[-1].version

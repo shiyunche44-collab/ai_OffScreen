@@ -175,6 +175,10 @@ class Pipeline:
         visit(target)
         return order
 
+    def peek(self, stage: str, asset_id: str, opts: RunOptions | None = None) -> Artifact | None:
+        """The cached artifact of `stage` if it and all upstream are built; runs nothing."""
+        return self._engine(opts or RunOptions(), None).peek(stage, {"asset_id": asset_id})
+
     def _engine(self, opts: RunOptions, reports: list[StageReport] | None) -> Engine:
         def resolved(stage: str, hit: bool) -> None:
             if reports is not None:

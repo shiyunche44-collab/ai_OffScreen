@@ -55,6 +55,36 @@ class Engine:
         """The artifact of `target` for `scope`, running missing stages (upstream first)."""
         return self._ensure(ArtifactRef(target, dict(scope)), {}, [])
 
+    def peek(self, target: str, scope: Scope) -> Artifact | None:
+        """The cached artifact of `target` for `scope`, or None when it, or anything it depends
+        on, is not built yet. Runs nothing (a status query)."""
+        return self._peek(ArtifactRef(target, dict(scope)), {})
+
+    def _peek(
+        self,
+        ref: ArtifactRef,
+        memo: dict[tuple[str, tuple[tuple[str, str], ...]], Artifact | None],
+    ) -> Artifact | None:
+        key = _memo_key(ref)
+        if key in memo:
+            return memo[key]
+        stage = self.stages.get(ref.stage)
+        if stage is None:
+            raise UnknownStage(ref.stage)
+        upstream = [self._peek(dep, memo) for dep in stage.inputs(ref.scope)]
+        found: Artifact | None = None
+        if all(a is not None for a in upstream):
+            cache_key = compute_cache_key(
+                stage.name,
+                stage.version,
+                [a.content_hash for a in upstream if a is not None],
+                stage.params(ref.scope),
+                stage.provider_info(ref.scope),
+            )
+            found = self.store.get(stage.name, cache_key)
+        memo[key] = found
+        return found
+
     def _ensure(
         self,
         ref: ArtifactRef,

@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "ProjectOptions": {
+      "additionalProperties": false,
+      "description": "How the commentary is written and voiced. Stages read these; changing them changes the\ncreative stages' cache keys, never the analysis.",
+      "properties": {
+        "minutes": {
+          "default": 3.0,
+          "exclusiveMinimum": 0,
+          "maximum": 240,
+          "title": "Minutes",
+          "type": "number"
+        },
+        "spoil_ending": {
+          "default": true,
+          "title": "Spoil Ending",
+          "type": "boolean"
+        },
+        "style": {
+          "default": "neutral",
+          "minLength": 1,
+          "title": "Style",
+          "type": "string"
+        },
+        "voice": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Voice"
+        }
+      },
+      "title": "ProjectOptions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^prj_[0-9A-Za-z]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "options": {
+      "$ref": "#/$defs/ProjectOptions"
+    }
+  },
+  "required": [
+    "id",
+    "asset_id",
+    "name",
+    "created_at"
+  ],
+  "title": "Project",
+  "type": "object"
+}

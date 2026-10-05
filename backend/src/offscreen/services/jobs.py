@@ -24,6 +24,7 @@ from offscreen.domain.job import Job, JobCanceled, JobStatus, Lane
 from offscreen.engine.stage import StageCanceled
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.providers.ports import AsrCanceled, DetectionCanceled
+from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
     Pipeline,
@@ -42,6 +43,8 @@ ANALYZE = StoryStage.name  # everything the script writer reads
 GENERATE_SCRIPT = ScriptStage.name
 BUILD_PLAN = PlanStage.name
 RENDER = RenderStage.name
+
+LOG_TAIL_BYTES = 256 * 1024
 
 USE_CASE_STAGES = (ANALYZE, GENERATE_SCRIPT, BUILD_PLAN, RENDER)
 
@@ -119,14 +122,37 @@ class JobService:
     def list(self, *, status: JobStatus | None = None, lane: Lane | None = None) -> list[Job]:
         return self.jobs.list(status=status, lane=lane)
 
+    def log(self, job_id: str) -> str:
+        """The tail of the job's log file (empty until the job has started)."""
+        job = self.jobs.get(job_id)
+        if job is None:
+            raise NotFound(f"unknown job {job_id}")
+        if not job.log_path:
+            return ""
+        path = self.cfg.data_dir / job.log_path
+        try:
+            with path.open("rb") as f:
+                f.seek(0, 2)
+                size = f.tell()
+                f.seek(max(0, size - LOG_TAIL_BYTES))
+                text = f.read().decode("utf-8", errors="replace")
+        except FileNotFoundError:
+            return ""
+        return text if size <= LOG_TAIL_BYTES else "… (earlier output cut)\n" + text
+
     def cancel(self, job_id: str) -> Job:
         job = self.jobs.request_cancel(job_id)
         if job is None:
-            raise KeyError(job_id)
+            raise NotFound(f"unknown job {job_id}")
         return job
 
     def retry(self, job_id: str) -> Job:
-        return self.jobs.retry(job_id)
+        try:
+            return self.jobs.retry(job_id)
+        except KeyError as e:
+            raise NotFound(f"unknown job {job_id}") from e
+        except ValueError as e:
+            raise Conflict(str(e)) from e
 
     # ---- what the worker runs ---------------------------------------------------------------
     def execute(self, job: Job, ctx: JobRun) -> None:
@@ -162,7 +188,7 @@ class JobService:
     def _asset(self, asset_id: str) -> MediaAsset:
         asset = self.assets.get(asset_id)
         if asset is None:
-            raise ValueError(f"unknown asset {asset_id}")
+            raise NotFound(f"unknown asset {asset_id}")
         return asset
 
     def _submit(self, stage: str, asset_id: str, opts: RunOptions, lane: Lane) -> Job:
@@ -179,7 +205,7 @@ class JobService:
 def _checked(opts: RunOptions | None) -> RunOptions:
     opts = opts or RunOptions()
     if opts.minutes <= 0:
-        raise ValueError("minutes must be positive")
+        raise InvalidInput("minutes must be positive")
     if not opts.style.strip():
         return RunOptions(opts.minutes, opts.voice, DEFAULT_STYLE, opts.spoil_ending)
     return opts

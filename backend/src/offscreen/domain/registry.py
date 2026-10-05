@@ -18,6 +18,7 @@ from offscreen.domain.index import (
 )
 from offscreen.domain.job import Job
 from offscreen.domain.plan import EditPlan
+from offscreen.domain.project import Project
 from offscreen.domain.script import Script
 from offscreen.domain.timeline import Timeline
 
@@ -35,5 +36,6 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "plan": EditPlan,
     "timeline": Timeline,
     "job": Job,
+    "project": Project,
     "manifest": Manifest,
 }

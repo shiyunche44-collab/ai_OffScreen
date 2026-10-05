@@ -16,9 +16,10 @@ from offscreen.domain.asset import MediaAsset
 from offscreen.domain.common import canonical_json, new_id
 from offscreen.domain.job import Job, JobStatus, Lane, can_transition
 from offscreen.domain.llm import LlmCallRecord
+from offscreen.domain.project import Project, ProjectOptions
 from offscreen.store.db import Database
 from offscreen.store.files import atomic_write_bytes
-from offscreen.store.models import ArtifactRow, AssetRow, JobRow, LlmCallRow, utcnow
+from offscreen.store.models import ArtifactRow, AssetRow, JobRow, LlmCallRow, ProjectRow, utcnow
 
 
 class AssetRepo:
@@ -127,6 +128,42 @@ class ArtifactIndex:
             row = s.get(ArtifactRow, cache_key)
             if row is not None:
                 s.delete(row)
+
+
+class ProjectRepo:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    def add(self, asset_id: str, name: str, options: ProjectOptions) -> Project:
+        row = ProjectRow(
+            id=new_id("prj"), asset_id=asset_id, name=name, options_json=canonical_json(options)
+        )
+        with self.db.session() as s:
+            s.add(row)
+        return _project(row)
+
+    def get(self, project_id: str) -> Project | None:
+        with self.db.session() as s:
+            row = s.get(ProjectRow, project_id)
+            return _project(row) if row else None
+
+    def list(self) -> list[Project]:
+        """Newest first."""
+        with self.db.session() as s:
+            q = select(ProjectRow).order_by(
+                col(ProjectRow.created_at).desc(), col(ProjectRow.id).desc()
+            )
+            return [_project(r) for r in s.exec(q).all()]
+
+
+def _project(row: ProjectRow) -> Project:
+    return Project(
+        id=row.id,
+        asset_id=row.asset_id,
+        name=row.name,
+        options=ProjectOptions.model_validate_json(row.options_json),
+        created_at=row.created_at.replace(tzinfo=UTC),
+    )
 
 
 _JOBS = JobRow.__table__  # type: ignore[attr-defined]

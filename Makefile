@@ -1,4 +1,4 @@
-.PHONY: sync fmt lint type test contracts schemas check
+.PHONY: sync fmt lint type test contracts schemas openapi check
 BE = cd backend &&
 
 sync:
@@ -21,5 +21,8 @@ contracts:
 
 schemas:
 	$(BE) uv run python ../scripts/export_schemas.py
+
+openapi:
+	$(BE) uv run python ../scripts/export_openapi.py
 
 check: lint type test contracts

@@ -16,6 +16,7 @@ from offscreen.domain.common import TimeRange
 from offscreen.domain.job import Job
 from offscreen.providers.adapters.fake import FakeLLM
 from offscreen.providers.ports import DetectionCanceled, LLMAuthError
+from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.jobs import (
     ANALYZE,
     BUILD_PLAN,
@@ -144,15 +145,15 @@ def test_analysis_takes_the_gpu_lane_only_when_a_local_asr_would_run(
 
 
 def test_unknown_asset_and_bad_options_are_refused_up_front(svc: JobService) -> None:
-    with pytest.raises(ValueError, match="unknown asset"):
+    with pytest.raises(NotFound, match="unknown asset"):
         svc.analyze("ast_missing")
-    with pytest.raises(ValueError, match="unknown asset"):
+    with pytest.raises(NotFound, match="unknown asset"):
         svc.render("ast_missing")
 
 
 def test_non_positive_length_is_refused(svc: JobService, movie: Path) -> None:
     asset = asset_of(svc, movie)
-    with pytest.raises(ValueError, match="minutes"):
+    with pytest.raises(InvalidInput, match="minutes"):
         svc.generate_script(asset, RunOptions(minutes=0))
 
 
@@ -188,7 +189,7 @@ def test_failure_is_reported_on_the_job_and_manual_retry_succeeds(
     svc.retry(job.id)
     w.drain(timeout_s=120)
     assert status(svc, job) == "succeeded"
-    with pytest.raises(ValueError, match="only failed"):
+    with pytest.raises(Conflict, match="only failed"):
         svc.retry(job.id)
 
 
@@ -237,8 +238,10 @@ def test_canceling_a_queued_job_means_it_never_runs(svc: JobService, movie: Path
     assert not (svc.cfg.data_dir / "artifacts").exists() or not list(
         (svc.cfg.data_dir / "artifacts").glob("analysis.*/*")
     )
-    with pytest.raises(KeyError):
+    with pytest.raises(NotFound):
         svc.cancel("job_missing")
+    with pytest.raises(NotFound):
+        svc.retry("job_missing")
 
 
 def test_options_round_trip_through_the_job_scope() -> None:

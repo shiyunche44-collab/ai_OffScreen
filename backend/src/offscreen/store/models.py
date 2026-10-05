@@ -38,6 +38,16 @@ class ArtifactRow(SQLModel, table=True):
     last_used_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
 
 
+class ProjectRow(SQLModel, table=True):
+    __tablename__ = "projects"
+
+    id: str = Field(primary_key=True)
+    asset_id: str = Field(foreign_key="assets.id", index=True)
+    name: str
+    options_json: str  # canonical JSON of the domain ProjectOptions
+    created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+
+
 class JobRow(SQLModel, table=True):
     """A unit of background work (ARCHITECTURE §5.7). `attempt` counts runs since the last
     manual retry; a run is guarded by it, so a worker that lost its job cannot overwrite the

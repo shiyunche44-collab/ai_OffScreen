@@ -1,0 +1,12 @@
+{
+  "asset_id": "ast_sintel01",
+  "created_at": "2026-10-04T08:00:00Z",
+  "id": "prj_demo01",
+  "name": "Sintel 三分钟解说",
+  "options": {
+    "minutes": 3.0,
+    "spoil_ending": true,
+    "style": "neutral",
+    "voice": null
+  }
+}

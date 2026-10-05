@@ -96,6 +96,32 @@ def test_on_resolved_reports_each_stage_upstream_first_with_cache_status(
     assert seen == [("t.source", True), ("t.upper", True)]
 
 
+def test_peek_reports_what_is_cached_without_running_anything(store: ArtifactStore) -> None:
+    src, up = Source(), Upper()
+    engine = Engine(store, [src, up])
+    assert engine.peek("t.source", SCOPE) is None
+    assert engine.peek("t.upper", SCOPE) is None
+
+    built = engine.ensure("t.source", SCOPE)  # only the upstream exists
+    assert engine.peek("t.source", SCOPE) == built
+    assert engine.peek("t.upper", SCOPE) is None
+    assert (src.runs, up.runs) == (1, 0)
+
+    full = engine.ensure("t.upper", SCOPE)
+    assert engine.peek("t.upper", SCOPE) == full
+    assert engine.peek("t.upper", {"asset_id": "ast_other"}) is None  # another scope
+
+    changed = Engine(store, [Source("other text"), Upper()])  # new params: upstream key changes
+    assert changed.peek("t.source", SCOPE) is None
+    assert changed.peek("t.upper", SCOPE) is None
+    assert (src.runs, up.runs) == (1, 1)
+
+
+def test_peek_unknown_stage(store: ArtifactStore) -> None:
+    with pytest.raises(UnknownStage):
+        Engine(store, [Source()]).peek("nope", SCOPE)
+
+
 def test_manifest_lists_files_with_hashes_and_meta(store: ArtifactStore) -> None:
     art = Engine(store, [Source(), Upper()]).ensure("t.source", SCOPE)
     assert [f.path for f in art.manifest.files] == ["out.txt"]

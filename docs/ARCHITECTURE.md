@@ -727,7 +727,7 @@ data/
 | 表 | 主要字段 |
 |----|---------|
 | `assets` | id, title, source_path, fingerprint, probe_json, created_at |
-| `projects` | id, asset_id, name, current_script_version, current_plan_version, created_at |
+| `projects` | id, asset_id, name, options_json（时长 / 音色 / 风格 / 是否剧透）, created_at；`current_script_version`、`current_plan_version` 随版本化文档（M4 / M5）加入 |
 | `documents` | id, project_id, kind(script/plan), version, parent_version, author(ai/human), path, created_at |
 | `artifacts` | cache_key, stage, stage_version, scope, path, content_hash, size, created_at, last_used_at |
 | `jobs` | id, stage, scope_json, lane, status, progress, message, cache_key, attempt, error, log_path, cancel_requested, not_before（重试退避）, heartbeat_at, 时间戳 |
