@@ -251,6 +251,11 @@ class CharacterOverride(Strict):
     aliases: list[str] | None = None
     ignored: bool = False
     merged_into: CharacterId | None = None
+    centroid: list[float] | None = None
+    """The character's face centre when the edit was made. After a re-clustering the ids change;
+    this is what finds the same person again."""
+    merged_into_centroid: list[float] | None = None
+    """Likewise for `merged_into`."""
 
 
 class CharacterOverrides(Versioned):

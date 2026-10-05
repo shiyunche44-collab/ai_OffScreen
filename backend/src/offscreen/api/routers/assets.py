@@ -8,6 +8,7 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Job
+from offscreen.services.characters import CharactersView
 from offscreen.services.index import ShotsView
 from offscreen.services.library import AssetDetail, MediaListing
 from offscreen.services.report import AnalysisReport
@@ -78,3 +79,9 @@ def index_scenes(asset_id: str, services: Services) -> Scenes:
 def index_story(asset_id: str, services: Services) -> Story:
     """The story: logline, acts, turning points, ending (404 until the story stage is built)."""
     return services.index.story(asset_id)
+
+
+@router.get("/{asset_id}/index/characters")
+def index_characters(asset_id: str, services: Services) -> CharactersView:
+    """The characters with human edits applied (404 until the characters stage is built)."""
+    return services.characters.view(asset_id)

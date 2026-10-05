@@ -9,8 +9,8 @@ import pytest
 
 from offscreen.config import AppConfig
 from offscreen.domain.common import TimeRange
-from offscreen.providers.adapters.fake import FakeLLM, FakeTTS
-from offscreen.providers.ports import Recorder
+from offscreen.providers.adapters.fake import FakeFaceAnalyzer, FakeLLM, FakeTTS
+from offscreen.providers.ports import DetectedFace, Recorder
 from offscreen.services.pipeline import Providers
 
 SRT = """1
@@ -114,6 +114,22 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             "turning_points": [{"scene_id": found[0], "what": "找到龙"}],
         }
 
+    def character_name(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        found = list(dict.fromkeys(re.findall(r"人物 (ch_\d+)（", m[0].content)))
+        return {
+            "characters": [
+                {
+                    "id": cid,
+                    "name": "Sintel" if i == 0 else None,
+                    "aliases": ["the girl"] if i == 0 else [],
+                    "role": "主角" if i == 0 else "配角",
+                    "bio": "寻找她的龙。" if i == 0 else None,
+                    "evidence": "We cannot stay here." if i == 0 else None,
+                }
+                for i, cid in enumerate(found)
+            ]
+        }
+
     def script(_t: str, m: Any, _s: Any) -> dict[str, Any]:
         found = ids(m)
         target = int(re.search(r"全文约 (\d+) 字", m[0].content).group(1))  # type: ignore[union-attr]
@@ -130,6 +146,7 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             "shot_caption": caption,
             "scene_segment": scene_segment,
             "story": story,
+            "character_name": character_name,
             "script_write": script,
         },
         recorder=recorder,
@@ -155,7 +172,13 @@ def cfg(tmp_path: Path) -> AppConfig:
             },
             "tasks": {
                 t: {"provider": "p", "model": "fake-model"}
-                for t in ("shot_caption", "scene_segment", "story", "script_write")
+                for t in (
+                    "shot_caption",
+                    "scene_segment",
+                    "story",
+                    "character_name",
+                    "script_write",
+                )
             },
             "asr": {"provider": "faster_whisper"},
             "tts": {"provider": "edge_tts", "default_voice": "voice-x"},
@@ -172,3 +195,26 @@ def movie(clip30: Path, tmp_path: Path) -> Path:
     m.write_bytes(clip30.read_bytes())
     m.with_suffix(".srt").write_text(SRT, encoding="utf-8")
     return m
+
+
+def two_people_faces() -> FakeFaceAnalyzer:
+    """On the 30 s clip's four shots: person A in every keyframe, a smaller person B in shots 3
+    and 4, and a third face seen once (an extra). Features are noisy copies of three directions."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    a, b, c = (v / np.linalg.norm(v) for v in rng.normal(size=(3, 32)))
+
+    def wiggle(v: Any) -> tuple[float, ...]:
+        return tuple(float(x) for x in v + 0.03 * rng.normal(size=32))
+
+    def faces_in(path: Path) -> list[DetectedFace]:
+        shot = int(path.name.split("_")[1]) - 1  # kf/sh_0001_b.jpg: the first shot -> 0
+        found = [DetectedFace((0.1, 0.1, 0.4, 0.5), 0.9, wiggle(a))]
+        if shot >= 2:
+            found.append(DetectedFace((0.5, 0.1, 0.6, 0.3), 0.9, wiggle(b)))
+        if shot == 0 and path.name.endswith("_a.jpg"):
+            found.append(DetectedFace((0.7, 0.1, 0.9, 0.4), 0.9, wiggle(c)))
+        return found
+
+    return FakeFaceAnalyzer(faces_in)

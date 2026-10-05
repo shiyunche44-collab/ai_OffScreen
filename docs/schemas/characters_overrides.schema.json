@@ -18,6 +18,21 @@
           "default": null,
           "title": "Aliases"
         },
+        "centroid": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Centroid"
+        },
         "character_id": {
           "pattern": "^ch_[0-9A-Za-z]+$",
           "title": "Character Id",
@@ -40,6 +55,21 @@
           ],
           "default": null,
           "title": "Merged Into"
+        },
+        "merged_into_centroid": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Merged Into Centroid"
         },
         "name": {
           "anyOf": [

@@ -35,6 +35,7 @@ from offscreen.stages.analysis.characters import CharactersError, CharactersStag
 from offscreen.stages.analysis.faces import FacesError, FacesStage
 from offscreen.stages.analysis.ingest import IngestError, ingest
 from offscreen.stages.analysis.keyframes import KeyframesStage
+from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.proxy import ProxyError, ProxyStage
 from offscreen.stages.analysis.scenes import ScenesError, ScenesStage
 from offscreen.stages.analysis.shots import ShotsError, ShotsStage
@@ -158,7 +159,9 @@ class Pipeline:
             style=opts.style,
             spoil_ending=opts.spoil_ending,
         )
-        models = task_models(cfg, ["story", "script_write", "shot_caption", "scene_segment"])
+        models = task_models(
+            cfg, ["story", "script_write", "shot_caption", "scene_segment", "character_name"]
+        )
         caption_task = cfg.tasks.get("shot_caption")
         return [
             ProxyStage(self.assets),
@@ -166,6 +169,7 @@ class Pipeline:
             KeyframesStage(),
             FacesStage(p.faces),
             CharactersStage(),
+            NamingStage(p.llm, models),
             CaptionsStage(
                 p.llm,
                 models,

@@ -156,6 +156,135 @@
         "title": "AudioStream",
         "type": "object"
       },
+      "Character": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "face_cluster": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FaceCluster"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "pattern": "^ch_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "name_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ai",
+                  "human",
+                  "tmdb"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Source"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Character",
+        "type": "object"
+      },
+      "CharactersView": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/Character"
+            },
+            "title": "Characters",
+            "type": "array"
+          },
+          "ignored": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ignored",
+            "type": "array"
+          },
+          "merged": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Merged",
+            "type": "object"
+          },
+          "named": {
+            "title": "Named",
+            "type": "boolean"
+          },
+          "unmatched_edits": {
+            "title": "Unmatched Edits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "characters",
+          "merged",
+          "ignored",
+          "unmatched_edits",
+          "named"
+        ],
+        "title": "CharactersView",
+        "type": "object"
+      },
       "CreateProject": {
         "properties": {
           "asset_id": {
@@ -269,6 +398,40 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FaceCluster": {
+        "additionalProperties": false,
+        "properties": {
+          "centroid_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Centroid Ref"
+          },
+          "size": {
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "thumbnails": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Thumbnails",
+            "type": "array"
+          }
+        },
+        "required": [
+          "size"
+        ],
+        "title": "FaceCluster",
         "type": "object"
       },
       "ImportAsset": {
@@ -2004,6 +2167,69 @@
           }
         },
         "summary": "Analyze Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/index/characters": {
+      "get": {
+        "description": "The characters with human edits applied (404 until the characters stage is built).",
+        "operationId": "index_characters_api_assets__asset_id__index_characters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharactersView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Index Characters",
         "tags": [
           "assets"
         ]

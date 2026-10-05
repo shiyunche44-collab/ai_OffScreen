@@ -88,6 +88,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/index/characters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Index Characters
+         * @description The characters with human edits applied (404 until the characters stage is built).
+         */
+        get: operations["index_characters_api_assets__asset_id__index_characters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/index/scenes": {
         parameters: {
             query?: never;
@@ -489,6 +509,42 @@ export interface components {
             /** Sample Rate */
             sample_rate: number;
         };
+        /** Character */
+        Character: {
+            /**
+             * Aliases
+             * @default []
+             */
+            aliases: string[];
+            /** Bio */
+            bio?: string | null;
+            face_cluster?: components["schemas"]["FaceCluster"] | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name?: string | null;
+            /** Name Source */
+            name_source?: ("ai" | "human" | "tmdb") | null;
+            /** Role */
+            role?: string | null;
+        };
+        /** CharactersView */
+        CharactersView: {
+            /** Asset Id */
+            asset_id: string;
+            /** Characters */
+            characters: components["schemas"]["Character"][];
+            /** Ignored */
+            ignored: string[];
+            /** Merged */
+            merged: {
+                [key: string]: string;
+            };
+            /** Named */
+            named: boolean;
+            /** Unmatched Edits */
+            unmatched_edits: number;
+        };
         /** CreateProject */
         CreateProject: {
             /** Asset Id */
@@ -526,6 +582,18 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** FaceCluster */
+        FaceCluster: {
+            /** Centroid Ref */
+            centroid_ref?: string | null;
+            /** Size */
+            size: number;
+            /**
+             * Thumbnails
+             * @default []
+             */
+            thumbnails: string[];
         };
         /** ImportAsset */
         ImportAsset: {
@@ -1317,6 +1385,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    index_characters_api_assets__asset_id__index_characters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharactersView"];
                 };
             };
             /** @description Not found */

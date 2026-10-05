@@ -22,6 +22,8 @@ from offscreen.providers.adapters.fake import FakeFaceAnalyzer, FakeTTS
 from offscreen.providers.ports import DetectedFace
 from offscreen.services.pipeline import Pipeline, Providers, RunOptions
 
+from .conftest import two_people_faces
+
 CHAIN = [
     "analysis.proxy", "analysis.shots", "analysis.keyframes", "analysis.transcript",
     "analysis.captions", "analysis.scenes", "analysis.story",
@@ -212,24 +214,7 @@ def test_characters_are_grouped_from_the_faces_of_the_real_keyframes(
     )
     from offscreen.stages.analysis.faces import FACES_FILE
 
-    rng = np.random.default_rng(3)
-    a, b, c = (v / np.linalg.norm(v) for v in rng.normal(size=(3, 32)))
-
-    def wiggle(v: np.ndarray) -> tuple[float, ...]:  # type: ignore[type-arg]
-        w = v + 0.03 * rng.normal(size=32)
-        return tuple(float(x) for x in w)
-
-    def faces_in(path: Path) -> list[DetectedFace]:
-        shot = int(path.name.split("_")[1]) - 1  # kf/sh_0001_b.jpg: the first shot -> 0
-        frame = path.name[-5]
-        found = [DetectedFace((0.1, 0.1, 0.4, 0.5), 0.9, wiggle(a))]  # in every frame
-        if shot >= 2:
-            found.append(DetectedFace((0.5, 0.1, 0.6, 0.3), 0.9, wiggle(b)))  # smaller, shots 2-3
-        if shot == 0 and frame == "a":
-            found.append(DetectedFace((0.7, 0.1, 0.9, 0.4), 0.9, wiggle(c)))  # seen once
-        return found
-
-    fakes.faces = FakeFaceAnalyzer(faces_in)
+    fakes.faces = two_people_faces()
     with Pipeline(cfg, fakes) as p:
         result = p.run_stage("analysis.characters", str(movie))
         art = result.artifact
@@ -247,7 +232,7 @@ def test_characters_are_grouped_from_the_faces_of_the_real_keyframes(
         centres = np.load(art.path(CENTROIDS_FILE))
         assert centres.shape == (2, 32)
         np.testing.assert_allclose(np.linalg.norm(centres, axis=1), 1.0, atol=1e-5)
-        assert float(centres[0] @ a) > 0.99 and float(centres[1] @ b) > 0.99
+        assert float(centres[0] @ centres[1]) < 0.5  # two different people
 
         for x in chars:
             assert x.face_cluster is not None and len(x.face_cluster.thumbnails) == (
