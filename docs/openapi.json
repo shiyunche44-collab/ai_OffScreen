@@ -1,6 +1,36 @@
 {
   "components": {
     "schemas": {
+      "Annotation": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "fact_check",
+              "rule",
+              "style"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "type",
+          "message"
+        ],
+        "title": "Annotation",
+        "type": "object"
+      },
       "AssetDetail": {
         "properties": {
           "asset": {
@@ -492,6 +522,36 @@
         "title": "MediaListing",
         "type": "object"
       },
+      "OutlineBeat": {
+        "additionalProperties": false,
+        "properties": {
+          "beat": {
+            "title": "Beat",
+            "type": "string"
+          },
+          "scene_refs": {
+            "items": {
+              "pattern": "^sc_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Scene Refs",
+            "type": "array"
+          },
+          "target_s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Target S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "beat",
+          "scene_refs",
+          "target_s"
+        ],
+        "title": "OutlineBeat",
+        "type": "object"
+      },
       "Project": {
         "additionalProperties": false,
         "properties": {
@@ -618,6 +678,188 @@
           "den"
         ],
         "title": "Rational",
+        "type": "object"
+      },
+      "Script": {
+        "additionalProperties": false,
+        "properties": {
+          "annotations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Annotation"
+            },
+            "title": "Annotations",
+            "type": "array"
+          },
+          "author": {
+            "enum": [
+              "ai",
+              "human"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^scr_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "outline": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OutlineBeat"
+            },
+            "title": "Outline",
+            "type": "array"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ScriptParams"
+          },
+          "parent_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version"
+          },
+          "project_id": {
+            "pattern": "^prj_[0-9A-Za-z]+$",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/ScriptSegment"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "version",
+          "author",
+          "params",
+          "segments"
+        ],
+        "title": "Script",
+        "type": "object"
+      },
+      "ScriptParams": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "default": "zh",
+            "title": "Language",
+            "type": "string"
+          },
+          "perspective": {
+            "default": "third",
+            "enum": [
+              "first",
+              "third"
+            ],
+            "title": "Perspective",
+            "type": "string"
+          },
+          "spoil_ending": {
+            "default": true,
+            "title": "Spoil Ending",
+            "type": "boolean"
+          },
+          "style": {
+            "title": "Style",
+            "type": "string"
+          },
+          "target_duration_s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Target Duration S",
+            "type": "integer"
+          },
+          "voice_id": {
+            "title": "Voice Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "style",
+          "target_duration_s",
+          "voice_id"
+        ],
+        "title": "ScriptParams",
+        "type": "object"
+      },
+      "ScriptSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "beat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat"
+          },
+          "id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "narration",
+              "original"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "line_refs": {
+            "default": [],
+            "items": {
+              "pattern": "^ln_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Line Refs",
+            "type": "array"
+          },
+          "scene_refs": {
+            "default": [],
+            "items": {
+              "pattern": "^sc_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Scene Refs",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text"
+        ],
+        "title": "ScriptSegment",
         "type": "object"
       },
       "StageStatus": {
@@ -1727,6 +1969,69 @@
           }
         },
         "summary": "Render",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/script": {
+      "get": {
+        "description": "The generated commentary text; 404 until the script job has run.",
+        "operationId": "get_script_api_projects__project_id__script_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Script"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Get Script",
         "tags": [
           "projects"
         ]

@@ -12,3 +12,6 @@ export type AssetDetail = Schemas["AssetDetail"];
 export type Project = Schemas["Project"];
 export type ProjectDetail = Schemas["ProjectDetail"];
 export type ErrorBody = Schemas["ErrorBody"];
+export type ProjectOptions = Schemas["ProjectOptions"];
+export type Script = Schemas["Script"];
+export type ScriptSegment = Script["segments"][number];

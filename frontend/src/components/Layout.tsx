@@ -3,6 +3,7 @@ import { useJobEvents, type Connection } from "../api/events";
 
 const nav = [
   { to: "/library", label: "素材库" },
+  { to: "/projects", label: "项目" },
   { to: "/jobs", label: "作业中心" },
 ];
 

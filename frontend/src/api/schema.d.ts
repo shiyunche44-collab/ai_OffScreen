@@ -298,6 +298,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Script
+         * @description The generated commentary text; 404 until the script job has run.
+         */
+        get: operations["get_script_api_projects__project_id__script_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/script:generate": {
         parameters: {
             query?: never;
@@ -319,6 +339,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Annotation */
+        Annotation: {
+            /** Message */
+            message: string;
+            /** Segment Id */
+            segment_id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "fact_check" | "rule" | "style";
+        };
         /** AssetDetail */
         AssetDetail: {
             asset: components["schemas"]["MediaAsset"];
@@ -494,6 +526,15 @@ export interface components {
              */
             truncated: boolean;
         };
+        /** OutlineBeat */
+        OutlineBeat: {
+            /** Beat */
+            beat: string;
+            /** Scene Refs */
+            scene_refs: string[];
+            /** Target S */
+            target_s: number;
+        };
         /** Project */
         Project: {
             /** Asset Id */
@@ -550,6 +591,89 @@ export interface components {
             den: number;
             /** Num */
             num: number;
+        };
+        /** Script */
+        Script: {
+            /**
+             * Annotations
+             * @default []
+             */
+            annotations: components["schemas"]["Annotation"][];
+            /**
+             * Author
+             * @enum {string}
+             */
+            author: "ai" | "human";
+            /** Id */
+            id: string;
+            /**
+             * Outline
+             * @default []
+             */
+            outline: components["schemas"]["OutlineBeat"][];
+            params: components["schemas"]["ScriptParams"];
+            /** Parent Version */
+            parent_version?: number | null;
+            /** Project Id */
+            project_id: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Segments */
+            segments: components["schemas"]["ScriptSegment"][];
+            /** Version */
+            version: number;
+        };
+        /** ScriptParams */
+        ScriptParams: {
+            /**
+             * Language
+             * @default zh
+             */
+            language: string;
+            /**
+             * Perspective
+             * @default third
+             * @enum {string}
+             */
+            perspective: "first" | "third";
+            /**
+             * Spoil Ending
+             * @default true
+             */
+            spoil_ending: boolean;
+            /** Style */
+            style: string;
+            /** Target Duration S */
+            target_duration_s: number;
+            /** Voice Id */
+            voice_id: string;
+        };
+        /** ScriptSegment */
+        ScriptSegment: {
+            /** Beat */
+            beat?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "narration" | "original";
+            /**
+             * Line Refs
+             * @default []
+             */
+            line_refs: string[];
+            /**
+             * Scene Refs
+             * @default []
+             */
+            scene_refs: string[];
+            /** Text */
+            text: string;
         };
         /** StageStatus */
         StageStatus: {
@@ -1366,6 +1490,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_script_api_projects__project_id__script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Script"];
                 };
             };
             /** @description Not found */

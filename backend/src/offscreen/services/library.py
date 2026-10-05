@@ -14,11 +14,13 @@ from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
+from offscreen.domain.script import Script
 from offscreen.media.probe import ProbeError
 from offscreen.services.errors import InvalidInput, NotFound
-from offscreen.services.jobs import ANALYZE, RENDER, JobService
+from offscreen.services.jobs import ANALYZE, GENERATE_SCRIPT, RENDER, JobService
 from offscreen.services.pipeline import Pipeline, RunOptions
 from offscreen.stages.analysis.ingest import IngestError, ingest
+from offscreen.stages.creation.script import SCRIPT_FILE
 from offscreen.stages.output.render import FINAL_FILE
 from offscreen.store.db import Database
 from offscreen.store.repos import AssetRepo, ProjectRepo
@@ -180,6 +182,15 @@ class LibraryService:
                 else None
             )
         return ProjectDetail(project=project, stages=stages, video=video)
+
+    def script(self, project_id: str) -> Script:
+        """The commentary text generated for this project's options (read-only for now)."""
+        project = self._project(project_id)
+        with self._pipeline() as p:
+            artifact = p.peek(GENERATE_SCRIPT, project.asset_id, run_options(project.options))
+        if artifact is None:
+            raise NotFound("the script has not been generated yet")
+        return artifact.read_model(SCRIPT_FILE, Script)
 
     def generate_script(self, project_id: str) -> Job:
         p = self._project(project_id)

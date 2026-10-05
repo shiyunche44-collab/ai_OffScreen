@@ -29,6 +29,7 @@ def test_the_documented_routes() -> None:
         "/api/assets/{asset_id}/analyze",
         "/api/projects",
         "/api/projects/{project_id}",
+        "/api/projects/{project_id}/script",
         "/api/projects/{project_id}/script:generate",
         "/api/projects/{project_id}/plan:build",
         "/api/projects/{project_id}/render",

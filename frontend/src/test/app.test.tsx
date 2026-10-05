@@ -25,13 +25,14 @@ describe("routing and layout", () => {
     expect(screen.getByRole("progressbar", { name: "进度" })).toHaveValue(0.4);
   });
 
-  it("shows a project with the stages that are built", async () => {
+  it("shows a project with its steps", async () => {
     stubApi({
+      "GET /api/jobs": () => json([]),
       "GET /api/projects/prj_1": () =>
         json({
           project: { id: "prj_1", asset_id: "ast_1", name: "三分钟版", options: {}, created_at: "2026-10-05T08:00:00Z" },
           stages: [
-            { stage: "analysis.proxy", cached: true },
+            { stage: "analysis.story", cached: true },
             { stage: "creation.script", cached: false },
           ],
           video: null,
@@ -39,8 +40,8 @@ describe("routing and layout", () => {
     });
     renderWithProviders(<App />, "/projects/prj_1");
     expect(await screen.findByRole("heading", { name: "三分钟版" })).toBeInTheDocument();
-    expect(screen.getByText(/analysis\.proxy/)).toHaveTextContent("✓");
-    expect(screen.getByText(/creation\.script/)).toHaveTextContent("·");
+    expect(screen.getByRole("listitem", { name: "分析影片" })).toHaveTextContent("已完成");
+    expect(screen.getByRole("listitem", { name: "解说文案" })).toHaveTextContent("未开始");
   });
 
   it("explains an API failure instead of crashing", async () => {

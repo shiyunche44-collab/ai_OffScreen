@@ -1,25 +1,60 @@
-import { useParams } from "react-router-dom";
-import { useProject } from "../api/queries";
+import { Link, useParams } from "react-router-dom";
+import { useJobs, useProject } from "../api/queries";
 import { QueryState } from "../components/Query";
+import { ScriptView } from "../components/ScriptView";
+import { StepList } from "../components/StepList";
+import { fileUrl, optionsOf } from "../lib/project";
 
-// Skeleton: the project page proper (one button per step, script text, video) is M2-10.
 export function ProjectPage() {
   const { projectId = "" } = useParams();
   const { data, isPending, error } = useProject(projectId);
+  const jobs = useJobs(); // live: drives each step's progress
+
   return (
     <section>
       <QueryState isPending={isPending} error={error}>
         {data ? (
-          <>
-            <h1 className="mb-4 text-xl font-semibold">{data.project.name}</h1>
-            <ul className="space-y-1 text-sm">
-              {data.stages.map((s) => (
-                <li key={s.stage}>
-                  {s.cached ? "✓" : "·"} {s.stage}
-                </li>
-              ))}
-            </ul>
-          </>
+          <div className="space-y-8">
+            <header>
+              <h1 className="text-xl font-semibold">{data.project.name}</h1>
+              {(() => {
+                const o = optionsOf(data);
+                return (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {o.minutes} 分钟 · 风格 {o.style} · 音色 {o.voice ?? "默认"} · {o.spoil_ending ? "含结局" : "不剧透结局"}
+                  </p>
+                );
+              })()}
+            </header>
+
+            <StepList detail={data} jobs={jobs.data} />
+
+            {data.stages.find((s) => s.stage === "creation.script")?.cached ? (
+              <div>
+                <h2 className="mb-3 text-lg font-medium">解说文案</h2>
+                <ScriptView projectId={projectId} />
+              </div>
+            ) : null}
+
+            {data.video ? (
+              <div>
+                <h2 className="mb-3 text-lg font-medium">成片</h2>
+                <video
+                  controls
+                  preload="metadata"
+                  src={fileUrl(data.video)}
+                  aria-label="成片"
+                  className="w-full max-w-3xl rounded bg-black"
+                />
+              </div>
+            ) : null}
+
+            <p className="text-sm">
+              <Link className="text-sky-600 hover:underline dark:text-sky-400" to="/jobs">
+                查看作业详情与日志 →
+              </Link>
+            </p>
+          </div>
         ) : null}
       </QueryState>
     </section>

@@ -8,6 +8,7 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.common import AssetId
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
+from offscreen.domain.script import Script
 from offscreen.services.library import ProjectDetail
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
@@ -33,6 +34,12 @@ def list_projects(services: Services) -> list[Project]:
 def get_project(project_id: str, services: Services) -> ProjectDetail:
     """The project, which stages are built for its options, and the finished video if any."""
     return services.library.project(project_id)
+
+
+@router.get("/{project_id}/script")
+def get_script(project_id: str, services: Services) -> Script:
+    """The generated commentary text; 404 until the script job has run."""
+    return services.library.script(project_id)
 
 
 @router.post("/{project_id}/script:generate", status_code=202)

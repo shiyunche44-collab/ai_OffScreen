@@ -242,6 +242,7 @@ def test_create_project_defaults_and_validation(client: TestClient, movie: Path)
     bad = {"asset_id": asset["id"], "options": {"minutes": 0}}
     err(client.post("/api/projects", json=bad), 422, "validation_error")
     err(client.get("/api/projects/prj_missing"), 404, "not_found")
+    err(client.get("/api/projects/prj_missing/script"), 404, "not_found")
 
 
 def test_a_project_goes_from_nothing_to_a_playable_video(
@@ -254,6 +255,7 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     pid = project["id"]
     before = client.get(f"/api/projects/{pid}").json()
     assert before["video"] is None and not any(s["cached"] for s in before["stages"])
+    err(client.get(f"/api/projects/{pid}/script"), 404, "not_found")  # nothing generated yet
 
     jobs = []
     for step in ("script:generate", "plan:build", "render"):
@@ -263,6 +265,11 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     assert [j["stage"] for j in jobs] == ["creation.script", "creation.plan", "output.render"]
     drain(services)
     assert all(client.get(f"/api/jobs/{j['id']}").json()["status"] == "succeeded" for j in jobs)
+
+    script = client.get(f"/api/projects/{pid}/script").json()
+    assert script["params"]["target_duration_s"] == 15
+    assert [seg["kind"] for seg in script["segments"]] == ["narration"] * 3
+    assert all(seg["text"] for seg in script["segments"])
 
     after = client.get(f"/api/projects/{pid}").json()
     assert all(s["cached"] for s in after["stages"])

@@ -102,3 +102,45 @@ function useJobControl(action: "cancel" | "retry") {
 
 export const useCancelJob = () => useJobControl("cancel");
 export const useRetryJob = () => useJobControl("retry");
+
+export function useProjects() {
+  return useQuery({
+    queryKey: keys.projects,
+    queryFn: async () => unwrap(await api.GET("/api/projects")),
+  });
+}
+
+/** The generated script; only asked for once the project says it exists. */
+export function useScript(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.project(projectId), "script"] as const,
+    enabled,
+    queryFn: async () =>
+      unwrap(await api.GET("/api/projects/{project_id}/script", { params: { path: { project_id: projectId } } })),
+  });
+}
+
+export type StepStage = "analysis.story" | "creation.script" | "creation.plan" | "output.render";
+
+/** Queue one step of the project; the job then shows up through /api/events. */
+export function useRunStep(project: { id: string; asset_id: string }) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (stage: StepStage): Promise<Job> => {
+      const path = { path: { project_id: project.id } };
+      switch (stage) {
+        case "analysis.story":
+          return unwrap(
+            await api.POST("/api/assets/{asset_id}/analyze", { params: { path: { asset_id: project.asset_id } } }),
+          );
+        case "creation.script":
+          return unwrap(await api.POST("/api/projects/{project_id}/script:generate", { params: path }));
+        case "creation.plan":
+          return unwrap(await api.POST("/api/projects/{project_id}/plan:build", { params: path }));
+        case "output.render":
+          return unwrap(await api.POST("/api/projects/{project_id}/render", { params: path }));
+      }
+    },
+    onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}

@@ -4,6 +4,7 @@ import { Jobs } from "./pages/Jobs";
 import { Library } from "./pages/Library";
 import { NotFound } from "./pages/NotFound";
 import { ProjectPage } from "./pages/Project";
+import { Projects } from "./pages/Projects";
 
 export function App() {
   return (
@@ -12,6 +13,7 @@ export function App() {
         <Route index element={<Navigate to="/library" replace />} />
         <Route path="library" element={<Library />} />
         <Route path="jobs" element={<Jobs />} />
+        <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
