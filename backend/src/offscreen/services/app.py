@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from offscreen.config import AppConfig
+from offscreen.services.events import JobWatcher
 from offscreen.services.files import FileService
 from offscreen.services.jobs import JobService
 from offscreen.services.library import LibraryService
@@ -18,6 +19,10 @@ class AppServices:
         self.jobs = JobService(cfg, providers=providers, db=self.db)
         self.library = LibraryService(cfg, self.db, self.jobs)
         self.files = FileService(cfg)
+
+    def job_watcher(self) -> JobWatcher:
+        """A watcher for one live connection (each keeps its own baseline)."""
+        return JobWatcher(self.jobs.jobs)
 
     def close(self) -> None:
         self.db.close()

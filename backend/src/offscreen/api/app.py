@@ -8,7 +8,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from offscreen.api.errors import install_error_handlers
-from offscreen.api.routers import assets, files, jobs, projects
+from offscreen.api.routers import assets, events, files, jobs, projects
+from offscreen.api.sse import EventSettings
 from offscreen.config import load_config
 from offscreen.services.app import AppServices
 
@@ -16,7 +17,9 @@ TITLE = "AI OffScreen"
 VERSION = "0.1.0"
 
 
-def create_app(services: AppServices | None = None) -> FastAPI:
+def create_app(
+    services: AppServices | None = None, *, events_settings: EventSettings | None = None
+) -> FastAPI:
     """`services`: ready-made services (tests). Without them the app loads the config
     (`$OFFSCREEN_CONFIG` or ./config.yaml) when it starts and closes the services when it stops."""
 
@@ -34,7 +37,8 @@ def create_app(services: AppServices | None = None) -> FastAPI:
             own.close()
 
     app = FastAPI(title=TITLE, version=VERSION, lifespan=lifespan)
+    app.state.event_settings = events_settings or EventSettings()
     install_error_handlers(app)
-    for module in (assets, projects, jobs, files):
+    for module in (assets, projects, jobs, files, events):
         app.include_router(module.router)
     return app

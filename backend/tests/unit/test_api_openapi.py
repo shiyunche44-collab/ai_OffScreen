@@ -37,6 +37,7 @@ def test_the_documented_routes() -> None:
         "/jobs/{job_id}:cancel",
         "/jobs/{job_id}:retry",
         "/files/{path}",
+        "/events",
     }
 
 
@@ -44,6 +45,8 @@ def test_error_responses_are_documented_with_the_shared_model() -> None:
     s = spec()
     assert {"ErrorResponse", "ErrorBody"} <= set(s["components"]["schemas"])
     for path, ops in s["paths"].items():
+        if path == "/events":  # a stream: it never answers with an error body
+            continue
         for method, op in ops.items():
             for code in ("404", "409", "422"):
                 ref = op["responses"][code]["content"]["application/json"]["schema"]["$ref"]

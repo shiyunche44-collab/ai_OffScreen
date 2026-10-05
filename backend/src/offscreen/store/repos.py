@@ -376,6 +376,27 @@ class JobRepo:
             )
             return [r[0] for r in requeued.all()]
 
+    def active(self) -> list[Job]:
+        """Queued and running jobs, oldest first."""
+        with self.db.session() as s:
+            q = (
+                select(JobRow)
+                .where(col(JobRow.status).in_(("queued", "running")))
+                .order_by(col(JobRow.created_at), col(JobRow.id))
+            )
+            return [_job(r) for r in s.exec(q).all()]
+
+    def finished_since(self, since: datetime) -> list[Job]:
+        """Jobs that reached a final state at or after `since`, oldest first."""
+        with self.db.session() as s:
+            q = (
+                select(JobRow)
+                .where(col(JobRow.finished_at) >= since)
+                .where(col(JobRow.status).in_(("succeeded", "failed", "canceled")))
+                .order_by(col(JobRow.created_at), col(JobRow.id))
+            )
+            return [_job(r) for r in s.exec(q).all()]
+
     def list(
         self, *, status: JobStatus | None = None, lane: Lane | None = None, limit: int = 200
     ) -> list[Job]:

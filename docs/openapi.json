@@ -823,6 +823,28 @@
         ]
       }
     },
+    "/events": {
+      "get": {
+        "description": "Live job progress.",
+        "operationId": "events_events_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A Server-Sent Events stream. First a `snapshot` event whose data is `{\"jobs\": [Job, ...]}` (active jobs and those finished in the last minutes), then a `job` event carrying the full `Job` whenever one changes. The server closes the stream now and then; `EventSource` reconnects by itself and gets a fresh snapshot, so clients just replace jobs by id."
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/files/{path}": {
       "get": {
         "description": "A file under the data directory (videos, keyframes, audio, ...). Supports HTTP Range, so\nplayers can seek. Nothing outside the data directory is reachable.",
