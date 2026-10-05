@@ -256,4 +256,6 @@ class Story(Versioned):
     turning_points: list[TurningPoint] = []
     relations: list[Relation] = []
     ending: str | None = None
+    ending_scene_ids: list[SceneId] = []
+    """The scenes the ending is drawn from (a claim about the plot, so it has its anchors too)."""
     themes: list[str] = []

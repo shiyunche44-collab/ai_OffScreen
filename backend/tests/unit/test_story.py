@@ -1,186 +1,220 @@
+"""The story stage: acts and turning points from scenes, then the whole story, all anchored."""
+
 from __future__ import annotations
 
-from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from offscreen.domain.index import Scenes, Shot, Shots, Story, Transcript, TranscriptLine
-from offscreen.engine import ArtifactStore, Engine, Scope, Stage, StageContext, StageOutput
+from offscreen.domain.index import Scene, Scenes, Story
+from offscreen.engine import (
+    ArtifactStore,
+    Engine,
+    Scope,
+    Stage,
+    StageCanceled,
+    StageContext,
+    StageOutput,
+)
 from offscreen.providers.adapters.fake import FakeLLM
 from offscreen.providers.ports import LLMError
-from offscreen.stages.analysis.shots import SHOTS_FILE
-from offscreen.stages.analysis.story import (
-    SCENES_FILE,
-    STORY_FILE,
-    StoryError,
-    StoryStage,
-)
-from offscreen.stages.analysis.transcript import TRANSCRIPT_FILE
+from offscreen.stages.analysis.scenes import SCENES_FILE
+from offscreen.stages.analysis.story import STORY_FILE, StoryError, StoryStage
 from offscreen.store.files import write_model
 
 ASSET = "ast_t1"
+SCOPE = {"asset_id": ASSET}
+IDS = [f"sc_{i:03d}" for i in range(1, 7)]
 
 
-class StubTranscript(Stage):
-    name = "analysis.transcript"
+class StubScenes(Stage):
+    name = "analysis.scenes"
     version = 1
-    lane = "cpu"
+    lane = "api"
 
-    def __init__(self, lines: list[TranscriptLine]) -> None:
-        self.lines = lines
+    def __init__(self, n: int = 6, tag: str = "a") -> None:
+        self.n, self.tag = n, tag
 
     def params(self, scope: Scope) -> dict[str, Any]:
-        return {"n": len(self.lines), "text": [x.text for x in self.lines]}
+        return {"n": self.n, "tag": self.tag}
 
     def run(self, ctx: StageContext) -> StageOutput:
-        doc = Transcript(asset_id=ASSET, language="en", source="stub", lines=self.lines)
-        write_model(ctx.out_dir / TRANSCRIPT_FILE, doc)
-        return StageOutput()
-
-
-class StubShots(Stage):
-    name = "analysis.shots"
-    version = 1
-    lane = "cpu"
-
-    def __init__(self, n: int) -> None:
-        self.n = n
-
-    def params(self, scope: Scope) -> dict[str, Any]:
-        return {"n": self.n}
-
-    def run(self, ctx: StageContext) -> StageOutput:
-        shots = [
-            Shot(id=f"sh_{i:04d}", start_ms=i * 10_000, end_ms=(i + 1) * 10_000)
-            for i in range(self.n)
+        scenes = [
+            Scene(
+                id=f"sc_{i:03d}",
+                start_ms=(i - 1) * 60_000,
+                end_ms=i * 60_000,
+                shot_ids=[f"sh_{i:04d}"],
+                summary=f"场景 {i} 发生的事" + ("" if self.tag == "a" else self.tag),
+                location="雪山" if i % 2 else None,
+                importance=0.1 * i,
+            )
+            for i in range(1, self.n + 1)
         ]
-        write_model(ctx.out_dir / SHOTS_FILE, Shots(asset_id=ASSET, shots=shots))
+        write_model(ctx.out_dir / SCENES_FILE, Scenes(asset_id=ASSET, scenes=scenes))
         return StageOutput()
 
 
-def lines(*items: tuple[int, int, str]) -> list[TranscriptLine]:
-    return [
-        TranscriptLine(id=f"ln_{i:04d}", start_ms=a, end_ms=b, text=t)
-        for i, (a, b, t) in enumerate(items, 1)
-    ]
-
-
-def build(
-    tmp_path: Path, llm: FakeLLM, ls: list[TranscriptLine], n_shots: int = 6
-) -> tuple[Engine, StoryStage]:
-    stage = StoryStage(llm, {"story_chunk": "fake/m", "story": "fake/m"})
-    engine = Engine(ArtifactStore(tmp_path / "a"), [StubTranscript(ls), StubShots(n_shots), stage])
-    return engine, stage
-
-
-STORY = {
-    "logline": "一个故事",
-    "synopsis": "梗概",
-    "acts": [{"name": "第一幕", "summary": "开端", "scene_ids": ["sc_001"]}],
-    "turning_points": [{"scene_id": "sc_001", "what": "转折"}],
-    "ending": "结局",
-    "themes": ["成长"],
+ACTS = {
+    "acts": [
+        {"name": "开端", "summary": "相遇", "scene_ids": IDS[:2]},
+        {"name": "发展", "summary": "旅途", "scene_ids": IDS[2:5]},
+        {"name": "结局", "summary": "告别", "scene_ids": IDS[5:]},
+    ],
+    "turning_points": [{"scene_id": "sc_003", "what": "找到龙"}],
 }
-CHUNK = {"summary": "两人相遇", "characters": ["A", "B"], "location": "雪山", "importance": 3}
+SYNTHESIS = {
+    "logline": "一个女孩寻龙",
+    "synopsis": "梗概" * 50,
+    "ending": "她独自离开",
+    "ending_scene_ids": ["sc_006"],
+    "themes": ["陪伴", "失去"],
+}
 
 
-def test_single_chunk_story_and_scenes(tmp_path: Path) -> None:
-    llm = FakeLLM({"story_chunk": [CHUNK], "story": [STORY]})
-    engine, _ = build(tmp_path, llm, lines((1000, 2000, "Hello"), (30_000, 31_000, "Bye")))
-    art = engine.ensure("analysis.story", {"asset_id": ASSET})
+def build(tmp_path: Path, llm: FakeLLM, n: int = 6, models: dict[str, str] | None = None) -> Engine:
+    stage = StoryStage(llm, models or {"story": "fake/m"})
+    return Engine(ArtifactStore(tmp_path / "a"), [StubScenes(n), stage])
 
+
+def test_story_is_built_in_two_levels_and_anchored_in_scenes(tmp_path: Path) -> None:
+    llm = FakeLLM({"story": [ACTS, SYNTHESIS]})
+    art = build(tmp_path, llm).ensure("analysis.story", SCOPE)
     story = art.read_model(STORY_FILE, Story)
-    scenes = art.read_model(SCENES_FILE, Scenes)
-    assert story.asset_id == ASSET and story.acts[0].scene_ids == ["sc_001"]
-    assert len(scenes.scenes) == 1
-    sc = scenes.scenes[0]
-    assert (sc.start_ms, sc.end_ms) == (0, 60_000)  # covers the whole film
-    assert sc.shot_ids[0] == "sh_0000" and len(sc.shot_ids) == 6
-    assert sc.line_ids == ["ln_0001", "ln_0002"]
-    assert sc.importance == 1.0  # model said 3: clamped
-    assert sc.location == "雪山"
-    assert art.meta == {"lines": 2, "scenes": 1, "acts": 1}
-    assert [c[0] for c in llm.calls] == ["story_chunk", "story"]
-    assert llm.calls[0][2].startswith("story_chunk@") and llm.calls[1][2].startswith("story_merge@")
-    assert "[00:01] Hello" in llm.calls[0][1][0].content
+
+    assert story.logline == "一个女孩寻龙" and story.themes == ["陪伴", "失去"]
+    assert [(a.name, a.scene_ids) for a in story.acts] == [
+        (a["name"], a["scene_ids"]) for a in ACTS["acts"]
+    ]
+    assert [(t.scene_id, t.what) for t in story.turning_points] == [("sc_003", "找到龙")]
+    assert (story.ending, story.ending_scene_ids) == ("她独自离开", ["sc_006"])
+    assert story.relations == []  # no characters yet
+    assert art.meta == {"scenes": 6, "acts": 3, "turning_points": 1}
+    assert [c[0] for c in llm.calls] == ["story", "story"]
+    assert llm.calls[0][2].startswith("story_acts@") and llm.calls[1][2].startswith(
+        "story_synthesis@"
+    )
 
 
-def test_multiple_chunks_get_rolling_context_and_contiguous_scenes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("offscreen.stages.analysis.story.MAX_CHUNK_CHARS", 8)
+def test_prompts_carry_the_scene_summaries_then_the_acts(tmp_path: Path) -> None:
+    llm = FakeLLM({"story": [ACTS, SYNTHESIS]})
+    build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    acts_prompt = llm.calls[0][1][0].content
+    assert "sc_001（00:00 – 01:00，地点：雪山，重要度 0.1）" in acts_prompt
+    assert (
+        "场景 6 发生的事" in acts_prompt
+        and "地点：" not in acts_prompt.split("sc_002")[1].split("sc_003")[0]
+    )
+    synthesis_prompt = llm.calls[1][1][0].content
+    assert "第 1 幕「开端」（00:00 – 02:00，场景 sc_001、sc_002）" in synthesis_prompt
+    assert "- sc_003：找到龙" in synthesis_prompt
 
-    ls = lines((1000, 2000, "aaaaaaaa"), (25_000, 26_000, "bbbbbbbb"), (50_000, 51_000, "cc"))
-    prompts: list[str] = []
 
-    def chunk(_t: str, msgs: Any, _s: Any) -> dict[str, Any]:
-        prompts.append(msgs[0].content)
-        return {"summary": f"摘要{len(prompts)}"}
+def test_acts_must_cover_every_scene_once_and_get_one_repair_round(tmp_path: Path) -> None:
+    bad = {**ACTS, "acts": [ACTS["acts"][0], ACTS["acts"][2]]}  # scenes 3-5 are in no act
+    llm = FakeLLM({"story": [bad, ACTS, SYNTHESIS]})
+    art = build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    assert art.meta["acts"] == 3
+    repair = llm.calls[1][1]
+    assert (
+        repair[-1].role == "user"
+        and "这些场景不属于任何一幕：sc_003、sc_004、sc_005" in repair[-1].content
+    )
+    assert "sc_001, sc_002" in repair[-1].content  # the valid ids are listed again
 
-    def merge(_t: str, msgs: Any, _s: Any) -> dict[str, Any]:
-        assert "sc_001" in msgs[0].content and "摘要3" in msgs[0].content
-        return {
-            **STORY,
-            "acts": [{"name": "全", "summary": "x", "scene_ids": ["sc_001", "sc_002", "sc_003"]}],
+
+def test_a_scene_in_two_acts_or_an_unknown_one_is_refused(tmp_path: Path) -> None:
+    twice = {
+        "acts": [
+            {"name": "a", "summary": "x", "scene_ids": IDS},
+            {"name": "b", "summary": "y", "scene_ids": ["sc_002", "sc_099"]},
+        ]
+    }
+    llm = FakeLLM({"story": [twice, twice]})
+    with pytest.raises(StoryError, match="sc_002") as e:
+        build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    assert "sc_099" in str(e.value) and len(llm.calls) == 2  # one repair round, then give up
+
+
+def test_a_turning_point_must_cite_an_existing_scene(tmp_path: Path) -> None:
+    bad = {**ACTS, "turning_points": [{"scene_id": "sc_404", "what": "x"}]}
+    llm = FakeLLM({"story": [bad, bad]})
+    with pytest.raises(StoryError, match="sc_404"):
+        build(tmp_path, llm).ensure("analysis.story", SCOPE)
+
+
+def test_the_ending_must_be_anchored_too(tmp_path: Path) -> None:
+    unanchored = {**SYNTHESIS, "ending_scene_ids": []}
+    llm = FakeLLM({"story": [ACTS, unanchored, SYNTHESIS]})
+    art = build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    assert art.read_model(STORY_FILE, Story).ending_scene_ids == ["sc_006"]
+    assert "ending_scene_ids" in llm.calls[2][1][-1].content
+
+    llm2 = FakeLLM(
+        {
+            "story": [
+                ACTS,
+                {**SYNTHESIS, "ending_scene_ids": ["sc_77"]},
+                {**SYNTHESIS, "ending_scene_ids": ["sc_77"]},
+            ]
         }
-
-    llm = FakeLLM({"story_chunk": chunk, "story": merge})
-    engine, _ = build(tmp_path, llm, ls)
-    art = engine.ensure("analysis.story", {"asset_id": ASSET})
-
-    scenes = art.read_model(SCENES_FILE, Scenes).scenes
-    assert [s.id for s in scenes] == ["sc_001", "sc_002", "sc_003"]
-    assert scenes[0].start_ms == 0 and scenes[-1].end_ms == 60_000
-    assert all(a.end_ms == b.start_ms for a, b in pairwise(scenes))
-    assert sum(len(s.shot_ids) for s in scenes) == 6
-    assert "摘要1" in prompts[1] and "摘要1" not in prompts[0]
+    )
+    with pytest.raises(StoryError, match="结局引用了不存在的场景 sc_77"):
+        build(tmp_path / "x", llm2).ensure("analysis.story", SCOPE)
 
 
-def test_invalid_scene_refs_get_one_repair_round(tmp_path: Path) -> None:
-    bad = {**STORY, "acts": [{"name": "x", "summary": "y", "scene_ids": ["sc_099"]}]}
-    llm = FakeLLM({"story_chunk": [CHUNK], "story": [bad, STORY]})
-    engine, _ = build(tmp_path, llm, lines((1000, 2000, "Hello")))
-    art = engine.ensure("analysis.story", {"asset_id": ASSET})
-    assert art.read_model(STORY_FILE, Story).acts[0].scene_ids == ["sc_001"]
-    retry = llm.calls[-1][1]
-    assert [m.role for m in retry] == ["user", "assistant", "user"]
-    assert "sc_099" in retry[2].content and "sc_001" in retry[2].content
+def test_a_story_without_an_ending_needs_no_anchor(tmp_path: Path) -> None:
+    llm = FakeLLM({"story": [ACTS, {**SYNTHESIS, "ending": None, "ending_scene_ids": []}]})
+    story = build(tmp_path, llm).ensure("analysis.story", SCOPE).read_model(STORY_FILE, Story)
+    assert story.ending is None and story.ending_scene_ids == []
 
 
-def test_invalid_scene_refs_twice_fail(tmp_path: Path) -> None:
-    bad = {**STORY, "turning_points": [{"scene_id": "sc_099", "what": "w"}]}
-    llm = FakeLLM({"story_chunk": [CHUNK], "story": [bad, bad]})
-    engine, _ = build(tmp_path, llm, lines((1000, 2000, "Hello")))
-    with pytest.raises(StoryError, match="sc_099"):
-        engine.ensure("analysis.story", {"asset_id": ASSET})
+def test_no_scenes_is_an_error(tmp_path: Path) -> None:
+    with pytest.raises(StoryError, match="no scenes"):
+        build(tmp_path, FakeLLM({}), n=0).ensure("analysis.story", SCOPE)
 
 
-def test_no_dialogue_is_an_error(tmp_path: Path) -> None:
-    engine, _ = build(tmp_path, FakeLLM({}), [])
-    with pytest.raises(StoryError, match="no dialogue"):
-        engine.ensure("analysis.story", {"asset_id": ASSET})
-
-
-def test_llm_failure_propagates_and_leaves_no_artifact(tmp_path: Path) -> None:
-    llm = FakeLLM({"story_chunk": [LLMError("boom")]})
-    engine, _ = build(tmp_path, llm, lines((1000, 2000, "Hello")))
+def test_a_model_failure_propagates_and_leaves_no_artifact(tmp_path: Path) -> None:
+    llm = FakeLLM({"story": [LLMError("boom")]})
     with pytest.raises(LLMError):
-        engine.ensure("analysis.story", {"asset_id": ASSET})
-    assert not list((tmp_path / "a").glob("analysis.story/*/manifest.json"))
+        build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    assert list((tmp_path / "a" / "analysis.story").iterdir()) == []
 
 
-def test_second_run_hits_cache_and_model_change_invalidates(tmp_path: Path) -> None:
-    llm = FakeLLM({"story_chunk": [CHUNK, CHUNK], "story": [STORY, STORY]})
-    ls = lines((1000, 2000, "Hello"))
-    engine, _ = build(tmp_path, llm, ls)
-    scope = {"asset_id": ASSET}
-    first = engine.ensure("analysis.story", scope)
-    again = engine.ensure("analysis.story", scope)
+def test_cancel_between_the_two_levels(tmp_path: Path) -> None:
+    llm = FakeLLM({"story": [ACTS, SYNTHESIS]})
+    flag = {"stop": False}
+
+    def progress(stage: str, _f: float, msg: str) -> None:
+        if stage == "analysis.story" and msg.startswith("acts"):
+            flag["stop"] = True
+
+    engine = Engine(
+        ArtifactStore(tmp_path / "a"),
+        [StubScenes(), StoryStage(llm, {"story": "fake/m"})],
+        progress=progress,
+        is_canceled=lambda: flag["stop"],
+    )
+    with pytest.raises(StageCanceled):
+        engine.ensure("analysis.story", SCOPE)
+    assert len(llm.calls) == 1  # the second level was never asked
+
+
+def test_a_second_run_hits_the_cache_and_a_new_model_or_scenes_invalidate_it(
+    tmp_path: Path,
+) -> None:
+    llm = FakeLLM({"story": [ACTS, SYNTHESIS, ACTS, SYNTHESIS, ACTS, SYNTHESIS]})
+    first = build(tmp_path, llm).ensure("analysis.story", SCOPE)
+    again = build(tmp_path, llm).ensure("analysis.story", SCOPE)
     assert again.cache_key == first.cache_key and len(llm.calls) == 2
 
-    other = StoryStage(llm, {"story_chunk": "fake/m2", "story": "fake/m"})
-    engine2 = Engine(ArtifactStore(tmp_path / "a"), [StubTranscript(ls), StubShots(6), other])
-    third = engine2.ensure("analysis.story", scope)
-    assert third.cache_key != first.cache_key and len(llm.calls) == 4
+    other_model = build(tmp_path, llm, models={"story": "fake/other"}).ensure(
+        "analysis.story", SCOPE
+    )
+    assert other_model.cache_key != first.cache_key and len(llm.calls) == 4
+
+    changed_scenes = Engine(
+        ArtifactStore(tmp_path / "a"), [StubScenes(6, "b"), StoryStage(llm, {"story": "fake/m"})]
+    )
+    assert changed_scenes.ensure("analysis.story", SCOPE).cache_key != first.cache_key

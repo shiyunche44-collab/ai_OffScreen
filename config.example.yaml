@@ -37,7 +37,6 @@ providers:
     enabled: false
 
 tasks:                  # 每个 LLM 任务单独选供应商和模型
-  story_chunk:     { provider: minimax,  model: MiniMax-M3 }
   scene_segment:   { provider: minimax,  model: MiniMax-M3 }
   story:           { provider: minimax,  model: MiniMax-M3 }
   character_name:  { provider: minimax,  model: MiniMax-M3 }

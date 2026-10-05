@@ -147,9 +147,7 @@ class Pipeline:
             style=opts.style,
             spoil_ending=opts.spoil_ending,
         )
-        models = task_models(
-            cfg, ["story_chunk", "story", "script_write", "shot_caption", "scene_segment"]
-        )
+        models = task_models(cfg, ["story", "script_write", "shot_caption", "scene_segment"])
         caption_task = cfg.tasks.get("shot_caption")
         return [
             ProxyStage(self.assets),

@@ -1,0 +1,20 @@
+{# version: 1 #}
+你是电影剧情分析助手。下面是一部电影已经划分好的各幕概括和关键转折（场景编号形如 sc_001）。请据此写出全片剧情。
+
+要求：
+- 用中文；只依据给出的内容，不要引入外部知识，不要编造
+- logline：一句话剧情
+- synopsis：300–500 字梗概，按时间顺序，写清主要人物、冲突、转折和结局
+- ending：结局一两句话；ending_scene_ids：结局所依据的场景编号（1–3 个，必须是下面出现过的编号）
+- themes：2–4 个主题词
+
+各幕：
+{% for a in acts %}
+第 {{ loop.index }} 幕「{{ a.name }}」（{{ a.start }} – {{ a.end }}，场景 {{ a.scene_ids | join("、") }}）
+{{ a.summary }}
+
+{% endfor %}
+关键转折：
+{% for t in turning_points %}
+- {{ t.scene_id }}：{{ t.what }}
+{% endfor %}

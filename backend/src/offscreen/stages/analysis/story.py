@@ -1,69 +1,40 @@
-"""story: transcript (+ shots) -> story.json and a coarse scenes.json (v0).
+"""story: scenes -> story.json, a layered summary of the film (M3-12).
 
-Dialogue is cut into chunks by time and size, the LLM summarizes each chunk (task
-`story_chunk`), and the summaries are merged into one story (task `story`). Every chunk is
-one coarse scene whose borders are snapped to shot starts, so M1's shot picking has scene
-and shot ids to refer to. The real scene segmentation (M3-11) will replace this part and
-make this stage read scenes.json instead of writing it. Every plot claim in the story
-cites scene ids, and the stage checks that they exist."""
+Two levels over the scene summaries of `analysis.scenes`: first the scenes are grouped into acts
+and the key turning points are named (prompt `story_acts`); then the acts become the film's
+logline, synopsis, ending and themes (prompt `story_synthesis`; both use task `story`). Every
+claim about the plot is anchored in scene ids and the stage checks them: acts must contain every
+scene exactly once, turning points and the ending must cite scenes that exist. A wrong answer
+gets one repair round with the problems listed, then the stage fails rather than keep a story
+that points at nothing.
+
+Relations and character biographies need characters (M3-08 / M3-09) and stay empty until then."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
-from offscreen.algo.story import ScenePlan, check_story_refs, fmt_clock, plan_scenes
-from offscreen.domain.index import (
-    Act,
-    Scene,
-    Scenes,
-    Shot,
-    Shots,
-    Story,
-    Transcript,
-    TranscriptLine,
-    TurningPoint,
-)
+from offscreen.algo.story import check_story_refs, fmt_clock
+from offscreen.domain.index import Act, Scene, Scenes, Story, TurningPoint
 from offscreen.domain.job import Lane
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.prompts import render, template_version
 from offscreen.providers.ports import LLM, Message
-from offscreen.stages.analysis.shots import SHOTS_FILE
-from offscreen.stages.analysis.transcript import TRANSCRIPT_FILE
+from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.store.files import write_model
 
 STORY_FILE = "story.json"
-SCENES_FILE = "scenes.json"
-CHUNK_TASK = "story_chunk"
 STORY_TASK = "story"
-MAX_CHUNK_CHARS = 6_000
-MAX_CHUNK_SPAN_MS = 15 * 60 * 1000
-MERGE_ATTEMPTS = 2
+ATTEMPTS = 2
+
+R = TypeVar("R", bound=BaseModel)
 
 
 class StoryError(RuntimeError):
     pass
-
-
-class ChunkReply(BaseModel):
-    """What the model returns for one chunk (lenient: unknown fields are ignored)."""
-
-    summary: str = Field(min_length=1)
-    characters: list[str] = []
-    location: str | None = None
-    importance: float = 0.5
-
-    @field_validator("importance")
-    @classmethod
-    def _clamp(cls, v: float) -> float:
-        return min(1.0, max(0.0, v))
-
-    @field_validator("location")
-    @classmethod
-    def _blank_location(cls, v: str | None) -> str | None:
-        return v.strip() or None if v else None
 
 
 class ActReply(BaseModel):
@@ -77,18 +48,22 @@ class TurningPointReply(BaseModel):
     what: str = Field(min_length=1)
 
 
-class StoryReply(BaseModel):
-    logline: str = Field(min_length=1)
-    synopsis: str = Field(min_length=1)
+class ActsReply(BaseModel):
     acts: list[ActReply] = Field(min_length=1)
     turning_points: list[TurningPointReply] = []
+
+
+class SynthesisReply(BaseModel):
+    logline: str = Field(min_length=1)
+    synopsis: str = Field(min_length=1)
     ending: str | None = None
+    ending_scene_ids: list[str] = []
     themes: list[str] = []
 
 
 class StoryStage(Stage):
     name = "analysis.story"
-    version = 1
+    version = 2
     lane: Lane = "api"
 
     def __init__(self, llm: LLM, models: Mapping[str, str] | None = None) -> None:
@@ -97,114 +72,59 @@ class StoryStage(Stage):
         """`task -> "provider/model"` for the tasks this stage uses; part of the cache key."""
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
-        return [ArtifactRef("analysis.transcript", scope), ArtifactRef("analysis.shots", scope)]
+        return [ArtifactRef("analysis.scenes", scope)]
 
     def params(self, scope: Scope) -> dict[str, Any]:
-        return {
-            "asset_id": scope["asset_id"],
-            "max_chunk_chars": MAX_CHUNK_CHARS,
-            "max_chunk_span_ms": MAX_CHUNK_SPAN_MS,
-            "language": "zh",
-        }
+        return {"asset_id": scope["asset_id"], "language": "zh"}
 
     def provider_info(self, scope: Scope) -> dict[str, Any]:
         return {
-            "models": {t: self.models.get(t) for t in (CHUNK_TASK, STORY_TASK)},
+            "models": {STORY_TASK: self.models.get(STORY_TASK)},
             "prompts": {
-                CHUNK_TASK: template_version("story_chunk"),
-                STORY_TASK: template_version("story_merge"),
+                "acts": template_version("story_acts"),
+                "synthesis": template_version("story_synthesis"),
             },
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
-        asset_id = ctx.scope["asset_id"]
-        transcript = ctx.input("analysis.transcript").read_model(TRANSCRIPT_FILE, Transcript)
-        shots = ctx.input("analysis.shots").read_model(SHOTS_FILE, Shots).shots
-        lines = sorted(transcript.lines, key=lambda x: (x.start_ms, x.end_ms))
-        if not lines:
-            raise StoryError("no dialogue in the transcript: nothing to build a story from")
-        if not shots:
-            raise StoryError("no shots detected")
+        doc = ctx.input("analysis.scenes").read_model(SCENES_FILE, Scenes)
+        scenes = doc.scenes
+        if not scenes:
+            raise StoryError("no scenes to build a story from")
+        ids = [s.id for s in scenes]
 
-        plans = plan_scenes(
-            lines,
-            [s.start_ms for s in shots],
-            max_chars=MAX_CHUNK_CHARS,
-            max_span_ms=MAX_CHUNK_SPAN_MS,
+        acts = self._acts(scenes, ids)
+        ctx.progress(0.5, "acts and turning points")
+        if ctx.is_canceled():
+            raise StageCanceled(self.name)
+        synthesis = self._synthesis(scenes, ids, acts)
+
+        story = Story(
+            asset_id=doc.asset_id,
+            logline=synthesis.logline,
+            synopsis=synthesis.synopsis,
+            acts=[Act(name=a.name, scene_ids=a.scene_ids, summary=a.summary) for a in acts.acts],
+            turning_points=[
+                TurningPoint(scene_id=t.scene_id, what=t.what) for t in acts.turning_points
+            ],
+            ending=synthesis.ending,
+            ending_scene_ids=synthesis.ending_scene_ids,
+            themes=synthesis.themes,
         )
-        width = max(3, len(str(len(plans))))
-        scenes: list[Scene] = []
-        replies: list[ChunkReply] = []
-        for i, plan in enumerate(plans):
-            if ctx.is_canceled():
-                raise StageCanceled(self.name)
-            scene_lines = lines[plan.line_lo : plan.line_hi]
-            start_ms, end_ms = shots[plan.shot_lo].start_ms, shots[plan.shot_hi - 1].end_ms
-            reply = self._summarize_chunk(
-                i, len(plans), start_ms, end_ms, scene_lines, replies[-1] if replies else None
-            )
-            replies.append(reply)
-            scenes.append(self._scene(f"sc_{i + 1:0{width}d}", plan, reply, lines, shots))
-            ctx.progress((i + 1) / (len(plans) + 1) * 0.95, f"summarized chunk {i + 1}")
-
-        story = self._merge(asset_id, scenes, replies)
-        write_model(ctx.out_dir / SCENES_FILE, Scenes(asset_id=asset_id, scenes=scenes))
         write_model(ctx.out_dir / STORY_FILE, story)
         ctx.progress(1.0, "done")
         return StageOutput(
-            meta={"lines": len(lines), "scenes": len(scenes), "acts": len(story.acts)}
+            meta={
+                "scenes": len(scenes),
+                "acts": len(story.acts),
+                "turning_points": len(story.turning_points),
+            }
         )
 
-    # ---- per chunk ---------------------------------------------------------------------
-    def _summarize_chunk(
-        self,
-        index: int,
-        total: int,
-        start_ms: int,
-        end_ms: int,
-        lines: list[TranscriptLine],
-        previous: ChunkReply | None,
-    ) -> ChunkReply:
+    # ---- level 1: scenes -> acts ---------------------------------------------------------
+    def _acts(self, scenes: Sequence[Scene], ids: list[str]) -> ActsReply:
         prompt = render(
-            "story_chunk",
-            index=index + 1,
-            total=total,
-            start=fmt_clock(start_ms),
-            end=fmt_clock(end_ms),
-            previous_summary=previous.summary if previous else None,
-            lines=[{"at": fmt_clock(x.start_ms), "text": x.text} for x in lines],
-        )
-        return self.llm.generate(
-            CHUNK_TASK,
-            [Message("user", prompt.text)],
-            ChunkReply,
-            prompt_version=prompt.version,
-            max_tokens=1024,
-        )
-
-    @staticmethod
-    def _scene(
-        scene_id: str,
-        plan: ScenePlan,
-        reply: ChunkReply,
-        lines: list[TranscriptLine],
-        shots: list[Shot],
-    ) -> Scene:
-        return Scene(
-            id=scene_id,
-            start_ms=shots[plan.shot_lo].start_ms,
-            end_ms=shots[plan.shot_hi - 1].end_ms,
-            shot_ids=[s.id for s in shots[plan.shot_lo : plan.shot_hi]],
-            line_ids=[x.id for x in lines[plan.line_lo : plan.line_hi]],
-            summary=reply.summary,
-            location=reply.location,
-            importance=reply.importance,
-        )
-
-    # ---- merge -------------------------------------------------------------------------
-    def _merge(self, asset_id: str, scenes: list[Scene], replies: list[ChunkReply]) -> Story:
-        prompt = render(
-            "story_merge",
+            "story_acts",
             scenes=[
                 {
                     "id": s.id,
@@ -212,47 +132,77 @@ class StoryStage(Stage):
                     "end": fmt_clock(s.end_ms),
                     "location": s.location,
                     "importance": s.importance,
-                    "characters": r.characters,
                     "summary": s.summary,
                 }
-                for s, r in zip(scenes, replies, strict=True)
+                for s in scenes
             ],
         )
-        messages = [Message("user", prompt.text)]
-        scene_ids = [s.id for s in scenes]
-        problems: list[str] = []
-        for _ in range(MERGE_ATTEMPTS):
+
+        def problems(r: ActsReply) -> list[str]:
+            return check_story_refs(
+                [a.scene_ids for a in r.acts],
+                [t.scene_id for t in r.turning_points],
+                ids,
+                cover=True,
+            )
+
+        return self._ask(prompt.text, prompt.version, ActsReply, problems, ids, 4096)
+
+    # ---- level 2: acts -> the whole story ------------------------------------------------
+    def _synthesis(
+        self, scenes: Sequence[Scene], ids: list[str], acts: ActsReply
+    ) -> SynthesisReply:
+        by_id = {s.id: s for s in scenes}
+        prompt = render(
+            "story_synthesis",
+            acts=[
+                {
+                    "name": a.name,
+                    "summary": a.summary,
+                    "scene_ids": a.scene_ids,
+                    "start": fmt_clock(by_id[a.scene_ids[0]].start_ms),
+                    "end": fmt_clock(by_id[a.scene_ids[-1]].end_ms),
+                }
+                for a in acts.acts
+            ],
+            turning_points=acts.turning_points,
+        )
+
+        def problems(r: SynthesisReply) -> list[str]:
+            found = check_story_refs([], [], ids, ending_ids=r.ending_scene_ids)
+            if r.ending and not r.ending_scene_ids:
+                found.append("写了结局，但没有给出 ending_scene_ids（结局依据的场景编号）")
+            return found
+
+        return self._ask(prompt.text, prompt.version, SynthesisReply, problems, ids, 4096)
+
+    # ---- ask, check, repair once ---------------------------------------------------------
+    def _ask(
+        self,
+        text: str,
+        prompt_version: str,
+        schema: type[R],
+        problems: Callable[[R], list[str]],
+        scene_ids: Sequence[str],
+        max_tokens: int,
+    ) -> R:
+        messages = [Message("user", text)]
+        found: list[str] = []
+        for _ in range(ATTEMPTS):
             reply = self.llm.generate(
-                STORY_TASK, messages, StoryReply, prompt_version=prompt.version, max_tokens=4096
+                STORY_TASK, messages, schema, prompt_version=prompt_version, max_tokens=max_tokens
             )
-            problems = check_story_refs(
-                [a.scene_ids for a in reply.acts],
-                [t.scene_id for t in reply.turning_points],
-                scene_ids,
-            )
-            if not problems:
-                return Story(
-                    asset_id=asset_id,
-                    logline=reply.logline,
-                    synopsis=reply.synopsis,
-                    acts=[
-                        Act(name=a.name, scene_ids=a.scene_ids, summary=a.summary)
-                        for a in reply.acts
-                    ],
-                    turning_points=[
-                        TurningPoint(scene_id=t.scene_id, what=t.what) for t in reply.turning_points
-                    ],
-                    ending=reply.ending,
-                    themes=reply.themes,
-                )
+            found = problems(reply)
+            if not found:
+                return reply
             messages = [
                 *messages,
                 Message("assistant", reply.model_dump_json()),
                 Message(
                     "user",
                     "上一次输出有以下问题：\n- "
-                    + "\n- ".join(problems)
+                    + "\n- ".join(found)
                     + f"\n请只使用这些场景编号：{', '.join(scene_ids)}。重新输出完整 JSON。",
                 ),
             ]
-        raise StoryError("story cites invalid scene ids after retry: " + "; ".join(problems))
+        raise StoryError("story cites invalid scene ids after retry: " + "; ".join(found))

@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 
-from offscreen.domain.index import Act, Scene, Scenes, Shot, Shots, Story
+from offscreen.domain.index import Scene, Scenes, Shot, Shots
 from offscreen.domain.plan import EditPlan
 from offscreen.domain.script import Script, ScriptParams, ScriptSegment
 from offscreen.engine import ArtifactStore, Engine, Stage, StageContext, StageOutput
 from offscreen.providers.adapters.fake import FakeTTS
 from offscreen.providers.ports import TTSError
+from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
-from offscreen.stages.analysis.story import SCENES_FILE, STORY_FILE
 from offscreen.stages.creation.plan import AUDIO_DIR, PLAN_FILE, PlanError, PlanStage
 from offscreen.stages.creation.script import SCRIPT_FILE
 from offscreen.store.files import write_model
@@ -49,14 +49,7 @@ class StubInputs(Stage):
     def run(self, ctx: StageContext) -> StageOutput:
         if self.name == "analysis.shots":
             write_model(ctx.out_dir / SHOTS_FILE, Shots(asset_id=ASSET, shots=SHOTS))
-        elif self.name == "analysis.story":
-            story = Story(
-                asset_id=ASSET,
-                logline="l",
-                synopsis="s",
-                acts=[Act(name="a", scene_ids=["sc_001"], summary="x")],
-            )
-            write_model(ctx.out_dir / STORY_FILE, story)
+        elif self.name == "analysis.scenes":
             write_model(ctx.out_dir / SCENES_FILE, Scenes(asset_id=ASSET, scenes=SCENES))
         else:
             script = Script(
@@ -78,7 +71,7 @@ def build(
         ArtifactStore(tmp_path / "a"),
         [
             StubInputs("creation.script", segments),
-            StubInputs("analysis.story", segments),
+            StubInputs("analysis.scenes", segments),
             StubInputs("analysis.shots", segments),
             PlanStage(tts, speed),
         ],

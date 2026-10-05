@@ -70,23 +70,47 @@ def scripted_llm() -> FakeLLM:
     def ids(messages: list[Any]) -> list[str]:
         return list(dict.fromkeys(re.findall(r"sc_\d+", messages[0].content)))
 
-    def chunk(_t: str, _m: Any, _s: Any) -> dict[str, Any]:
+    def caption(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        shot_ids = re.findall(r"镜头 (sh_\d+)（", m[-1].content)
+        assert len(m[-1].images) == 3 * len(shot_ids)  # three keyframes per shot, as data URLs
         return {
-            "summary": "两人在雪山相遇，一起照顾受伤的龙。",
-            "characters": ["她", "他"],
-            "location": "雪山",
-            "importance": 0.7,
+            "captions": [
+                {"shot_id": sid, "caption": f"雪山里的画面 {sid}", "shot_size": "wide"}
+                for sid in shot_ids
+            ]
+        }
+
+    def scene_segment(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        text = m[-1].content
+        if "衔接处" in text:  # keep every candidate cut
+            n = len(re.findall(r"^S\d+（", text, flags=re.M))
+            return {"joins": [{"after": i, "new_scene": True} for i in range(1, n)]}
+        starts = re.findall(r"^场景 \d+（", text, flags=re.M)
+        return {
+            "summaries": [
+                {
+                    "scene": i + 1,
+                    "summary": "两人在雪山相遇，一起照顾受伤的龙。",
+                    "location": "雪山",
+                    "importance": 0.7,
+                }
+                for i in range(len(starts))
+            ]
         }
 
     def story(_t: str, m: Any, _s: Any) -> dict[str, Any]:
         found = ids(m)
+        if "各幕：" in m[0].content:  # second level: acts -> the whole story
+            return {
+                "logline": "一个女孩寻找受伤的龙。",
+                "synopsis": "女孩在雪山找到受伤的龙，并决定带它离开。",
+                "ending": "告别",
+                "ending_scene_ids": [found[-1]],
+                "themes": ["陪伴"],
+            }
         return {
-            "logline": "一个女孩寻找受伤的龙。",
-            "synopsis": "女孩在雪山找到受伤的龙，并决定带它离开。",
             "acts": [{"name": "全片", "summary": "寻龙与告别", "scene_ids": found}],
             "turning_points": [{"scene_id": found[0], "what": "找到龙"}],
-            "ending": "告别",
-            "themes": ["陪伴"],
         }
 
     def script(_t: str, m: Any, _s: Any) -> dict[str, Any]:
@@ -100,7 +124,14 @@ def scripted_llm() -> FakeLLM:
             ]
         }
 
-    return FakeLLM({"story_chunk": chunk, "story": story, "script_write": script})
+    return FakeLLM(
+        {
+            "shot_caption": caption,
+            "scene_segment": scene_segment,
+            "story": story,
+            "script_write": script,
+        }
+    )
 
 
 @pytest.fixture
@@ -122,7 +153,7 @@ def cfg(tmp_path: Path) -> AppConfig:
             },
             "tasks": {
                 t: {"provider": "p", "model": "fake-model"}
-                for t in ("story_chunk", "story", "script_write")
+                for t in ("shot_caption", "scene_segment", "story", "script_write")
             },
             "asr": {"provider": "faster_whisper"},
             "tts": {"provider": "edge_tts", "default_voice": "voice-x"},

@@ -103,6 +103,15 @@
       "default": null,
       "title": "Ending"
     },
+    "ending_scene_ids": {
+      "default": [],
+      "items": {
+        "pattern": "^sc_[0-9A-Za-z]+$",
+        "type": "string"
+      },
+      "title": "Ending Scene Ids",
+      "type": "array"
+    },
     "logline": {
       "title": "Logline",
       "type": "string"

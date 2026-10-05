@@ -28,8 +28,8 @@ from offscreen.domain.plan import (
 from offscreen.domain.script import Script
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.providers.ports import TTS
+from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
-from offscreen.stages.analysis.story import SCENES_FILE
 from offscreen.stages.creation.script import SCRIPT_FILE
 from offscreen.store.files import write_model
 
@@ -57,7 +57,7 @@ class PlanStage(Stage):
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
         return [
             ArtifactRef("creation.script", scope),
-            ArtifactRef("analysis.story", scope),
+            ArtifactRef("analysis.scenes", scope),
             ArtifactRef("analysis.shots", scope),
         ]
 
@@ -77,7 +77,7 @@ class PlanStage(Stage):
         asset_id = ctx.scope["asset_id"]
         script = ctx.input("creation.script").read_model(SCRIPT_FILE, Script)
         scenes = {
-            s.id: s for s in ctx.input("analysis.story").read_model(SCENES_FILE, Scenes).scenes
+            s.id: s for s in ctx.input("analysis.scenes").read_model(SCENES_FILE, Scenes).scenes
         }
         shots = {s.id: s for s in ctx.input("analysis.shots").read_model(SHOTS_FILE, Shots).shots}
         voice = VoiceSpec(voice_id=script.params.voice_id, speed=self.voice_speed)

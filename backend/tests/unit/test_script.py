@@ -10,7 +10,8 @@ from offscreen.domain.script import Script
 from offscreen.engine import ArtifactStore, Engine, Stage, StageContext, StageOutput
 from offscreen.providers.adapters.fake import FakeLLM
 from offscreen.providers.ports import LLMError
-from offscreen.stages.analysis.story import SCENES_FILE, STORY_FILE
+from offscreen.stages.analysis.scenes import SCENES_FILE
+from offscreen.stages.analysis.story import STORY_FILE
 from offscreen.stages.creation.script import (
     SCRIPT_FILE,
     ScriptError,
@@ -38,6 +39,16 @@ class StubStory(Stage):
             ending="小龙已死",
             themes=["失去"],
         )
+        write_model(ctx.out_dir / STORY_FILE, story)
+        return StageOutput()
+
+
+class StubScenes(Stage):
+    name = "analysis.scenes"
+    version = 1
+    lane = "api"
+
+    def run(self, ctx: StageContext) -> StageOutput:
         scenes = Scenes(
             asset_id=ASSET,
             scenes=[
@@ -47,7 +58,6 @@ class StubStory(Stage):
                 ),
             ],
         )
-        write_model(ctx.out_dir / STORY_FILE, story)
         write_model(ctx.out_dir / SCENES_FILE, scenes)
         return StageOutput()
 
@@ -62,7 +72,10 @@ SETTINGS = ScriptSettings(target_duration_s=20, voice_id="v1")
 
 
 def build(tmp_path: Path, llm: FakeLLM, settings: ScriptSettings = SETTINGS) -> Engine:
-    return Engine(ArtifactStore(tmp_path / "a"), [StubStory(), ScriptStage(llm, settings, MODELS)])
+    return Engine(
+        ArtifactStore(tmp_path / "a"),
+        [StubStory(), StubScenes(), ScriptStage(llm, settings, MODELS)],
+    )
 
 
 def test_writes_valid_script_document(tmp_path: Path) -> None:
@@ -134,7 +147,7 @@ def test_cache_keyed_on_settings_and_model(tmp_path: Path) -> None:
 
     changed = Engine(
         ArtifactStore(tmp_path / "a"),
-        [StubStory(), ScriptStage(llm, SETTINGS, {"script_write": "fake/m2"})],
+        [StubStory(), StubScenes(), ScriptStage(llm, SETTINGS, {"script_write": "fake/m2"})],
     )
     assert changed.ensure("creation.script", SCOPE).cache_key != first.cache_key
 

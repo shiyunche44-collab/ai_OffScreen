@@ -68,8 +68,11 @@ def test_import_list_and_get_an_asset(client: TestClient, movie: Path) -> None:
     assert detail["asset"]["id"] == asset["id"]
     assert [s["stage"] for s in detail["stages"]] == [
         "analysis.proxy",
-        "analysis.transcript",
         "analysis.shots",
+        "analysis.keyframes",
+        "analysis.transcript",
+        "analysis.captions",
+        "analysis.scenes",
         "analysis.story",
     ]
     assert not any(s["cached"] for s in detail["stages"])
@@ -287,7 +290,10 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     assert cached == {  # same film, other length: only the analysis carries over
         "analysis.proxy",
         "analysis.shots",
+        "analysis.keyframes",
         "analysis.transcript",
+        "analysis.captions",
+        "analysis.scenes",
         "analysis.story",
     }
     assert client.get(f"/api/projects/{other['id']}").json()["video"] is None

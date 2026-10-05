@@ -33,7 +33,8 @@ from offscreen.domain.script import Script, ScriptParams, ScriptSegment
 from offscreen.engine import ArtifactRef, Scope, Stage, StageContext, StageOutput
 from offscreen.prompts import render, template_version
 from offscreen.providers.ports import LLM, Message
-from offscreen.stages.analysis.story import SCENES_FILE, STORY_FILE
+from offscreen.stages.analysis.scenes import SCENES_FILE
+from offscreen.stages.analysis.story import STORY_FILE
 from offscreen.store.files import write_model
 
 SCRIPT_FILE = "script.json"
@@ -91,7 +92,7 @@ class ScriptStage(Stage):
         """`task -> "provider/model"` for the tasks this stage uses; part of the cache key."""
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
-        return [ArtifactRef("analysis.story", scope)]
+        return [ArtifactRef("analysis.story", scope), ArtifactRef("analysis.scenes", scope)]
 
     def params(self, scope: Scope) -> dict[str, Any]:
         return {
@@ -110,9 +111,8 @@ class ScriptStage(Stage):
     def run(self, ctx: StageContext) -> StageOutput:
         cfg = self.settings
         asset_id = ctx.scope["asset_id"]
-        story_art = ctx.input("analysis.story")
-        story = story_art.read_model(STORY_FILE, Story)
-        scenes = story_art.read_model(SCENES_FILE, Scenes).scenes
+        story = ctx.input("analysis.story").read_model(STORY_FILE, Story)
+        scenes = ctx.input("analysis.scenes").read_model(SCENES_FILE, Scenes).scenes
         if not scenes:
             raise ScriptError("no scenes to write from")
 

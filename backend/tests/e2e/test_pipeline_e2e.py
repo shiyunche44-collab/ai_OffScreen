@@ -22,7 +22,8 @@ from offscreen.providers.adapters.fake import FakeTTS
 from offscreen.services.pipeline import Pipeline, Providers, RunOptions
 
 CHAIN = [
-    "analysis.proxy", "analysis.transcript", "analysis.shots", "analysis.story",
+    "analysis.proxy", "analysis.shots", "analysis.keyframes", "analysis.transcript",
+    "analysis.captions", "analysis.scenes", "analysis.story",
     "creation.script", "creation.plan", "output.compile", "output.render",
 ]  # fmt: skip
 OPTS = RunOptions(minutes=0.25)  # 15 s of commentary
@@ -52,7 +53,7 @@ def test_run_all_makes_a_commentary_video_then_reuses_everything(
 
         # Every layer's document is on disk and validates.
         scenes = Scenes.model_validate_json(
-            (artifact_dir(cfg, "analysis.story") / "scenes.json").read_bytes()
+            (artifact_dir(cfg, "analysis.scenes") / "scenes.json").read_bytes()
         )
         story = Story.model_validate_json(
             (artifact_dir(cfg, "analysis.story") / "story.json").read_bytes()
@@ -98,12 +99,7 @@ def test_run_all_makes_a_commentary_video_then_reuses_everything(
         # A different target length reuses the analysis and redoes the creative stages.
         longer = p.run_all(movie, RunOptions(minutes=0.3))
         cached = {r.stage for r in longer.stages if r.cached}
-        assert cached == {
-            "analysis.proxy",
-            "analysis.shots",
-            "analysis.transcript",
-            "analysis.story",
-        }
+        assert cached == set(CHAIN[:7])  # all of the analysis
 
 
 def test_run_stage_by_name_with_a_path_or_an_asset_id(
@@ -132,12 +128,12 @@ def test_cli_run_all_and_stage(
 
     r = runner.invoke(app, ["run-all", str(movie), "--minutes", "0.25", "--config", str(conf)])
     assert r.exit_code == 0, r.output
-    assert "done    output.render" in r.output and "8 run, 0 cached" in r.output
+    assert "done    output.render" in r.output and "11 run, 0 cached" in r.output
     final = next(line for line in r.output.splitlines() if line.startswith("video")).split()[-1]
     assert Path(final).is_file() and Path(final).name == "final.mp4"
 
     again = runner.invoke(app, ["run-all", str(movie), "--minutes", "0.25", "--config", str(conf)])
-    assert again.exit_code == 0 and "0 run, 8 cached" in again.output
+    assert again.exit_code == 0 and "0 run, 11 cached" in again.output
     asset = next(line for line in again.output.splitlines() if line.startswith("asset")).split()[1]
 
     s = runner.invoke(app, ["stage", "analysis.story", "--asset", asset, "--config", str(conf)])

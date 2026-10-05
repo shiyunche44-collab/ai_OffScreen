@@ -10,6 +10,9 @@
   ],
   "asset_id": "ast_sintel01",
   "ending": "结局",
+  "ending_scene_ids": [
+    "sc_040"
+  ],
   "logline": "一个女孩为了找回小龙，走遍世界。",
   "relations": [
     {
