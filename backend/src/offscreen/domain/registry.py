@@ -13,6 +13,7 @@ from offscreen.domain.index import (
     Faces,
     Scenes,
     Shots,
+    SpriteSheets,
     Story,
     Transcript,
 )
@@ -26,6 +27,7 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "asset": MediaAsset,
     "transcript": Transcript,
     "shots": Shots,
+    "sprites": SpriteSheets,
     "captions": Captions,
     "faces": Faces,
     "scenes": Scenes,

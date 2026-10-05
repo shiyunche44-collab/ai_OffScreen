@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "SpriteTile": {
+      "additionalProperties": false,
+      "properties": {
+        "col": {
+          "minimum": 0,
+          "title": "Col",
+          "type": "integer"
+        },
+        "row": {
+          "minimum": 0,
+          "title": "Row",
+          "type": "integer"
+        },
+        "sheet": {
+          "minimum": 0,
+          "title": "Sheet",
+          "type": "integer"
+        },
+        "shot_id": {
+          "pattern": "^sh_[0-9A-Za-z]+$",
+          "title": "Shot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shot_id",
+        "sheet",
+        "col",
+        "row"
+      ],
+      "title": "SpriteTile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Thumbnails of every shot (one frame each) packed into a few large images, so the shot strip\nof the analysis page loads a handful of files instead of one request per shot. A tile sits at\n`(col * tile_width, row * tile_height)` of its sheet.",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "columns": {
+      "exclusiveMinimum": 0,
+      "title": "Columns",
+      "type": "integer"
+    },
+    "rows": {
+      "exclusiveMinimum": 0,
+      "title": "Rows",
+      "type": "integer"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "sheets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sheets",
+      "type": "array"
+    },
+    "tile_height": {
+      "exclusiveMinimum": 0,
+      "title": "Tile Height",
+      "type": "integer"
+    },
+    "tile_width": {
+      "exclusiveMinimum": 0,
+      "title": "Tile Width",
+      "type": "integer"
+    },
+    "tiles": {
+      "items": {
+        "$ref": "#/$defs/SpriteTile"
+      },
+      "title": "Tiles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "asset_id",
+    "tile_width",
+    "tile_height",
+    "columns",
+    "rows",
+    "sheets",
+    "tiles"
+  ],
+  "title": "SpriteSheets",
+  "type": "object"
+}

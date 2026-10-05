@@ -1,0 +1,14 @@
+{
+  "asset_id": "ast_sintel01",
+  "columns": 10,
+  "rows": 10,
+  "schema_version": 1,
+  "sheets": ["sprites/sheet_001.jpg", "sprites/sheet_002.jpg"],
+  "tile_height": 90,
+  "tile_width": 160,
+  "tiles": [
+    { "col": 0, "row": 0, "shot_id": "sh_0001", "sheet": 0 },
+    { "col": 1, "row": 0, "shot_id": "sh_0002", "sheet": 0 },
+    { "col": 0, "row": 0, "shot_id": "sh_0101", "sheet": 1 }
+  ]
+}

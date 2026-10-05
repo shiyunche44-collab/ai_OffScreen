@@ -76,6 +76,38 @@ class Shots(Versioned):
         return self
 
 
+class SpriteTile(Strict):
+    shot_id: ShotId
+    sheet: int = Field(ge=0)
+    """Index into `SpriteSheets.sheets`."""
+    col: int = Field(ge=0)
+    row: int = Field(ge=0)
+
+
+class SpriteSheets(Versioned):
+    """Thumbnails of every shot (one frame each) packed into a few large images, so the shot strip
+    of the analysis page loads a handful of files instead of one request per shot. A tile sits at
+    `(col * tile_width, row * tile_height)` of its sheet."""
+
+    asset_id: AssetId
+    tile_width: int = Field(gt=0)
+    tile_height: int = Field(gt=0)
+    columns: int = Field(gt=0)
+    rows: int = Field(gt=0)
+    sheets: list[str]  # relative to the artifact directory holding this document
+    tiles: list[SpriteTile]
+
+    @model_validator(mode="after")
+    def _tiles_fit(self) -> Self:
+        for t in self.tiles:
+            if t.sheet >= len(self.sheets) or t.col >= self.columns or t.row >= self.rows:
+                raise ValueError(f"tile of {t.shot_id} lies outside the sheets")
+        ids = [t.shot_id for t in self.tiles]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate shot ids in tiles")
+        return self
+
+
 ShotSize = Literal["extreme_close_up", "close_up", "medium", "wide", "extreme_wide", "other"]
 
 

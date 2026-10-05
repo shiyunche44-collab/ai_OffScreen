@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 
 from offscreen.domain.common import TimeRange
-from offscreen.domain.index import Shots
+from offscreen.domain.index import Shots, SpriteSheets
 from offscreen.engine import Artifact, ArtifactStore, Engine, StageCanceled
 from offscreen.media.probe import probe
 from offscreen.providers.adapters.scenedetect_adapter import SceneDetectShots
 from offscreen.providers.ports import DetectionCanceled
 from offscreen.stages.analysis.ingest import ingest
-from offscreen.stages.analysis.keyframes import KeyframesStage
+from offscreen.stages.analysis.keyframes import SPRITES_FILE, KeyframesStage
 from offscreen.stages.analysis.proxy import ProxyError, ProxyStage
 from offscreen.stages.analysis.shots import SHOTS_FILE, ShotsStage
 from offscreen.store.db import Database
@@ -119,30 +119,116 @@ def test_shots_cache_depends_on_detector_and_hits_otherwise(cut_clip: Path, tmp_
     assert changed.dir != first.dir and fake.calls == 2
 
 
-def test_keyframes_one_middle_thumbnail_per_shot(cut_clip: Path, tmp_path: Path) -> None:
+def pixel(path: Path, x: int = 0, y: int = 0, *, size: str = "1:1") -> tuple[int, ...]:
+    """RGB of the picture scaled to `size` (default: its average colour)."""
+    px = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-i", str(path), "-vf", f"scale={size}", "-f", "rawvideo",
+         "-pix_fmt", "rgb24", "-"],
+        capture_output=True, check=True,
+    ).stdout  # fmt: skip
+    return tuple(px)
+
+
+def test_keyframes_three_frames_per_shot(cut_clip: Path, tmp_path: Path) -> None:
     repo, engine = build(tmp_path, SceneDetectShots())
     asset = ingest(cut_clip, repo).asset
     art: Artifact = engine.ensure("analysis.keyframes", {"asset_id": asset.id})
 
     doc = art.read_model(SHOTS_FILE, Shots)
-    assert [s.keyframes for s in doc.shots] == [[f"kf/sh_000{i}.jpg"] for i in (1, 2, 3)]
+    assert [s.keyframes for s in doc.shots] == [
+        [f"kf/sh_000{i}_{c}.jpg" for c in "abc"] for i in (1, 2, 3)
+    ]
     for shot in doc.shots:
-        assert jpeg_size(art.path(shot.keyframes[0])) == (320, 180)  # not upscaled
-    assert art.meta == {"keyframes": 3}
+        for rel in shot.keyframes:
+            assert jpeg_size(art.path(rel)) == (320, 180)  # not upscaled
+    assert art.meta == {"shots": 3, "keyframes": 9, "sprite_sheets": 1}
 
 
-def test_keyframe_shows_the_middle_of_its_shot(cut_clip: Path, tmp_path: Path) -> None:
+def test_keyframes_show_their_shot(cut_clip: Path, tmp_path: Path) -> None:
     repo, engine = build(tmp_path, SceneDetectShots())
     asset = ingest(cut_clip, repo).asset
     art = engine.ensure("analysis.keyframes", {"asset_id": asset.id})
     expected = [(255, 0, 0), (0, 0, 255), (0, 128, 0)]  # red, blue, green (approx.)
-    for i, (r, g, b) in enumerate(expected, 1):
-        px = subprocess.run(
-            ["ffmpeg", "-loglevel", "error", "-i", str(art.path(f"kf/sh_000{i}.jpg")),
-             "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-            capture_output=True, check=True,
-        ).stdout  # fmt: skip
-        assert all(abs(a - e) < 60 for a, e in zip(px, (r, g, b), strict=True)), (i, list(px))
+    for i, want in enumerate(expected, 1):
+        for c in "abc":  # every one of the three frames is inside the shot
+            got = pixel(art.path(f"kf/sh_000{i}_{c}.jpg"))
+            assert all(abs(a - e) < 60 for a, e in zip(got, want, strict=True)), (i, c, got)
+
+
+def test_flat_shots_have_no_sharpness_and_brightness_follows_luma(
+    cut_clip: Path, tmp_path: Path
+) -> None:
+    repo, engine = build(tmp_path, SceneDetectShots())
+    art = engine.ensure("analysis.keyframes", {"asset_id": ingest(cut_clip, repo).asset.id})
+    doc = art.read_model(SHOTS_FILE, Shots)
+    qualities = [s.quality for s in doc.shots]
+    assert all(q is not None and q.sharpness < 0.05 for q in qualities)  # solid colours
+    luma = [q.brightness for q in qualities if q is not None]  # red 0.30, blue 0.11, green 0.29
+    assert luma[0] == pytest.approx(0.30, abs=0.06)
+    assert luma[1] == pytest.approx(0.11, abs=0.06)
+    assert luma[2] == pytest.approx(0.29, abs=0.06)
+
+
+@pytest.fixture(scope="module")
+def quality_clip(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """2 s of sharp noise, 2 s of the same noise blurred, 2 s of black."""
+    p = tmp_path_factory.mktemp("quality") / "quality.mp4"
+    noise = "nullsrc=s=320x180:r=24:d=2,geq=random(1)*255:128:128"
+    graph = (
+        f"{noise}[n1];{noise},boxblur=6[n2];color=c=black:s=320x180:r=24:d=2[n3];"
+        "[n1][n2][n3]concat=n=3:v=1:a=0,format=yuv420p[v]"
+    )
+    subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-y", "-filter_complex", graph, "-map", "[v]",
+         "-c:v", "libx264", "-crf", "14", str(p)],
+        check=True,
+    )  # fmt: skip
+    return p
+
+
+def test_sharp_blurred_and_black_shots_are_told_apart(quality_clip: Path, tmp_path: Path) -> None:
+    detector = FakeDetector([(0, 2000), (2000, 4000), (4000, 6000)])
+    repo, engine = build(tmp_path, detector)
+    art = engine.ensure("analysis.keyframes", {"asset_id": ingest(quality_clip, repo).asset.id})
+    sharp, blurred, black = (s.quality for s in art.read_model(SHOTS_FILE, Shots).shots)
+    assert sharp is not None and blurred is not None and black is not None
+    assert sharp.sharpness > 0.5 > blurred.sharpness  # detail vs blur
+    assert blurred.sharpness > black.sharpness
+    assert black.sharpness < 0.02 and black.brightness < 0.1  # a black frame is both
+    assert sharp.brightness > 0.3 and blurred.brightness > 0.3
+
+
+def test_sprite_sheet_holds_every_shots_middle_frame(cut_clip: Path, tmp_path: Path) -> None:
+    repo, engine = build(tmp_path, SceneDetectShots())
+    art = engine.ensure("analysis.keyframes", {"asset_id": ingest(cut_clip, repo).asset.id})
+    sprites = art.read_model(SPRITES_FILE, SpriteSheets)
+
+    assert (sprites.tile_width, sprites.tile_height, sprites.columns, sprites.rows) == (
+        160,
+        90,
+        10,
+        10,
+    )
+    assert sprites.sheets == ["sprites/sheet_001.jpg"]
+    assert [(t.shot_id, t.sheet, t.col, t.row) for t in sprites.tiles] == [
+        ("sh_0001", 0, 0, 0), ("sh_0002", 0, 1, 0), ("sh_0003", 0, 2, 0),
+    ]  # fmt: skip
+    sheet = art.path(sprites.sheets[0])
+    assert jpeg_size(sheet) == (1600, 900)
+    # each tile has its shot's colour: sample the centre of tile (col, 0)
+    for tile, want in zip(sprites.tiles, [(255, 0, 0), (0, 0, 255), (0, 128, 0)], strict=True):
+        x, y = tile.col * 160 + 60, tile.row * 90 + 30
+        crop = pixel_at(sheet, x, y)
+        assert all(abs(a - e) < 60 for a, e in zip(crop, want, strict=True)), (tile.shot_id, crop)
+
+
+def pixel_at(path: Path, x: int, y: int) -> tuple[int, ...]:
+    px = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-i", str(path), "-vf", f"crop=40:30:{x}:{y},scale=1:1",
+         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+        capture_output=True, check=True,
+    ).stdout  # fmt: skip
+    return tuple(px)
 
 
 def test_unknown_asset_is_an_error(tmp_path: Path) -> None:
