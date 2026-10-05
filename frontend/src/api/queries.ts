@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
+import { mergeJobs } from "./events";
+import type { Job } from "./types";
 
 export const keys = {
   assets: ["assets"] as const,
@@ -68,3 +70,35 @@ export function useCreateProject() {
     onSuccess: () => void client.invalidateQueries({ queryKey: keys.projects }),
   });
 }
+
+/** The tail of a job's log. Refetched every 2 s while `live` (the job is still running). */
+export function useJobLog(jobId: string, live: boolean) {
+  return useQuery({
+    queryKey: ["job-log", jobId] as const,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/jobs/{job_id}/log", { params: { path: { job_id: jobId } }, parseAs: "text" }),
+      ),
+    refetchInterval: live ? 2000 : false,
+    staleTime: 0,
+  });
+}
+
+function useJobControl(action: "cancel" | "retry") {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string): Promise<Job> => {
+      const params = { params: { path: { job_id: jobId } } };
+      return unwrap(
+        action === "cancel"
+          ? await api.POST("/api/jobs/{job_id}:cancel", params)
+          : await api.POST("/api/jobs/{job_id}:retry", params),
+      );
+    },
+    // Show the new state at once; /api/events confirms it.
+    onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}
+
+export const useCancelJob = () => useJobControl("cancel");
+export const useRetryJob = () => useJobControl("retry");

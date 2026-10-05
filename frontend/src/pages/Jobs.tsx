@@ -1,28 +1,59 @@
-import { useJobs } from "../api/queries";
+import { useMemo, useState } from "react";
+import { useAssets, useJobs } from "../api/queries";
+import { JobRow } from "../components/JobRow";
 import { QueryState } from "../components/Query";
+import { filterJobs, type JobFilter } from "../lib/jobs";
 
-// Skeleton: the job center proper (log viewer, retry / cancel) is M2-09.
+const filters: { id: JobFilter; label: string }[] = [
+  { id: "all", label: "全部" },
+  { id: "active", label: "进行中" },
+  { id: "failed", label: "失败" },
+];
+
 export function Jobs() {
   const { data, isPending, error } = useJobs();
+  const assets = useAssets();
+  const [filter, setFilter] = useState<JobFilter>("all");
+  const titles = useMemo(
+    () => new Map((assets.data ?? []).map((d) => [d.asset.id, d.asset.title])),
+    [assets.data],
+  );
+  const shown = filterJobs(data ?? [], filter);
+
   return (
     <section>
-      <h1 className="mb-4 text-xl font-semibold">作业中心</h1>
+      <div className="mb-4 flex items-center gap-4">
+        <h1 className="text-xl font-semibold">作业中心</h1>
+        <div className="flex gap-1 text-sm" role="group" aria-label="筛选">
+          {filters.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+              className={`rounded px-3 py-1 ${filter === id ? "bg-sky-600 text-white" : "border border-slate-300 dark:border-slate-700"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <QueryState isPending={isPending} error={error}>
-        {data?.length ? (
+        {shown.length ? (
           <ul className="space-y-2">
-            {data.map((job) => (
-              <li key={job.id} className="rounded border border-slate-200 px-4 py-3 dark:border-slate-800">
-                <div className="flex items-baseline gap-3">
-                  <span className="font-medium">{job.stage}</span>
-                  <span className="text-xs text-slate-500">{job.status}</span>
-                </div>
-                <progress className="mt-2 h-1.5 w-full" max={1} value={job.progress} aria-label="进度" />
-                {job.message ? <p className="mt-1 text-xs text-slate-500">{job.message}</p> : null}
-              </li>
-            ))}
+            {shown.map((job) => {
+              const assetId = job.scope["asset_id"];
+              return (
+                <JobRow
+                  key={job.id}
+                  job={job}
+                  assetTitle={typeof assetId === "string" ? titles.get(assetId) : undefined}
+                />
+              );
+            })}
           </ul>
         ) : (
-          <p className="text-sm text-slate-500">没有作业。</p>
+          <p className="text-sm text-slate-500">{filter === "all" ? "还没有作业。" : "没有符合条件的作业。"}</p>
         )}
       </QueryState>
     </section>

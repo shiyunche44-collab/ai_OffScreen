@@ -20,7 +20,7 @@ describe("routing and layout", () => {
   it("shows the job center with live progress", async () => {
     stubApi({ "GET /api/jobs": () => json([job({ status: "running", progress: 0.4, message: "shots 40%" })]) });
     renderWithProviders(<App />, "/jobs");
-    expect(await screen.findByText("analysis.story")).toBeInTheDocument();
+    expect(await screen.findByText("分析影片")).toBeInTheDocument();
     expect(screen.getByText("shots 40%")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "进度" })).toHaveValue(0.4);
   });
