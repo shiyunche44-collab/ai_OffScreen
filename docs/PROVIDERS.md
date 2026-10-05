@@ -200,7 +200,18 @@
 
 ---
 
-## 6. 云环境网络备注
+## 6. InsightFace（人脸检测与特征，本地）
+
+M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l`）：
+
+- 首次使用由 InsightFace 从 GitHub releases 下载模型包（约 280 MB，约 3 秒），之后在 `~/.insightface/models/`
+- 加载约 13 秒（含下载），之后每张图约 0.33 秒；两小时电影约 4500 张关键帧，约 25 分钟（CPU）
+- 检测 + ArcFace 特征一体：每张脸 512 维、已 L2 归一化；检测框是像素坐标，适配器换算为 0..1
+- 在 scikit-image 自带的宇航员肖像上：检出 1 张脸（置信度 0.84），同一人镜像后的余弦相似度 > 0.6
+- 关键帧是 540p 代理上取的缩略图，小脸（面积 < 画面 0.4%）会被阶段丢弃；动画片的脸检测效果未验证（Sintel 待测）
+- 依赖不在默认安装里（和 faster-whisper 一样按需装）：`uv pip install insightface onnxruntime`
+
+## 7. 云环境网络备注
 
 - 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
 - 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）

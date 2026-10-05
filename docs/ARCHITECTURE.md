@@ -341,8 +341,11 @@ ai_OffScreen/
   "has_onscreen_text": false, "is_credits": false }
 
 { "shot_id": "sh_0412",
-  "faces": [{ "character_id": "ch_01", "bbox": [0.31, 0.12, 0.58, 0.66], "area_ratio": 0.18 }] }
+  "faces": [{ "character_id": "ch_01", "bbox": [0.31, 0.12, 0.58, 0.66], "area_ratio": 0.18,
+              "frame": 1, "score": 0.97, "embedding": 0 }] }
 ```
+
+`faces` 阶段（M3-07）的产物是 `faces.json` 和 `embeddings.npy`：后者每行是一张脸的 L2 归一化特征（float32），`embedding` 是该脸在其中的行号（行序即 faces.json 中人脸的出现顺序）；`character_id` 在聚类（M3-08）之前为空。
 
 **scenes.json**
 ```json

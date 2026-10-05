@@ -49,6 +49,39 @@
           ],
           "default": null,
           "title": "Character Id"
+        },
+        "embedding": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding"
+        },
+        "frame": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Frame",
+          "type": "integer"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
         }
       },
       "required": [

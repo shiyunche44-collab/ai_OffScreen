@@ -17,11 +17,13 @@ from offscreen.log import current_job_id
 from offscreen.media.ffmpeg import FFmpegCanceled, FFmpegError
 from offscreen.media.probe import ProbeError
 from offscreen.providers.adapters.faster_whisper_asr import FasterWhisperAsr
+from offscreen.providers.adapters.insightface_faces import InsightFaceAnalyzer
 from offscreen.providers.adapters.scenedetect_adapter import SceneDetectShots
 from offscreen.providers.ports import (
     ASR,
     LLM,
     TTS,
+    FaceAnalyzer,
     LLMError,
     ShotDetector,
     TTSError,
@@ -29,6 +31,7 @@ from offscreen.providers.ports import (
 from offscreen.services.llm import build_llm, task_models
 from offscreen.services.tts import build_tts
 from offscreen.stages.analysis.captions import DEFAULT_BATCH, CaptionsError, CaptionsStage
+from offscreen.stages.analysis.faces import FacesError, FacesStage
 from offscreen.stages.analysis.ingest import IngestError, ingest
 from offscreen.stages.analysis.keyframes import KeyframesStage
 from offscreen.stages.analysis.proxy import ProxyError, ProxyStage
@@ -47,7 +50,8 @@ FINAL_STAGE = "output.render"
 DEFAULT_STYLE = "neutral"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
-    ConfigError, IngestError, ProbeError, ProxyError, ShotsError, TranscriptError, StoryError,
+    ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, TranscriptError,
+    StoryError,
     ScriptError, CaptionsError, ScenesError, PlanError, CompileStageError, RenderError, FFmpegError,
     FFmpegCanceled, LLMError, TTSError, ValueError,
 )  # fmt: skip
@@ -64,6 +68,8 @@ class Providers:
     detector: ShotDetector
     asr: ASR | None = None
     """None: the transcript stage needs an external subtitle file."""
+    faces: FaceAnalyzer | None = None
+    """None: the faces stage cannot run."""
 
 
 @dataclass(frozen=True)
@@ -98,7 +104,11 @@ def build_providers(cfg: AppConfig, db: Database) -> Providers:
     if cfg.asr.provider == "faster_whisper":
         asr = FasterWhisperAsr(cfg.asr.model, device=cfg.asr.device)
     return Providers(
-        llm=build_llm(cfg, db), tts=build_tts(cfg), detector=SceneDetectShots(), asr=asr
+        llm=build_llm(cfg, db),
+        tts=build_tts(cfg),
+        detector=SceneDetectShots(),
+        asr=asr,
+        faces=InsightFaceAnalyzer(cfg.faces.model, device=cfg.faces.device),
     )
 
 
@@ -154,6 +164,7 @@ class Pipeline:
             ProxyStage(self.assets),
             ShotsStage(self.assets, p.detector),
             KeyframesStage(),
+            FacesStage(p.faces),
             CaptionsStage(
                 p.llm,
                 models,

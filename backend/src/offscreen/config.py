@@ -62,6 +62,13 @@ class AsrCfg(_Cfg):
     device: Literal["cuda", "cpu"] = "cuda"
 
 
+class FacesCfg(_Cfg):
+    provider: Literal["insightface"] = "insightface"
+    model: str = "buffalo_l"
+    device: Literal["cuda", "cpu"] = "cpu"
+    """Face detection on keyframes is light work; the CPU is fine."""
+
+
 class TtsCfg(_Cfg):
     provider: str = "minimax"
     model: str = "speech-2.8-hd"
@@ -88,6 +95,7 @@ class AppConfig(_Cfg):
     providers: dict[str, ProviderCfg] = {}
     tasks: dict[str, TaskCfg] = {}
     asr: AsrCfg = AsrCfg()
+    faces: FacesCfg = FacesCfg()
     tts: TtsCfg = TtsCfg()
     budget: BudgetCfg = BudgetCfg()
     worker: WorkerCfg = WorkerCfg()

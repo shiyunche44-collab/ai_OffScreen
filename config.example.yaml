@@ -52,6 +52,11 @@ asr:
   model: large-v3
   device: cuda
 
+faces:
+  provider: insightface   # 本地；需要 insightface 与 onnxruntime（首次使用下载 buffalo_l 模型，约 280 MB）
+  model: buffalo_l
+  device: cpu             # 关键帧上检测，CPU 够用；有 GPU 可改 cuda（装 onnxruntime-gpu）
+
 tts:
   provider: minimax
   model: speech-2.8-hd

@@ -157,6 +157,13 @@ class FaceBox(Strict):
     character_id: CharacterId | None = None
     bbox: tuple[Unit, Unit, Unit, Unit]  # x0, y0, x1, y1, normalized
     area_ratio: Unit
+    frame: int = Field(default=0, ge=0)
+    """Which of the shot's keyframes the face was found in."""
+    score: Unit | None = None
+    """The detector's confidence."""
+    embedding: int | None = Field(default=None, ge=0)
+    """Row of this face in `embeddings.npy` next to the document (the file is the `Faces`
+    artifact's second output; rows follow the order of the faces in the document)."""
 
 
 class ShotFaces(Strict):

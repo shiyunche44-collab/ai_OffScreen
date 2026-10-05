@@ -78,6 +78,27 @@ class ASR(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class DetectedFace:
+    bbox: tuple[float, float, float, float]
+    """x0, y0, x1, y1 as fractions of the image (0..1)."""
+    score: float
+    embedding: tuple[float, ...]
+    """Identity feature; faces of one person are close under cosine similarity."""
+
+
+class FaceAnalyzer(Protocol):
+    @property
+    def id(self) -> str:
+        """Engine, model and settings; part of the stage's cache key."""
+        ...
+
+    def detect_and_embed(self, image: Path) -> list[DetectedFace]:
+        """Every face in the image file, with its feature vector. May be empty. Raises
+        RuntimeError when the engine is not installed or the image cannot be read."""
+        ...
+
+
 # ---- LLM ---------------------------------------------------------------------------------
 M = TypeVar("M", bound=BaseModel)
 

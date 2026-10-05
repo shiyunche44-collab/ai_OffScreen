@@ -18,7 +18,8 @@ from offscreen.domain.index import Scenes, Story
 from offscreen.domain.plan import EditPlan
 from offscreen.domain.script import Script
 from offscreen.domain.timeline import Timeline
-from offscreen.providers.adapters.fake import FakeTTS
+from offscreen.providers.adapters.fake import FakeFaceAnalyzer, FakeTTS
+from offscreen.providers.ports import DetectedFace
 from offscreen.services.pipeline import Pipeline, Providers, RunOptions
 
 CHAIN = [
@@ -167,3 +168,32 @@ def test_tts_is_called_once_per_segment_even_across_runs(
         n = len(fakes.tts.calls)
         p.run_stage("creation.plan", str(movie), OPTS)
     assert n == 3 and len(fakes.tts.calls) == 3
+
+
+def test_faces_stage_runs_on_the_keyframes_of_the_real_chain(
+    cfg: AppConfig, fakes: Providers, movie: Path
+) -> None:
+    import numpy as np
+
+    from offscreen.domain.index import Faces
+    from offscreen.stages.analysis.faces import EMBEDDINGS_FILE, FACES_FILE
+
+    face = DetectedFace(bbox=(0.2, 0.2, 0.5, 0.6), score=0.9, embedding=(1.0, 2.0, 2.0))
+    analyzer = FakeFaceAnalyzer(lambda p: [face] if p.name.endswith("_b.jpg") else [])
+    fakes.faces = analyzer
+    with Pipeline(cfg, fakes) as p:
+        result = p.run_stage("analysis.faces", str(movie))
+        assert [r.stage for r in result.stages] == [
+            "analysis.proxy", "analysis.shots", "analysis.keyframes", "analysis.faces",
+        ]  # fmt: skip
+        doc = result.artifact.read_model(FACES_FILE, Faces)
+        assert [len(s.faces) for s in doc.shots] == [1, 1, 1, 1]  # the middle frame of each shot
+        assert all(s.faces[0].frame == 1 for s in doc.shots)
+        matrix = np.load(result.artifact.path(EMBEDDINGS_FILE))
+        assert matrix.shape == (4, 3)
+        np.testing.assert_allclose(matrix[0], [1 / 3, 2 / 3, 2 / 3], rtol=1e-6)
+        assert len(analyzer.images) == 12 and all(i.is_file() for i in analyzer.images)
+
+        # the analysis chain itself does not need faces yet
+        again = p.run_stage("analysis.story", str(movie))
+        assert "analysis.faces" not in [r.stage for r in again.stages]

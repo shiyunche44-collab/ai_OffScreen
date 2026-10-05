@@ -62,7 +62,8 @@ module = ["offscreen.domain.*", "offscreen.algo.*"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["scenedetect", "scenedetect.*", "faster_whisper", "faster_whisper.*"]
+module = ["scenedetect", "scenedetect.*", "faster_whisper", "faster_whisper.*",
+  "insightface", "insightface.*", "cv2", "cv2.*"]
 ignore_missing_imports = true  # no type information / not installed by default
 
 [tool.pytest.ini_options]

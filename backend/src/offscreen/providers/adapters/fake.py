@@ -6,6 +6,7 @@ import io
 import wave
 from collections import defaultdict, deque
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -13,7 +14,14 @@ from pydantic import BaseModel
 from offscreen.algo.jsonreply import extract_json
 from offscreen.algo.tts import WordSpan, char_timings_from_spans
 from offscreen.domain.llm import LlmCallRecord
-from offscreen.providers.ports import LLMError, M, Message, Recorder, SynthesizedAudio
+from offscreen.providers.ports import (
+    DetectedFace,
+    LLMError,
+    M,
+    Message,
+    Recorder,
+    SynthesizedAudio,
+)
 
 Reply = BaseModel | dict[str, Any] | str | Exception
 """A model instance or dict (validated against the requested schema), a string (parsed
@@ -129,3 +137,18 @@ class FakeTTS:
             char_timings=char_timings_from_spans(len(text), spans, duration_ms),
             billed_chars=len(spoken),
         )
+
+
+class FakeFaceAnalyzer:
+    """Offline face analysis: `faces_in(image path)` says what is found (default: nothing).
+    Records the images it was asked about."""
+
+    id = "fake-faces@1"
+
+    def __init__(self, faces_in: Callable[[Path], list[DetectedFace]] | None = None) -> None:
+        self._faces_in = faces_in or (lambda _p: [])
+        self.images: list[Path] = []
+
+    def detect_and_embed(self, image: Path) -> list[DetectedFace]:
+        self.images.append(image)
+        return self._faces_in(image)
