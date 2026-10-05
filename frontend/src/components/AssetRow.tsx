@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAnalyzeAsset, useCreateProject } from "../api/queries";
 import type { AssetDetail, Job } from "../api/types";
 import { analysisState } from "../lib/analysis";
@@ -40,7 +40,15 @@ export function AssetRow({ detail, jobs }: { detail: AssetDetail; jobs: Job[] | 
     <li className="px-4 py-3" aria-label={asset.title}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{asset.title}</div>
+          <div className="truncate font-medium">
+            {state.kind === "done" ? (
+              <Link className="hover:underline" to={`/library/${asset.id}`}>
+                {asset.title}
+              </Link>
+            ) : (
+              asset.title
+            )}
+          </div>
           <div className="text-xs text-slate-500">
             {formatDuration(asset.duration_ms)} · {asset.video.width}×{asset.video.height}
             {asset.subtitles_external ? " · 有外挂字幕" : " · 无外挂字幕"}

@@ -88,6 +88,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/index/scenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Index Scenes
+         * @description The scenes (404 until the scenes stage is built).
+         */
+        get: operations["index_scenes_api_assets__asset_id__index_scenes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/index/shots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Index Shots
+         * @description Shots with keyframes, quality, description and sprite position, plus the proxy video.
+         */
+        get: operations["index_shots_api_assets__asset_id__index_shots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/index/story": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Index Story
+         * @description The story: logline, acts, turning points, ending (404 until the story stage is built).
+         */
+        get: operations["index_story_api_assets__asset_id__index_story_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/index/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Index Transcript
+         * @description The dialogue lines with their times (404 until the transcript stage is built).
+         */
+        get: operations["index_transcript_api_assets__asset_id__index_transcript_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/report": {
         parameters: {
             query?: never;
@@ -359,6 +439,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Act */
+        Act: {
+            /** Name */
+            name: string;
+            /** Scene Ids */
+            scene_ids: string[];
+            /** Summary */
+            summary: string;
+        };
         /** AnalysisReport */
         AnalysisReport: {
             asset: components["schemas"]["MediaAsset"];
@@ -657,6 +746,15 @@ export interface components {
             /** Num */
             num: number;
         };
+        /** Relation */
+        Relation: {
+            /** A */
+            a: string;
+            /** B */
+            b: string;
+            /** Relation */
+            relation: string;
+        };
         /**
          * ReportCounts
          * @description What the analysis found; None where the stage is not built (or does not exist yet).
@@ -670,6 +768,48 @@ export interface components {
             shots?: number | null;
             /** Transcript Lines */
             transcript_lines?: number | null;
+        };
+        /** Scene */
+        Scene: {
+            /**
+             * Characters
+             * @default []
+             */
+            characters: string[];
+            /** End Ms */
+            end_ms: number;
+            /** Id */
+            id: string;
+            /**
+             * Importance
+             * @default 0.5
+             */
+            importance: number;
+            /**
+             * Line Ids
+             * @default []
+             */
+            line_ids: string[];
+            /** Location */
+            location?: string | null;
+            /** Shot Ids */
+            shot_ids: string[];
+            /** Start Ms */
+            start_ms: number;
+            /** Summary */
+            summary: string;
+        };
+        /** Scenes */
+        Scenes: {
+            /** Asset Id */
+            asset_id: string;
+            /** Scenes */
+            scenes: components["schemas"]["Scene"][];
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
         };
         /** Script */
         Script: {
@@ -754,6 +894,82 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ShotCaption */
+        ShotCaption: {
+            /** Action */
+            action?: string | null;
+            /** Caption */
+            caption: string;
+            /** Emotion */
+            emotion?: string | null;
+            /**
+             * Has Onscreen Text
+             * @default false
+             */
+            has_onscreen_text: boolean;
+            /**
+             * Is Credits
+             * @default false
+             */
+            is_credits: boolean;
+            /** Shot Id */
+            shot_id: string;
+            /**
+             * Shot Size
+             * @default other
+             * @enum {string}
+             */
+            shot_size: "extreme_close_up" | "close_up" | "medium" | "wide" | "extreme_wide" | "other";
+        };
+        /** ShotQuality */
+        ShotQuality: {
+            /** Brightness */
+            brightness: number;
+            /** Sharpness */
+            sharpness: number;
+        };
+        /** ShotView */
+        ShotView: {
+            caption?: components["schemas"]["ShotCaption"] | null;
+            /** End Ms */
+            end_ms: number;
+            /** Id */
+            id: string;
+            /** Keyframes */
+            keyframes: string[];
+            quality?: components["schemas"]["ShotQuality"] | null;
+            sprite?: components["schemas"]["SpriteSlot"] | null;
+            /** Start Ms */
+            start_ms: number;
+        };
+        /** ShotsView */
+        ShotsView: {
+            /** Asset Id */
+            asset_id: string;
+            /** Columns */
+            columns: number;
+            /** Rows */
+            rows: number;
+            /** Sheets */
+            sheets: string[];
+            /** Shots */
+            shots: components["schemas"]["ShotView"][];
+            /** Tile Height */
+            tile_height: number;
+            /** Tile Width */
+            tile_width: number;
+            /** Video */
+            video: string;
+        };
+        /** SpriteSlot */
+        SpriteSlot: {
+            /** Col */
+            col: number;
+            /** Row */
+            row: number;
+            /** Sheet */
+            sheet: number;
+        };
         /** StageCost */
         StageCost: {
             /** Cached */
@@ -777,6 +993,88 @@ export interface components {
             /** Stage */
             stage: string;
         };
+        /**
+         * Story
+         * @description Every claim about the plot carries scene ids: the anchor against hallucination.
+         */
+        Story: {
+            /** Acts */
+            acts: components["schemas"]["Act"][];
+            /** Asset Id */
+            asset_id: string;
+            /** Ending */
+            ending?: string | null;
+            /**
+             * Ending Scene Ids
+             * @default []
+             */
+            ending_scene_ids: string[];
+            /** Logline */
+            logline: string;
+            /**
+             * Relations
+             * @default []
+             */
+            relations: components["schemas"]["Relation"][];
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Synopsis */
+            synopsis: string;
+            /**
+             * Themes
+             * @default []
+             */
+            themes: string[];
+            /**
+             * Turning Points
+             * @default []
+             */
+            turning_points: components["schemas"]["TurningPoint"][];
+        };
+        /** Transcript */
+        Transcript: {
+            /** Asset Id */
+            asset_id: string;
+            /** Language */
+            language: string;
+            /** Lines */
+            lines: components["schemas"]["TranscriptLine"][];
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Source */
+            source: string;
+        };
+        /** TranscriptLine */
+        TranscriptLine: {
+            /** End Ms */
+            end_ms: number;
+            /** Id */
+            id: string;
+            /** Speaker */
+            speaker?: string | null;
+            /** Start Ms */
+            start_ms: number;
+            /** Text */
+            text: string;
+            /**
+             * Words
+             * @default []
+             */
+            words: components["schemas"]["Word"][];
+        };
+        /** TurningPoint */
+        TurningPoint: {
+            /** Scene Id */
+            scene_id: string;
+            /** What */
+            what: string;
+        };
         /** VideoInfo */
         VideoInfo: {
             /** Codec */
@@ -786,6 +1084,15 @@ export interface components {
             height: number;
             /** Width */
             width: number;
+        };
+        /** Word */
+        Word: {
+            /** End Ms */
+            end_ms: number;
+            /** Start Ms */
+            start_ms: number;
+            /** W */
+            w: string;
         };
     };
     responses: never;
@@ -1010,6 +1317,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    index_scenes_api_assets__asset_id__index_scenes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scenes"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    index_shots_api_assets__asset_id__index_shots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotsView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    index_story_api_assets__asset_id__index_story_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Story"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    index_transcript_api_assets__asset_id__index_transcript_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transcript"];
                 };
             };
             /** @description Not found */

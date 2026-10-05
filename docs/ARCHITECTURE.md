@@ -756,7 +756,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | GET | `/assets`, `/assets/{id}` | 列表 / 详情（含各分析阶段状态） |
 | POST | `/assets/{id}/analyze` | 提交分析（可指定目标阶段） |
 | GET | `/assets/{id}/report` | 分析报告：各阶段耗时、模型调用与 token / 费用、镜头 / 台词 / 场景 / 人物数量 |
-| GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / characters / story（已合并 overrides） |
+| GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / story（四个独立路由，各有类型；未构建 404）。`shots` 是展示视图：关键帧、雪碧图位置、镜头描述、代理视频路径（相对 data 目录，经 `/files` 取）。characters（已合并 overrides）随 M3-08 / 09 加入 |
 | PATCH | `/assets/{id}/characters/{cid}` | 改名 / 合并 / 忽略（写 overrides） |
 | GET | `/assets/{id}/shots/search?q=` | 文本检索镜头 |
 | POST | `/projects` | 新建项目（绑定一个资产） |

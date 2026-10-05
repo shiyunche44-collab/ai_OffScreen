@@ -18,6 +18,50 @@ export function useAssets() {
   });
 }
 
+export function useAsset(assetId: string) {
+  return useQuery({
+    queryKey: keys.asset(assetId),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+/** One part of an asset's MovieIndex. Each is its own request, so a stage that is not built
+ * yet (404) leaves the other panels working. */
+export const indexKey = (assetId: string, part: string) => [...keys.asset(assetId), "index", part] as const;
+
+export function useShots(assetId: string) {
+  return useQuery({
+    queryKey: indexKey(assetId, "shots"),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/index/shots", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+export function useTranscript(assetId: string) {
+  return useQuery({
+    queryKey: indexKey(assetId, "transcript"),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/index/transcript", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+export function useScenes(assetId: string) {
+  return useQuery({
+    queryKey: indexKey(assetId, "scenes"),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/index/scenes", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+export function useStory(assetId: string) {
+  return useQuery({
+    queryKey: indexKey(assetId, "story"),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/index/story", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
 export function useJobs() {
   return useQuery({
     queryKey: keys.jobs,

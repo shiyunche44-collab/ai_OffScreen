@@ -1,6 +1,35 @@
 {
   "components": {
     "schemas": {
+      "Act": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scene_ids": {
+            "items": {
+              "pattern": "^sc_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Scene Ids",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "scene_ids",
+          "summary"
+        ],
+        "title": "Act",
+        "type": "object"
+      },
       "AnalysisReport": {
         "properties": {
           "asset": {
@@ -754,6 +783,32 @@
         "title": "Rational",
         "type": "object"
       },
+      "Relation": {
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "pattern": "^ch_[0-9A-Za-z]+$",
+            "title": "A",
+            "type": "string"
+          },
+          "b": {
+            "pattern": "^ch_[0-9A-Za-z]+$",
+            "title": "B",
+            "type": "string"
+          },
+          "relation": {
+            "title": "Relation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "relation"
+        ],
+        "title": "Relation",
+        "type": "object"
+      },
       "ReportCounts": {
         "description": "What the analysis found; None where the stage is not built (or does not exist yet).",
         "properties": {
@@ -803,6 +858,112 @@
           }
         },
         "title": "ReportCounts",
+        "type": "object"
+      },
+      "Scene": {
+        "additionalProperties": false,
+        "properties": {
+          "characters": {
+            "default": [],
+            "items": {
+              "pattern": "^ch_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Characters",
+            "type": "array"
+          },
+          "end_ms": {
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "id": {
+            "pattern": "^sc_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "importance": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Importance",
+            "type": "number"
+          },
+          "line_ids": {
+            "default": [],
+            "items": {
+              "pattern": "^ln_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Line Ids",
+            "type": "array"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "shot_ids": {
+            "items": {
+              "pattern": "^sh_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Shot Ids",
+            "type": "array"
+          },
+          "start_ms": {
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_ms",
+          "end_ms",
+          "id",
+          "shot_ids",
+          "summary"
+        ],
+        "title": "Scene",
+        "type": "object"
+      },
+      "Scenes": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "pattern": "^ast_[0-9A-Za-z]+$",
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "scenes": {
+            "items": {
+              "$ref": "#/components/schemas/Scene"
+            },
+            "title": "Scenes",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "scenes"
+        ],
+        "title": "Scenes",
         "type": "object"
       },
       "Script": {
@@ -987,6 +1148,232 @@
         "title": "ScriptSegment",
         "type": "object"
       },
+      "ShotCaption": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "emotion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emotion"
+          },
+          "has_onscreen_text": {
+            "default": false,
+            "title": "Has Onscreen Text",
+            "type": "boolean"
+          },
+          "is_credits": {
+            "default": false,
+            "title": "Is Credits",
+            "type": "boolean"
+          },
+          "shot_id": {
+            "pattern": "^sh_[0-9A-Za-z]+$",
+            "title": "Shot Id",
+            "type": "string"
+          },
+          "shot_size": {
+            "default": "other",
+            "enum": [
+              "extreme_close_up",
+              "close_up",
+              "medium",
+              "wide",
+              "extreme_wide",
+              "other"
+            ],
+            "title": "Shot Size",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shot_id",
+          "caption"
+        ],
+        "title": "ShotCaption",
+        "type": "object"
+      },
+      "ShotQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "brightness": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Brightness",
+            "type": "number"
+          },
+          "sharpness": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sharpness",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sharpness",
+          "brightness"
+        ],
+        "title": "ShotQuality",
+        "type": "object"
+      },
+      "ShotView": {
+        "properties": {
+          "caption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShotCaption"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_ms": {
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "keyframes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keyframes",
+            "type": "array"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShotQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sprite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpriteSlot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_ms": {
+            "title": "Start Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "start_ms",
+          "end_ms",
+          "keyframes"
+        ],
+        "title": "ShotView",
+        "type": "object"
+      },
+      "ShotsView": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "columns": {
+            "title": "Columns",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "sheets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "shots": {
+            "items": {
+              "$ref": "#/components/schemas/ShotView"
+            },
+            "title": "Shots",
+            "type": "array"
+          },
+          "tile_height": {
+            "title": "Tile Height",
+            "type": "integer"
+          },
+          "tile_width": {
+            "title": "Tile Width",
+            "type": "integer"
+          },
+          "video": {
+            "title": "Video",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "video",
+          "tile_width",
+          "tile_height",
+          "columns",
+          "rows",
+          "sheets",
+          "shots"
+        ],
+        "title": "ShotsView",
+        "type": "object"
+      },
+      "SpriteSlot": {
+        "properties": {
+          "col": {
+            "title": "Col",
+            "type": "integer"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sheet",
+          "col",
+          "row"
+        ],
+        "title": "SpriteSlot",
+        "type": "object"
+      },
       "StageCost": {
         "properties": {
           "cached": {
@@ -1054,6 +1441,198 @@
         "title": "StageStatus",
         "type": "object"
       },
+      "Story": {
+        "additionalProperties": false,
+        "description": "Every claim about the plot carries scene ids: the anchor against hallucination.",
+        "properties": {
+          "acts": {
+            "items": {
+              "$ref": "#/components/schemas/Act"
+            },
+            "title": "Acts",
+            "type": "array"
+          },
+          "asset_id": {
+            "pattern": "^ast_[0-9A-Za-z]+$",
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "ending": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ending"
+          },
+          "ending_scene_ids": {
+            "default": [],
+            "items": {
+              "pattern": "^sc_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Ending Scene Ids",
+            "type": "array"
+          },
+          "logline": {
+            "title": "Logline",
+            "type": "string"
+          },
+          "relations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Relation"
+            },
+            "title": "Relations",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "synopsis": {
+            "title": "Synopsis",
+            "type": "string"
+          },
+          "themes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Themes",
+            "type": "array"
+          },
+          "turning_points": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TurningPoint"
+            },
+            "title": "Turning Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "logline",
+          "synopsis",
+          "acts"
+        ],
+        "title": "Story",
+        "type": "object"
+      },
+      "Transcript": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "pattern": "^ast_[0-9A-Za-z]+$",
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "language",
+          "source",
+          "lines"
+        ],
+        "title": "Transcript",
+        "type": "object"
+      },
+      "TranscriptLine": {
+        "additionalProperties": false,
+        "properties": {
+          "end_ms": {
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "id": {
+            "pattern": "^ln_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker"
+          },
+          "start_ms": {
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "words": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start_ms",
+          "end_ms",
+          "id",
+          "text"
+        ],
+        "title": "TranscriptLine",
+        "type": "object"
+      },
+      "TurningPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "scene_id": {
+            "pattern": "^sc_[0-9A-Za-z]+$",
+            "title": "Scene Id",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scene_id",
+          "what"
+        ],
+        "title": "TurningPoint",
+        "type": "object"
+      },
       "VideoInfo": {
         "additionalProperties": false,
         "properties": {
@@ -1082,6 +1661,32 @@
           "codec"
         ],
         "title": "VideoInfo",
+        "type": "object"
+      },
+      "Word": {
+        "additionalProperties": false,
+        "properties": {
+          "end_ms": {
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "start_ms": {
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "w": {
+            "title": "W",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_ms",
+          "end_ms",
+          "w"
+        ],
+        "title": "Word",
         "type": "object"
       }
     }
@@ -1399,6 +2004,258 @@
           }
         },
         "summary": "Analyze Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/index/scenes": {
+      "get": {
+        "description": "The scenes (404 until the scenes stage is built).",
+        "operationId": "index_scenes_api_assets__asset_id__index_scenes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scenes"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Index Scenes",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/index/shots": {
+      "get": {
+        "description": "Shots with keyframes, quality, description and sprite position, plus the proxy video.",
+        "operationId": "index_shots_api_assets__asset_id__index_shots_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShotsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Index Shots",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/index/story": {
+      "get": {
+        "description": "The story: logline, acts, turning points, ending (404 until the story stage is built).",
+        "operationId": "index_story_api_assets__asset_id__index_story_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Story"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Index Story",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/index/transcript": {
+      "get": {
+        "description": "The dialogue lines with their times (404 until the transcript stage is built).",
+        "operationId": "index_transcript_api_assets__asset_id__index_transcript_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transcript"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Index Transcript",
         "tags": [
           "assets"
         ]

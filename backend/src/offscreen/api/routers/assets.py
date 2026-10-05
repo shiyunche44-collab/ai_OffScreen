@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 from offscreen.api.deps import Services
 from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
+from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Job
+from offscreen.services.index import ShotsView
 from offscreen.services.library import AssetDetail, MediaListing
 from offscreen.services.report import AnalysisReport
 
@@ -52,3 +54,27 @@ def analyze_asset(asset_id: str, services: Services) -> Job:
 def analysis_report(asset_id: str, services: Services) -> AnalysisReport:
     """What the analysis cost: time and model usage per stage, and what it found."""
     return services.report.analysis(asset_id)
+
+
+@router.get("/{asset_id}/index/transcript")
+def index_transcript(asset_id: str, services: Services) -> Transcript:
+    """The dialogue lines with their times (404 until the transcript stage is built)."""
+    return services.index.transcript(asset_id)
+
+
+@router.get("/{asset_id}/index/shots")
+def index_shots(asset_id: str, services: Services) -> ShotsView:
+    """Shots with keyframes, quality, description and sprite position, plus the proxy video."""
+    return services.index.shots(asset_id)
+
+
+@router.get("/{asset_id}/index/scenes")
+def index_scenes(asset_id: str, services: Services) -> Scenes:
+    """The scenes (404 until the scenes stage is built)."""
+    return services.index.scenes(asset_id)
+
+
+@router.get("/{asset_id}/index/story")
+def index_story(asset_id: str, services: Services) -> Story:
+    """The story: logline, acts, turning points, ending (404 until the story stage is built)."""
+    return services.index.story(asset_id)
