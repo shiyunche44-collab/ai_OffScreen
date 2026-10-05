@@ -1,0 +1,17 @@
+{# version: 1 #}
+你是电影镜头描述助手。下面是一部电影里连续的 {{ shots | length }} 个镜头。每个镜头给出了开头、中间、结尾三张画面（按顺序附在本消息的图片里）和镜头前后的台词。请逐个镜头描述画面内容，供后面的解说文案写作和选镜使用。
+
+要求：
+- caption：用中文 1–2 句话说清画面里「谁 / 什么、在哪、在做什么」，只写看得见的内容；人物不知道名字就用外貌或身份指代（如「红发女孩」「持刀的男人」），不要编造名字或剧情
+- shot_size：景别，只能取 extreme_close_up（特写以下）、close_up（特写）、medium（中景）、wide（全景）、extreme_wide（远景）、other 之一
+- action：主要动作，几个字（没有明显动作就留空）
+- emotion：人物情绪或画面氛围，几个字（不确定就留空）
+- has_onscreen_text：画面上有字幕以外的文字（标题、路牌、书信等）为 true
+- is_credits：片头标题、片尾字幕、演职员表、厂牌 logo 等非剧情画面为 true
+- 台词只用来帮助理解画面，不要复述台词
+- 每个镜头都必须输出，shot_id 原样照抄，顺序与下面一致
+
+镜头列表（格式「镜头 id（时间）图 a–b：附近台词」）：
+{% for shot in shots %}
+- 镜头 {{ shot.id }}（{{ shot.start }}–{{ shot.end }}）图 {{ shot.first_image }}–{{ shot.last_image }}：{{ shot.dialogue if shot.dialogue else "（无台词）" }}
+{% endfor %}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -94,6 +95,69 @@ def test_on_resolved_reports_each_stage_upstream_first_with_cache_status(
     seen.clear()
     Engine(store, stages, on_resolved=lambda n, hit: seen.append((n, hit))).ensure("t.upper", SCOPE)
     assert seen == [("t.source", True), ("t.upper", True)]
+
+
+class Resumable(Stage):
+    """Does its work in pieces kept in the work directory; fails on a chosen piece."""
+
+    name = "t.resumable"
+    version = 1
+    lane = "cpu"
+
+    def __init__(self, fail_at: int | None) -> None:
+        self.fail_at = fail_at
+        self.computed: list[int] = []
+
+    def run(self, ctx: StageContext) -> StageOutput:
+        parts = []
+        for i in range(4):
+            piece = ctx.work_dir / f"{i}.txt"
+            if not piece.exists():
+                if i == self.fail_at:
+                    raise RuntimeError("quota exhausted")
+                self.computed.append(i)
+                piece.write_text(str(i * i))
+            parts.append(piece.read_text())
+        (ctx.out_dir / "out.txt").write_text(",".join(parts))
+        return StageOutput()
+
+
+def test_work_dir_keeps_finished_pieces_across_a_failed_run(store: ArtifactStore) -> None:
+    first = Resumable(fail_at=2)
+    with pytest.raises(RuntimeError):
+        Engine(store, [first]).ensure("t.resumable", SCOPE)
+    assert first.computed == [0, 1]
+    assert not list((store.root / "t.resumable").glob(".tmp-*"))  # staging is gone, work is not
+
+    second = Resumable(fail_at=None)
+    art = Engine(store, [second]).ensure("t.resumable", SCOPE)
+    assert second.computed == [2, 3]  # only what was missing
+    assert art.path("out.txt").read_text() == "0,1,4,9"
+    assert not (store.root / ".work" / "t.resumable").exists() or not any(
+        (store.root / ".work" / "t.resumable").iterdir()
+    )  # cleaned after success
+
+
+def test_work_dir_is_not_shared_between_different_computations(store: ArtifactStore) -> None:
+    class Param(Resumable):
+        def __init__(self, tag: str, fail_at: int | None) -> None:
+            super().__init__(fail_at)
+            self.tag = tag
+
+        def params(self, scope: Scope) -> dict[str, Any]:
+            return {"tag": self.tag}
+
+    with pytest.raises(RuntimeError):
+        Engine(store, [Param("a", 2)]).ensure("t.resumable", SCOPE)
+    other = Param("b", None)  # other parameters: other cache key: nothing to resume from
+    Engine(store, [other]).ensure("t.resumable", SCOPE)
+    assert other.computed == [0, 1, 2, 3]
+
+
+def test_context_without_a_store_has_no_work_dir() -> None:
+    ctx = StageContext(stage="x", scope={}, inputs=[], out_dir=Path("."))
+    with pytest.raises(RuntimeError, match="work directory"):
+        _ = ctx.work_dir
 
 
 def test_peek_reports_what_is_cached_without_running_anything(store: ArtifactStore) -> None:

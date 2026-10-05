@@ -95,6 +95,17 @@ class ArtifactStore:
                 return None
         return Artifact(d, manifest)
 
+    def work_dir(self, stage: str, cache_key: str) -> Path:
+        """Scratch space that survives a failed run, for stages that do long work in resumable
+        pieces. Named by the cache key, so changed inputs, parameters or prompts start fresh; a
+        successful run removes it (`clear_work`)."""
+        d = self.root / ".work" / stage / _hex(cache_key)
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def clear_work(self, stage: str, cache_key: str) -> None:
+        shutil.rmtree(self.root / ".work" / stage / _hex(cache_key), ignore_errors=True)
+
     def begin(self, stage: str) -> Path:
         """A fresh, empty staging directory for a stage to write its output into."""
         staging = self.root / stage / f".tmp-{uuid.uuid4().hex}"

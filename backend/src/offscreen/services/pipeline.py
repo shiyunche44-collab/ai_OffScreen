@@ -27,6 +27,7 @@ from offscreen.providers.ports import (
 )
 from offscreen.services.llm import build_llm, task_models
 from offscreen.services.tts import build_tts
+from offscreen.stages.analysis.captions import DEFAULT_BATCH, CaptionsError, CaptionsStage
 from offscreen.stages.analysis.ingest import IngestError, ingest
 from offscreen.stages.analysis.keyframes import KeyframesStage
 from offscreen.stages.analysis.proxy import ProxyError, ProxyStage
@@ -45,8 +46,8 @@ DEFAULT_STYLE = "neutral"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
     ConfigError, IngestError, ProbeError, ProxyError, ShotsError, TranscriptError, StoryError,
-    ScriptError, PlanError, CompileStageError, RenderError, FFmpegError, FFmpegCanceled,
-    LLMError, TTSError, ValueError,
+    ScriptError, CaptionsError, PlanError, CompileStageError, RenderError, FFmpegError,
+    FFmpegCanceled, LLMError, TTSError, ValueError,
 )  # fmt: skip
 """Failures with a message meant for the person at the terminal (not bugs)."""
 
@@ -145,11 +146,17 @@ class Pipeline:
             style=opts.style,
             spoil_ending=opts.spoil_ending,
         )
-        models = task_models(cfg, ["story_chunk", "story", "script_write"])
+        models = task_models(cfg, ["story_chunk", "story", "script_write", "shot_caption"])
+        caption_task = cfg.tasks.get("shot_caption")
         return [
             ProxyStage(self.assets),
             ShotsStage(self.assets, p.detector),
             KeyframesStage(),
+            CaptionsStage(
+                p.llm,
+                models,
+                (caption_task.shots_per_request if caption_task else None) or DEFAULT_BATCH,
+            ),
             TranscriptStage(self.assets, p.asr),
             StoryStage(p.llm, models),
             ScriptStage(p.llm, script, models),

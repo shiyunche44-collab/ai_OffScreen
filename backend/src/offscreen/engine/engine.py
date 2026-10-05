@@ -135,11 +135,12 @@ class Engine:
                 out_dir=staging,
                 _progress=self._progress or (lambda _s, _f, _m: None),
                 _is_canceled=self._is_canceled or (lambda: False),
+                _work_dir=lambda: self.store.work_dir(stage.name, cache_key),
             )
             output = stage.run(ctx)
             if ctx.is_canceled():
                 raise StageCanceled(stage.name)
-            return self.store.commit(
+            artifact = self.store.commit(
                 staging,
                 stage=stage.name,
                 stage_version=stage.version,
@@ -147,6 +148,8 @@ class Engine:
                 scope=scope,
                 meta=output.meta,
             )
+            self.store.clear_work(stage.name, cache_key)
+            return artifact
         except BaseException:
             self.store.discard(staging)
             raise

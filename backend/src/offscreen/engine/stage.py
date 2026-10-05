@@ -43,12 +43,22 @@ class StageContext:
     """Private staging directory; everything the stage writes here becomes its artifact."""
     _progress: Callable[[str, float, str], None] = lambda _s, _f, _m: None
     _is_canceled: Callable[[], bool] = lambda: False
+    _work_dir: Callable[[], Path] | None = None
 
     def progress(self, frac: float, msg: str = "") -> None:
         self._progress(self.stage, min(1.0, max(0.0, frac)), msg)
 
     def is_canceled(self) -> bool:
         return self._is_canceled()
+
+    @property
+    def work_dir(self) -> Path:
+        """Scratch directory that outlives a failed run of this exact stage computation (same
+        inputs, parameters, provider): finished pieces of long work can be kept there and reused
+        by the next attempt. Removed once the stage succeeds; not part of the artifact."""
+        if self._work_dir is None:
+            raise RuntimeError("this context has no work directory")
+        return self._work_dir()
 
     def input(self, stage: str) -> Artifact:
         """The single input artifact produced by `stage`."""
