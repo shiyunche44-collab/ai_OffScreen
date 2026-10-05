@@ -1,0 +1,21 @@
+{
+  "asset_id": "ast_sintel01",
+  "schema_version": 1,
+  "shots": [
+    {
+      "characters": [
+        {
+          "area_ratio": 0.18,
+          "character_id": "ch_01",
+          "share": 0.75
+        },
+        {
+          "area_ratio": 0.06,
+          "character_id": "ch_02",
+          "share": 0.25
+        }
+      ],
+      "shot_id": "sh_0412"
+    }
+  ]
+}

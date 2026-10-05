@@ -347,6 +347,8 @@ ai_OffScreen/
 
 `faces` 阶段（M3-07）的产物是 `faces.json` 和 `embeddings.npy`：后者每行是一张脸的 L2 归一化特征（float32），`embedding` 是该脸在其中的行号（行序即 faces.json 中人脸的出现顺序）；`character_id` 在聚类（M3-08）之前为空。
 
+`characters` 阶段（M3-08）把特征聚成人物（相似度合并，不依赖 HDBSCAN）：`ch_01` 是出现最多的人；太小或只在一个镜头出现的簇算路人 / 误检，不成为人物。产物：`characters.json`（人数、`centroid_ref` = `centroids.npy#行号`、最多 3 张从关键帧裁出的缩略图 `faces/<id>_<n>.jpg`，名字留空）、填了 `character_id` 的 `faces.json`、`cast.json`（每个镜头出现的人物及其占该镜头人脸面积的比例，下游只读它而不碰人脸）、`centroids.npy`。
+
 **scenes.json**
 ```json
 { "id": "sc_040", "start_ms": 1220000, "end_ms": 1302000,

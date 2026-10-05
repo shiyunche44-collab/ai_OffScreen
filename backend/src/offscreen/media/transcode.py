@@ -112,6 +112,30 @@ def extract_frame(
     run_ffmpeg(args, should_cancel=should_cancel)
 
 
+def crop_image(
+    src: Path,
+    dst: Path,
+    box: tuple[float, float, float, float],
+    *,
+    margin: float = 0.2,
+    height: int = 160,
+    should_cancel: Callable[[], bool] | None = None,
+) -> None:
+    """A jpeg of the part of `src` inside `box` (x0, y0, x1, y1 as fractions of the image),
+    grown by `margin` of its size on every side (kept inside the image) and scaled to at most
+    `height` pixels tall."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    cx0, cy0 = max(0.0, x0 - margin * w), max(0.0, y0 - margin * h)
+    cx1, cy1 = min(1.0, x1 + margin * w), min(1.0, y1 + margin * h)
+    crop = f"crop=iw*{cx1 - cx0:.6f}:ih*{cy1 - cy0:.6f}:iw*{cx0:.6f}:ih*{cy0:.6f}"
+    scale = f"scale=-2:trunc(min({height}\\,ih)/2)*2"
+    run_ffmpeg(
+        ["-i", str(src), "-vf", f"{crop},{scale}", "-frames:v", "1", "-q:v", "3", str(dst)],
+        should_cancel=should_cancel,
+    )
+
+
 def make_sprite_sheets(
     frames: list[Path],
     out_pattern: Path,

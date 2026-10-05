@@ -31,6 +31,7 @@ from offscreen.providers.ports import (
 from offscreen.services.llm import build_llm, task_models
 from offscreen.services.tts import build_tts
 from offscreen.stages.analysis.captions import DEFAULT_BATCH, CaptionsError, CaptionsStage
+from offscreen.stages.analysis.characters import CharactersError, CharactersStage
 from offscreen.stages.analysis.faces import FacesError, FacesStage
 from offscreen.stages.analysis.ingest import IngestError, ingest
 from offscreen.stages.analysis.keyframes import KeyframesStage
@@ -50,10 +51,9 @@ FINAL_STAGE = "output.render"
 DEFAULT_STYLE = "neutral"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
-    ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, TranscriptError,
-    StoryError,
-    ScriptError, CaptionsError, ScenesError, PlanError, CompileStageError, RenderError, FFmpegError,
-    FFmpegCanceled, LLMError, TTSError, ValueError,
+    ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, CharactersError,
+    TranscriptError, StoryError, ScriptError, CaptionsError, ScenesError, PlanError,
+    CompileStageError, RenderError, FFmpegError, FFmpegCanceled, LLMError, TTSError, ValueError,
 )  # fmt: skip
 """Failures with a message meant for the person at the terminal (not bugs)."""
 
@@ -165,6 +165,7 @@ class Pipeline:
             ShotsStage(self.assets, p.detector),
             KeyframesStage(),
             FacesStage(p.faces),
+            CharactersStage(),
             CaptionsStage(
                 p.llm,
                 models,

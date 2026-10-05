@@ -263,3 +263,40 @@ def test_adapter_reports_an_unreadable_image_and_a_missing_package(tmp_path: Pat
 def test_adapter_id_names_model_and_settings() -> None:
     assert InsightFaceAnalyzer("buffalo_l").id == "insightface/buffalo_l@1/det640"
     assert InsightFaceAnalyzer("buffalo_l", device="cuda").id == InsightFaceAnalyzer("buffalo_l").id
+
+
+# --- the characters stage on degenerate input -----------------------------------------------
+
+
+def test_a_film_without_faces_has_no_characters(store: ArtifactStore) -> None:
+    from offscreen.domain.index import Cast, Characters
+    from offscreen.stages.analysis.characters import (
+        CAST_FILE,
+        CENTROIDS_FILE,
+        CHARACTERS_FILE,
+        CharactersStage,
+    )
+
+    engine = Engine(store, [StubKeyframes(2), FacesStage(FakeFaceAnalyzer()), CharactersStage()])
+    art = engine.ensure("analysis.characters", SCOPE)
+    assert art.read_model(CHARACTERS_FILE, Characters).characters == []
+    cast = art.read_model(CAST_FILE, Cast)
+    assert [(s.shot_id, s.characters) for s in cast.shots] == [("sh_0", []), ("sh_1", [])]
+    assert np.load(art.path(CENTROIDS_FILE)).shape == (0, 0)
+    assert art.meta == {"faces": 0, "characters": 0, "unassigned_faces": 0}
+
+
+def test_faces_and_embeddings_that_disagree_are_an_error(store: ArtifactStore) -> None:
+    from offscreen.stages.analysis.characters import CharactersError, CharactersStage
+
+    class Lying(FacesStage):
+        def run(self, ctx: StageContext) -> StageOutput:
+            out = super().run(ctx)
+            np.save(ctx.out_dir / EMBEDDINGS_FILE, np.zeros((5, 2), dtype=np.float32))
+            return out
+
+    analyzer = FakeFaceAnalyzer(lambda p: [face()] if p.name == "sh_0_a.jpg" else [])
+    with pytest.raises(CharactersError, match=r"lists 1 faces but embeddings\.npy has 5 rows"):
+        Engine(store, [StubKeyframes(1), Lying(analyzer), CharactersStage()]).ensure(
+            "analysis.characters", SCOPE
+        )

@@ -176,6 +176,28 @@ class Faces(Versioned):
     shots: list[ShotFaces]
 
 
+class CastMember(Strict):
+    character_id: CharacterId
+    share: Unit
+    """Share of the shot's identified face area (the members of a shot sum to 1)."""
+    area_ratio: Unit
+    """The character's largest face in the shot, as a share of the frame."""
+
+
+class ShotCast(Strict):
+    shot_id: ShotId
+    characters: list[CastMember] = []
+    """Largest share first; empty when nobody is identified."""
+
+
+class Cast(Versioned):
+    """Who is on screen in each shot: what scene summaries and footage matching read, so they
+    need not know about faces."""
+
+    asset_id: AssetId
+    shots: list[ShotCast]
+
+
 # ---- scenes, characters, story ----------------------------------------------
 class Scene(TimeRange):
     id: SceneId

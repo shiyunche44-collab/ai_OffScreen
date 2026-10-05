@@ -8,6 +8,7 @@ from offscreen.domain.artifact import Manifest
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import (
     Captions,
+    Cast,
     CharacterOverrides,
     Characters,
     Faces,
@@ -32,6 +33,7 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "sprites": SpriteSheets,
     "captions": Captions,
     "faces": Faces,
+    "cast": Cast,
     "scenes": Scenes,
     "characters": Characters,
     "characters_overrides": CharacterOverrides,

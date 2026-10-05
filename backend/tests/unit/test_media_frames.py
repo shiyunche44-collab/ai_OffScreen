@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from offscreen.media.transcode import GRAY_WIDTH, extract_frame, make_sprite_sheets
+from offscreen.media.transcode import GRAY_WIDTH, crop_image, extract_frame, make_sprite_sheets
 
 
 @pytest.fixture(scope="module")
@@ -139,3 +139,24 @@ def test_packing_nothing_is_an_error(tmp_path: Path) -> None:
         make_sprite_sheets(
             [], tmp_path / "s_%03d.jpg", tile_width=160, tile_height=90, columns=2, rows=2
         )
+
+
+def test_crop_image_cuts_the_box_with_a_margin_and_scales_it_down(
+    clip: Path, tmp_path: Path
+) -> None:
+    frame = tmp_path / "f.jpg"
+    extract_frame(clip, frame, at_ms=500, height=360)
+    assert size(frame) == (640, 360)
+
+    face = tmp_path / "face.jpg"
+    crop_image(frame, face, (0.25, 0.25, 0.75, 0.75), margin=0.0, height=1000)
+    assert size(face) == (320, 180)  # exactly the box, never upscaled
+
+    grown = tmp_path / "grown.jpg"
+    crop_image(frame, grown, (0.25, 0.25, 0.75, 0.75), margin=0.2, height=1000)
+    assert size(grown) == (448, 252)  # 20 % of the box added on every side
+
+    corner = tmp_path / "corner.jpg"
+    crop_image(frame, corner, (0.0, 0.0, 0.2, 0.2), margin=0.5, height=40)
+    w, h = size(corner)
+    assert h == 40 and abs(w / h - (0.3 * 640) / (0.3 * 360)) < 0.1  # margin stops at the edge
