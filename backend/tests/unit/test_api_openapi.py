@@ -20,7 +20,7 @@ def test_committed_openapi_is_up_to_date() -> None:
     assert committed == json.loads(json.dumps(spec())), "OpenAPI drifted; run `make openapi`"
 
 
-def test_every_documented_route_belongs_to_assets_projects_or_jobs() -> None:
+def test_the_documented_routes() -> None:
     paths = set(spec()["paths"])
     assert paths == {
         "/assets",
@@ -36,6 +36,7 @@ def test_every_documented_route_belongs_to_assets_projects_or_jobs() -> None:
         "/jobs/{job_id}/log",
         "/jobs/{job_id}:cancel",
         "/jobs/{job_id}:retry",
+        "/files/{path}",
     }
 
 
@@ -47,3 +48,9 @@ def test_error_responses_are_documented_with_the_shared_model() -> None:
             for code in ("404", "409", "422"):
                 ref = op["responses"][code]["content"]["application/json"]["schema"]["$ref"]
                 assert ref.endswith("/ErrorResponse"), (path, method, code)
+
+
+def test_operation_ids_are_unique() -> None:
+    """Generated clients name their functions after them."""
+    ids = [op["operationId"] for ops in spec()["paths"].values() for op in ops.values()]
+    assert len(ids) == len(set(ids))

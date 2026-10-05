@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from offscreen.api.errors import install_error_handlers
-from offscreen.api.routers import assets, jobs, projects
+from offscreen.api.routers import assets, files, jobs, projects
 from offscreen.config import load_config
 from offscreen.services.app import AppServices
 
@@ -35,6 +35,6 @@ def create_app(services: AppServices | None = None) -> FastAPI:
 
     app = FastAPI(title=TITLE, version=VERSION, lifespan=lifespan)
     install_error_handlers(app)
-    for module in (assets, projects, jobs):
+    for module in (assets, projects, jobs, files):
         app.include_router(module.router)
     return app
