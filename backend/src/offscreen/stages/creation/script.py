@@ -24,14 +24,20 @@ from offscreen import styles
 from offscreen.algo.script import (
     BEAT_TOLERANCE,
     DEFAULT_CHARS_PER_S,
-    MAX_SEGMENT_CHARS,
-    MIN_SEGMENT_CHARS,
-    check_beat,
     count_chars,
     estimate_duration_s,
     key_lines,
     scene_lines,
     target_chars,
+)
+from offscreen.algo.script_rules import (
+    LENGTH_TOLERANCE,
+    MIN_SEGMENT_CHARS,
+    KnownName,
+    Rules,
+    SegmentDraft,
+    as_annotations,
+    check,
 )
 from offscreen.algo.story import fmt_clock
 from offscreen.domain.index import Scenes, Story, Transcript
@@ -70,6 +76,8 @@ class ScriptSettings:
     chars_per_s: float = DEFAULT_CHARS_PER_S
     outline: ScriptOutline | None = None
     """A person's edit of the outline; None: use the generated one (`creation.outline`)."""
+    names: tuple[KnownName, ...] = ()
+    """Confirmed characters; the text must name them as given (rule `name`)."""
 
     def __post_init__(self) -> None:
         if self.target_duration_s < 1:
@@ -129,6 +137,7 @@ class ScriptStage(Stage):
             "chars_per_s": cfg.chars_per_s,
             "outline": cfg.outline.model_dump(mode="json") if cfg.outline else None,
             "tolerance": BEAT_TOLERANCE,
+            "names": [{"name": k.name, "aliases": list(k.aliases)} for k in cfg.names],
             "language": "zh",
         }
 
@@ -207,6 +216,10 @@ class ScriptStage(Stage):
                 for i, seg in enumerate(written)
             )
 
+        shortest_beat_lo = min(
+            round(target_chars(b.target_s, cfg.chars_per_s) * (1 - BEAT_TOLERANCE))
+            for b in outline.beats
+        )
         suffix = asset_id.split("_", 1)[1]
         script = Script(
             id=f"scr_{suffix}",
@@ -222,6 +235,20 @@ class ScriptStage(Stage):
             ),
             outline=outline.beats,
             segments=segments,
+            annotations=as_annotations(
+                check(
+                    [SegmentDraft(g.text, g.scene_refs, g.id) for g in segments],
+                    Rules(
+                        scene_ids=scene_ids,
+                        target_chars=target_chars(outline.total_s, cfg.chars_per_s),
+                        tolerance=LENGTH_TOLERANCE,
+                        min_segment_chars=min(MIN_SEGMENT_CHARS, shortest_beat_lo),
+                        banned_words=preset.banned_words,
+                        names=cfg.names,
+                    ),
+                ),
+                [g.id for g in segments],
+            ),
         )
         write_model(ctx.out_dir / SCRIPT_FILE, script)
         chars = sum(count_chars(s.text) for s in segments)
@@ -232,6 +259,7 @@ class ScriptStage(Stage):
                 "chars": chars,
                 "target_chars": target_chars(outline.total_s, cfg.chars_per_s),
                 "estimated_s": round(estimate_duration_s(chars, cfg.chars_per_s), 1),
+                "rule_notes": len(script.annotations),
             }
         )
 
@@ -251,6 +279,15 @@ class ScriptStage(Stage):
         target = max(1, target_chars(beat.target_s, cfg.chars_per_s))
         lo, hi = round(target * (1 - BEAT_TOLERANCE)), round(target * (1 + BEAT_TOLERANCE))
         purpose = next((b.purpose for b in preset.structure if b.name == beat.beat), None)
+        rules = Rules(
+            scene_ids=scene_ids,
+            target_chars=target,
+            tolerance=BEAT_TOLERANCE,
+            min_segment_chars=min(MIN_SEGMENT_CHARS, lo),  # a short beat may be one short segment
+            banned_words=preset.banned_words,
+            names=cfg.names,
+            whole="本节",
+        )
         instructions = render(
             "script_beat",
             index=index,
@@ -267,8 +304,8 @@ class ScriptStage(Stage):
             min_chars=lo,
             max_chars=hi,
             approx_segments=max(1, round(target / SEGMENT_CHARS_HINT)),
-            min_seg=MIN_SEGMENT_CHARS * 3,
-            max_seg=MAX_SEGMENT_CHARS // 2,
+            min_seg=rules.min_segment_chars,
+            max_seg=rules.max_segment_chars,
         )
         # the context comes first and is identical for every beat: that is the cacheable prefix
         messages = [Message("user", f"{context}\n\n{instructions.text}")]
@@ -278,13 +315,10 @@ class ScriptStage(Stage):
             reply = self.llm.generate(
                 WRITE_TASK, messages, BeatReply, prompt_version=version, max_tokens=4096
             )
-            problems = check_beat(
-                [s.text for s in reply.segments],
-                [s.scene_refs for s in reply.segments],
-                scene_ids,
-                target=target,
-                banned_words=preset.banned_words,
-            )
+            problems = [
+                v.message
+                for v in check([SegmentDraft(s.text, s.scene_refs) for s in reply.segments], rules)
+            ]
             if not problems:
                 return reply.segments
             ctx.progress(

@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from offscreen import styles
+from offscreen.algo.script_rules import KnownName
 from offscreen.domain.index import Act, Scene, Scenes, Story, Transcript, TranscriptLine
 from offscreen.domain.script import OutlineBeat, Script, ScriptOutline
 from offscreen.engine import ArtifactStore, Engine, Stage, StageContext, StageOutput
@@ -149,7 +150,13 @@ def test_writes_the_script_beat_by_beat(tmp_path: Path) -> None:
         ("hook", 10, "开场的相遇"),
         ("ending", 10, "分别与结局"),
     ]
-    assert art.meta == {"segments": 3, "chars": 90, "target_chars": 90, "estimated_s": 20.0}
+    assert art.meta == {
+        "segments": 3,
+        "chars": 90,
+        "target_chars": 90,
+        "estimated_s": 20.0,
+        "rule_notes": 0,
+    }
     assert len(llm.calls) == 2  # one call per beat
 
 
@@ -302,3 +309,33 @@ def test_settings_validation() -> None:
         ScriptSettings(target_duration_s=0, voice_id="v")
     with pytest.raises(ValueError):
         ScriptSettings(target_duration_s=10, voice_id="v", chars_per_s=0)
+
+
+def test_a_name_slip_is_sent_back_for_repair(tmp_path: Path) -> None:
+    slip = {"segments": [{"text": "辛特尔" + "字" * 42 + "。", "scene_refs": ["sc_001"]}]}
+    llm = FakeLLM({"script_write": [slip, HOOK, ENDING]})
+    settings = ScriptSettings(
+        target_duration_s=20, voice_id="v1", style=STYLE, names=(KnownName("辛忒尔"),)
+    )
+    build(tmp_path, llm, settings).ensure("creation.script", SCOPE)
+    assert "把人物「辛忒尔」写成了「辛特尔」" in llm.calls[1][1][2].content
+
+
+def test_confirmed_names_are_part_of_the_cache_key(tmp_path: Path) -> None:
+    llm = FakeLLM({"script_write": [HOOK, ENDING] * 2})
+    first = build(tmp_path, llm).ensure("creation.script", SCOPE)
+    named = ScriptSettings(
+        target_duration_s=20, voice_id="v1", style=STYLE, names=(KnownName("辛忒尔", ["小辛"]),)
+    )
+    assert build(tmp_path, llm, named).ensure("creation.script", SCOPE).cache_key != first.cache_key
+
+
+def test_what_the_beats_could_not_fix_is_left_as_rule_annotations(tmp_path: Path) -> None:
+    # each beat is at the edge of its own tolerance (+20 %), together they are 20 % over the
+    # target, which is more than the whole script may be (15 %)
+    long_beats = [{"segments": [seg(54, ["sc_001"])]}, {"segments": [seg(54, ["sc_002"])]}]
+    llm = FakeLLM({"script_write": long_beats})
+    art = build(tmp_path, llm).ensure("creation.script", SCOPE)
+    script = art.read_model(SCRIPT_FILE, Script)
+    assert [(a.segment_id, a.type) for a in script.annotations] == [("seg_02", "rule")]
+    assert "全文共 108 字" in script.annotations[0].message and art.meta["rule_notes"] == 1

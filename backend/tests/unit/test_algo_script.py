@@ -7,8 +7,6 @@ from hypothesis import strategies as st
 
 from offscreen.algo.script import (
     build_outline,
-    check_beat,
-    check_draft,
     count_chars,
     estimate_duration_s,
     key_lines,
@@ -31,33 +29,6 @@ def test_count_chars_ignores_punctuation_and_space() -> None:
 def test_target_and_estimate_round_trip() -> None:
     assert target_chars(180, 4.5) == 810
     assert estimate_duration_s(810, 4.5) == 180
-
-
-def test_check_draft_ok() -> None:
-    texts = ["一" * 50, "二" * 50]
-    assert check_draft(texts, [["sc_1"], ["sc_2"]], ["sc_1", "sc_2"], target=100) == []
-
-
-def test_check_draft_reports_each_problem() -> None:
-    texts = ["一" * 50, "二" * 2, "三" * 250]
-    errs = check_draft(texts, [["sc_1"], ["sc_9"], []], ["sc_1"], target=100)
-    joined = "\n".join(errs)
-    assert "sc_9" in joined  # unknown scene
-    assert "第 3 段没有 scene_refs" in joined
-    assert "第 2 段只有 2 字" in joined
-    assert "第 3 段有 250 字" in joined
-    assert "删减" in joined  # total 302 vs 100
-
-
-def test_check_draft_too_short_overall() -> None:
-    errs = check_draft(["一" * 30], [["sc_1"]], ["sc_1"], target=100)
-    assert len(errs) == 1 and "补充" in errs[0]
-
-
-def test_check_draft_tolerance_bounds_are_inclusive() -> None:
-    assert check_draft(["一" * 85], [["a"]], ["a"], target=100) == []
-    assert check_draft(["一" * 115], [["a"]], ["a"], target=100) == []
-    assert check_draft(["一" * 116], [["a"]], ["a"], target=100) != []
 
 
 def test_outline_groups_runs_and_dedupes_scenes() -> None:
@@ -110,21 +81,6 @@ def scene(start: int, end: int, line_ids: list[str] | None = None) -> Scene:
         shot_ids=["sh_1"],
         summary="x",
         line_ids=line_ids or [],
-    )
-
-
-def test_check_beat_reports_banned_words_and_speaks_of_this_section() -> None:
-    errors = check_beat(
-        ["字" * 20 + "不得不说"], [["sc_1"]], ["sc_1"], target=45, banned_words=["不得不说", "别的"]
-    )
-    assert any("禁用词：不得不说" in e for e in errors)
-    assert any(e.startswith("本节共") for e in errors)
-    assert not any("别的" in e for e in errors)  # only the words that occur
-
-
-def test_check_beat_accepts_a_good_beat() -> None:
-    assert (
-        check_beat(["字" * 44 + "。"], [["sc_1"]], ["sc_1"], target=45, banned_words=["坏"]) == []
     )
 
 
