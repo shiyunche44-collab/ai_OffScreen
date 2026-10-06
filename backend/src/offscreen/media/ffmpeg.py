@@ -97,3 +97,63 @@ def run_ffmpeg(
         )
     if on_progress:
         on_progress(1.0)
+
+
+def read_raw_video(
+    video: str,
+    *,
+    width: int,
+    height: int,
+    duration_ms: int | None = None,
+    on_progress: ProgressFn | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    binary: str = "ffmpeg",
+    chunk_frames: int = 2048,
+) -> bytes:
+    """Every frame of the video as raw rgb24, scaled to `width` x `height`, one after another
+    (frames are neither dropped nor repeated, so frame n is frame n of the film). The caller knows
+    the size: `len(result) = frames * width * height * 3`. Progress is a 0..1 fraction from the
+    frame timestamps when `duration_ms` is given. Raises FFmpegError or FFmpegCanceled."""
+    cmd = [
+        binary, "-hide_banner", "-nostdin", "-nostats", "-loglevel", "error",
+        "-i", video, "-map", "0:v:0", "-an", "-fps_mode", "passthrough",
+        "-vf", f"scale={width}:{height}:flags=bilinear,format=rgb24",
+        "-f", "rawvideo", "pipe:1",
+    ]  # fmt: skip
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None and proc.stderr is not None
+    tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
+    drain = threading.Thread(
+        target=lambda: tail.extend(line.decode("utf-8", "replace") for line in proc.stderr or ()),
+        daemon=True,
+    )
+    drain.start()
+    frame_bytes = width * height * 3
+    chunks: list[bytes] = []
+    got = 0
+    try:
+        while True:
+            if should_cancel is not None and should_cancel():
+                proc.kill()
+                raise FFmpegCanceled("ffmpeg canceled")
+            chunk = proc.stdout.read(chunk_frames * frame_bytes)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            got += len(chunk)
+            if on_progress and duration_ms:
+                on_progress(min(1.0, got / frame_bytes / max(1.0, duration_ms / 1000 * 24)))
+        proc.wait()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        drain.join(timeout=2)
+    if proc.returncode != 0:
+        raise FFmpegError(
+            f"ffmpeg failed (exit {proc.returncode})",
+            returncode=proc.returncode,
+            cmd=cmd,
+            stderr="".join(tail),
+        )
+    return b"".join(chunks)

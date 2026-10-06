@@ -20,6 +20,7 @@ from offscreen.providers.adapters.faster_whisper_asr import FasterWhisperAsr
 from offscreen.providers.adapters.insightface_faces import InsightFaceAnalyzer
 from offscreen.providers.adapters.scenedetect_adapter import SceneDetectShots
 from offscreen.providers.adapters.st_embedder import SentenceTransformerEmbedder
+from offscreen.providers.adapters.transnetv2_shots import TransNetV2Shots
 from offscreen.providers.ports import (
     ASR,
     LLM,
@@ -112,6 +113,11 @@ def build_providers(cfg: AppConfig, db: Database) -> Providers:
     asr: ASR | None = None
     if cfg.asr.provider == "faster_whisper":
         asr = FasterWhisperAsr(cfg.asr.model, device=cfg.asr.device)
+    detector: ShotDetector = (
+        TransNetV2Shots(threshold=cfg.shots.threshold, device=cfg.shots.device)
+        if cfg.shots.detector == "transnetv2"
+        else SceneDetectShots()
+    )
     emb = cfg.embeddings
     image_embedder = (
         SentenceTransformerEmbedder(
@@ -128,7 +134,7 @@ def build_providers(cfg: AppConfig, db: Database) -> Providers:
     return Providers(
         llm=build_llm(cfg, db),
         tts=build_tts(cfg),
-        detector=SceneDetectShots(),
+        detector=detector,
         asr=asr,
         faces=InsightFaceAnalyzer(cfg.faces.model, device=cfg.faces.device),
         image_embedder=image_embedder,

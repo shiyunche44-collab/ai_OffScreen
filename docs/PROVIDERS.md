@@ -217,7 +217,16 @@ M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l
 - **未实测**：M3-10 开发所在的云环境网络策略拒绝 huggingface.co（403，镜像站也不通），所以没有跑过真实模型，也没有测过「龙在天上飞」的检索质量；适配器只用替身模型测过，索引与融合用真实的 LanceDB 测过。要验证需要能访问模型下载的环境，装 `sentence-transformers`。
 - 依赖：`lancedb` 在默认依赖里（轻量）；`sentence-transformers`（含 torch，约数 GB）按需装。
 
-## 8. 云环境网络备注
+## 8. TransNetV2（镜头检测，本地；M3-02）
+
+- 用 PyPI 上的 `transnetv2-pytorch`（权重随包发布，约 32 MB；依赖 torch，云环境里装上约 4 GB，含 CUDA 库）。`uv pip install transnetv2-pytorch`，配置 `shots: {detector: transnetv2}`。官方仓库的权重走 git LFS，不从那里下。
+- 输入是 48×27 的缩小帧（由 `media/` 里的 ffmpeg 读取，每帧约 4 KB，两小时电影约 650 MB 内存），逐帧得到「这一帧之后画面变了」的分数；一段连续高分是一次转场，新镜头从这段之后开始。
+- **合成片上的实测**（4 种合成画面，每段 4 秒，24 fps；不是真实电影，只能说明集成正确、能看到渐变）：
+  - 5 个硬切：PySceneDetect 与 TransNetV2 都找全，F1 = 1.0（±2 帧）。PySceneDetect 1.5 秒，TransNetV2 约 11 秒（CPU，含加载）。
+  - 淡入淡出 + 叠化（各 0.75 秒）+ 1 个硬切：TransNetV2 找到 3 个边界（两个渐变各落在转场区间内，硬切在 ±2 帧内）；PySceneDetect 漏掉淡入淡出，只在叠化结束处出了 1 个、再加硬切。
+- **未做**：任务卡要求的「在人工标注的真实切点上与 PySceneDetect 的对比评估报告」需要真实测试片和标注（M3-01 的工具已就绪：`offscreen cuts evaluate <asset> --raw` 分别在两种检测器下跑）；所以默认检测器仍是 PySceneDetect，没有切换。
+
+## 9. 云环境网络备注
 
 - 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
 - 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）

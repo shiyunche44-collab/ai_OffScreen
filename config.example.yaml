@@ -52,6 +52,11 @@ asr:
   model: large-v3
   device: cuda
 
+shots:
+  detector: scenedetect   # 或 transnetv2：神经网络，能找到叠化 / 淡入淡出（需要 transnetv2-pytorch）
+  threshold: 0.5          # 仅 transnetv2：判定为转场的把握
+  device: cpu
+
 faces:
   provider: insightface   # 本地；需要 insightface 与 onnxruntime（首次使用下载 buffalo_l 模型，约 280 MB）
   model: buffalo_l

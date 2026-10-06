@@ -62,6 +62,16 @@ class AsrCfg(_Cfg):
     device: Literal["cuda", "cpu"] = "cuda"
 
 
+class ShotsCfg(_Cfg):
+    detector: Literal["scenedetect", "transnetv2"] = "scenedetect"
+    """`scenedetect`: colour-difference cuts, light and fast, misses dissolves and fades.
+    `transnetv2`: a neural network that also finds gradual transitions (needs the
+    `transnetv2-pytorch` package)."""
+    threshold: float = Field(default=0.5, gt=0, lt=1)
+    """TransNetV2 only: how sure a frame must be to count as a transition."""
+    device: Literal["cuda", "cpu"] = "cpu"
+
+
 class FacesCfg(_Cfg):
     provider: Literal["insightface"] = "insightface"
     model: str = "buffalo_l"
@@ -110,6 +120,7 @@ class AppConfig(_Cfg):
     providers: dict[str, ProviderCfg] = {}
     tasks: dict[str, TaskCfg] = {}
     asr: AsrCfg = AsrCfg()
+    shots: ShotsCfg = ShotsCfg()
     faces: FacesCfg = FacesCfg()
     embeddings: EmbeddingsCfg = EmbeddingsCfg()
     tts: TtsCfg = TtsCfg()
