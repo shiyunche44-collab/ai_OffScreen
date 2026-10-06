@@ -1,0 +1,11 @@
+{
+  "annotations": [
+    {
+      "message": "文中说女孩走遍了整个世界，场景 sc_040 只拍到她走出雪山。",
+      "segment_id": "seg_01",
+      "type": "fact_check"
+    }
+  ],
+  "asset_id": "ast_demo01",
+  "schema_version": 1
+}

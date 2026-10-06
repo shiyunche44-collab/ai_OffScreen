@@ -153,6 +153,11 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
         refs = re.search(r"依据的场景：(sc_\d+)", text).group(1)  # type: ignore[union-attr]
         return {"segments": [{"text": "字" * (chars - 1) + "。", "scene_refs": [refs]}]}
 
+    def script_critic(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        """Flags the first segment of the script it is shown."""
+        first = re.search(r"(seg_\d+)（依据", m[0].content).group(1)  # type: ignore[union-attr]
+        return {"findings": [{"segment_id": first, "problem": "这一段的说法资料里没有依据"}]}
+
     return FakeLLM(
         {
             "shot_caption": caption,
@@ -161,6 +166,7 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             "character_name": character_name,
             "script_outline": script_outline,
             "script_write": script,
+            "script_critic": script_critic,
         },
         recorder=recorder,
     )
@@ -192,6 +198,7 @@ def cfg(tmp_path: Path) -> AppConfig:
                     "character_name",
                     "script_outline",
                     "script_write",
+                    "script_critic",
                 )
             },
             "asr": {"provider": "faster_whisper"},

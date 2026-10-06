@@ -127,3 +127,10 @@ class ScriptOutline(Versioned):
     @property
     def total_s(self) -> int:
         return sum(b.target_s for b in self.beats)
+
+
+class ScriptReview(Versioned):
+    """What the fact checker found in a script: annotations only, the text is never changed."""
+
+    asset_id: AssetId
+    annotations: list[Annotation] = []

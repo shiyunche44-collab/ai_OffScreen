@@ -47,6 +47,7 @@ from offscreen.stages.analysis.story import StoryError, StoryStage
 from offscreen.stages.analysis.transcript import TranscriptError, TranscriptStage
 from offscreen.stages.creation.outline import OutlineError, OutlineSettings, OutlineStage
 from offscreen.stages.creation.plan import PlanError, PlanStage
+from offscreen.stages.creation.review import ReviewStage
 from offscreen.stages.creation.script import ScriptError, ScriptSettings, ScriptStage
 from offscreen.stages.output.compile import CompileStage, CompileStageError
 from offscreen.stages.output.render import FINAL_FILE, RenderError, RenderStage
@@ -202,6 +203,7 @@ class Pipeline:
                 "story",
                 "script_outline",
                 "script_write",
+                "script_critic",
                 "shot_caption",
                 "scene_segment",
                 "character_name",
@@ -230,6 +232,7 @@ class Pipeline:
                 models,
             ),
             ScriptStage(p.llm, script, models),
+            ReviewStage(p.llm, models),
             PlanStage(p.tts),
             CompileStage(self.assets),
             RenderStage(self.assets),

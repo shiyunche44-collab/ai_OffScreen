@@ -278,6 +278,10 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     # the generated draft is the project's first script version, with the project's own ids
     assert (script["version"], script["author"], script["project_id"]) == (1, "ai", pid)
     assert [v["version"] for v in client.get(f"/api/projects/{pid}/script/versions").json()] == [1]
+    # the fact check ran in the same job and its findings are part of that version
+    assert [(a["segment_id"], a["type"]) for a in script["annotations"]] == [
+        ("seg_01", "fact_check")
+    ]
 
     after = client.get(f"/api/projects/{pid}").json()
     assert all(s["cached"] for s in after["stages"])
@@ -346,6 +350,25 @@ def test_edits_and_regeneration_share_one_version_history(
         failed["status"] == "failed" and "changed while it was being generated" in failed["error"]
     )
     assert client.get(url).json()["version"] == 4 and client.get(url).json()["author"] == "human"
+
+
+def test_without_a_configured_critic_the_script_is_stored_unreviewed(
+    cfg: AppConfig, fakes: Providers, movie: Path
+) -> None:
+    tasks = {k: v for k, v in cfg.tasks.items() if k != "script_critic"}
+    rooted = cfg.model_copy(update={"media_roots": [movie.parent], "tasks": tasks})
+    with (
+        AppServices(rooted, providers=fakes) as services,
+        TestClient(create_app(services), raise_server_exceptions=False) as client,
+    ):
+        asset = import_movie(client, movie)
+        pid = client.post(
+            "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+        ).json()["id"]
+        job = client.post(f"/api/projects/{pid}/script:generate").json()
+        drain(services)
+        assert client.get(f"/api/jobs/{job['id']}").json()["status"] == "succeeded"
+        assert client.get(f"/api/projects/{pid}/script").json()["annotations"] == []
 
 
 def test_the_script_follows_the_outline_a_person_edited(

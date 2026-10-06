@@ -1,0 +1,40 @@
+{# version: 1 #}
+你是电影解说文案的事实审查员。下面是一部电影的剧情资料，和一篇据此写成的解说文案。请逐段核对文案里的陈述有没有资料支持，把有问题的段落标出来。你只标注问题，不要改写文案，也不要评价文笔和风格。
+
+要找的问题：
+- 与资料矛盾：人物、事件、因果、先后顺序、结局与资料不符
+- 资料里没有：编造了情节、人名、数字、地点或台词
+- 张冠李戴：把一个人物或场景的事写到了另一个上，或引用的 scene_refs 并不能支持这句话
+{% if not spoil_ending %}
+- 透露了结局：这篇文案要求不剧透，但某段讲出了结局
+{% endif %}
+
+不确定的不要标；解说常见的概括、修辞和合理的转述不算问题。每个问题要写清楚：这段说了什么，资料里是什么情况，最好指出依据的场景编号。
+
+只输出 JSON：{"findings": [{"segment_id": "seg_03", "problem": "…"}]}；没有问题就输出 {"findings": []}。segment_id 只能用下面出现过的段落编号。
+
+剧情资料
+一句话：{{ logline }}
+梗概：{{ synopsis }}
+{% if turning_points %}
+关键转折：
+{% for t in turning_points %}
+- {{ t.scene_id }}：{{ t.what }}
+{% endfor %}
+{% endif %}
+{% if ending %}
+结局：{{ ending }}
+{% endif %}
+
+场景（按时间顺序）：
+{% for s in scenes %}
+{{ s.id }}（{{ s.start }} – {{ s.end }}）{{ s.summary }}
+{% for line in s.lines %}
+  台词：{{ line }}
+{% endfor %}
+{% endfor %}
+
+解说文案：
+{% for seg in segments %}
+{{ seg.id }}（依据 {{ seg.scene_refs | join("、") }}）{{ seg.text }}
+{% endfor %}

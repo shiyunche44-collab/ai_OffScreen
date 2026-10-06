@@ -24,7 +24,7 @@ from offscreen.domain.index import (
 from offscreen.domain.job import Job
 from offscreen.domain.plan import EditPlan
 from offscreen.domain.project import Project
-from offscreen.domain.script import Script, ScriptOutline
+from offscreen.domain.script import Script, ScriptOutline, ScriptReview
 from offscreen.domain.timeline import Timeline
 
 DOCUMENTS: dict[str, type[BaseModel]] = {
@@ -44,6 +44,7 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "story": Story,
     "outline": ScriptOutline,
     "script": Script,
+    "script_review": ScriptReview,
     "plan": EditPlan,
     "timeline": Timeline,
     "job": Job,

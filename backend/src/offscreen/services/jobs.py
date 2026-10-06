@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job, JobCanceled, JobStatus, Lane
-from offscreen.domain.script import Script
+from offscreen.domain.script import Script, ScriptReview
 from offscreen.engine.stage import StageCanceled
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.providers.ports import AsrCanceled, DetectionCanceled
@@ -38,6 +38,7 @@ from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.story import StoryStage
 from offscreen.stages.creation.outline import OutlineStage
 from offscreen.stages.creation.plan import PlanStage
+from offscreen.stages.creation.review import REVIEW_FILE, REVIEW_TASK, ReviewStage
 from offscreen.stages.creation.script import SCRIPT_FILE, ScriptStage
 from offscreen.stages.output.render import RenderStage
 from offscreen.store.db import Database
@@ -210,13 +211,24 @@ class JobService:
             is_canceled=ctx.is_canceled,
             db=self.db,
         ) as pipeline:
+            adopting = job.stage == GENERATE_SCRIPT and bool(opts.project_id)
+            reviewing = adopting and REVIEW_TASK in self.cfg.tasks  # no critic: no fact check
             total = len(pipeline.stage_chain(job.stage, asset_id, opts))
+            if reviewing:  # the review resolves the whole chain again (cache hits)
+                total += len(pipeline.stage_chain(ReviewStage.name, asset_id, opts))
             try:
                 result = pipeline.run_stage(job.stage, asset_id, opts)
             except _CANCEL_ERRORS as e:
                 raise JobCanceled(str(e)) from e
-            if job.stage == GENERATE_SCRIPT and opts.project_id:
+            if adopting and opts.project_id:
                 draft = result.artifact.read_model(SCRIPT_FILE, Script)
+                if reviewing:
+                    try:
+                        reviewed = pipeline.run_stage(ReviewStage.name, asset_id, opts)
+                    except _CANCEL_ERRORS as e:
+                        raise JobCanceled(str(e)) from e
+                    found = reviewed.artifact.read_model(REVIEW_FILE, ScriptReview).annotations
+                    draft = draft.model_copy(update={"annotations": [*draft.annotations, *found]})
                 adopt_generated_script(
                     self.docs, opts.project_id, draft, job.scope.get("base_version")
                 )
