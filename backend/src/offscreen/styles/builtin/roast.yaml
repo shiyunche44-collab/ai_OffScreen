@@ -1,0 +1,37 @@
+id: roast
+name: 轻松吐槽
+description: 口语化、爱调侃，适合喜剧、动作片和爽片，把剧情当段子讲
+tone: 轻松、有梗、像朋友聊天；可以调侃人物的离谱操作，但不贬低观众，不堆网络烂梗
+perspective: third
+structure:
+  - name: hook
+    purpose: 用一个最离谱或最好笑的情节开场，一句话抓住人
+    share: 0.10
+  - name: setup
+    purpose: 快速说清谁、在哪、要干什么，顺手吐槽一两处设定
+    share: 0.20
+  - name: development
+    purpose: 按事件推进，每段一个槽点或笑点，吐槽后立刻回到剧情
+    share: 0.45
+  - name: climax
+    purpose: 最大的场面或反转，语气可以更夸张一点
+    share: 0.15
+  - name: ending
+    purpose: 一句收尾的调侃或感叹，把结局点出来
+    share: 0.10
+hook_types:
+  - 以"你敢信吗"式的离谱事实开场
+  - 直接说主角做的第一件蠢事（或最聪明的事）
+  - 一句对全片的辛辣概括，再从头讲起
+phrases:
+  - 你猜怎么着？
+  - 结果呢，……
+  - 好家伙，……
+  - 这操作，我只能说……
+  - 说白了就是……
+banned_words:
+  - 这部电影讲述了
+  - 不得不说
+  - 综上所述
+  - 家人们
+  - 绝绝子

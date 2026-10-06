@@ -38,3 +38,5 @@
 | 向量检索质量在真实模型上验证 | T1 分析 / embeddings | 2026-10-06 | 搁置 | 开发环境访问不了 Hugging Face，真实模型没跑过；退出标准「`search_shots("龙在天上飞")` 前 5 个中 ≥ 3 个相关」未验证。换模型（SigLIP / Chinese-CLIP）只需新增适配器 |
 | 默认镜头检测器换成 TransNetV2 | T1 分析 / shots | 2026-10-06 | 搁置 | M3-02 只在合成片上证明 TransNetV2 能找到渐变；是否换默认要看两部真实测试片上用 `offscreen cuts evaluate --raw`（分别配置两个检测器）得到的 F1，且换检测器会让 shots 以下所有阶段（含花钱的镜头描述）重算 |
 | TransNetV2 的渐变转场边界位置 | T1 分析 / shots | 2026-10-06 | 搁置 | 目前一次渐变只出一个边界（转场结束处的下一帧）；叠化期间的画面既不属于前一镜头也不属于后一镜头，选镜取片段时可能要避开转场区间，现在没有记录区间的起止 |
+| 自定义风格预设目录 | T2 写作 / styles | 2026-10-06 | 搁置 | M4-02 只加载包内 `styles/builtin/*.yaml`；用户自己的预设（`data/styles/*.yaml`，设置页里编辑）没做。加载器只需多扫一个目录，id 与内置同名时应报错而不是覆盖 |
+| 项目风格 id 的校验 | T2 写作 / 项目 | 2026-10-06 | 搁置 | `ProjectOptions.style` 和 `ScriptSettings.style` 仍是自由字符串（默认 `neutral`，并不是预设）。等 M4-04 / M4-05 改为读 `StylePreset` 时一并改成「必须是已知预设」，并在 `script_write` 提示词里用 tone / structure / phrases / banned_words 取代现在的 `{{ style }}风格` |

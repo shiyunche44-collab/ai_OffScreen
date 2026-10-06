@@ -1,0 +1,37 @@
+id: emotional
+name: 情感走心
+description: 舒缓、有温度，适合剧情片、家庭片、爱情片和成长故事
+tone: 平实、温柔、有共情；多用具体的细节而不是形容词，留一点安静的空白，不煽情、不说教
+perspective: third
+structure:
+  - name: hook
+    purpose: 从一个安静而具体的画面或一句台词开始，让人先感到这个人
+    share: 0.10
+  - name: setup
+    purpose: 讲清人物的处境和他心里最放不下的东西
+    share: 0.25
+  - name: development
+    purpose: 沿着人物的选择和关系变化推进，抓住几个小而真的瞬间
+    share: 0.35
+  - name: climax
+    purpose: 情感最重的一刻，用克制的句子，让画面和台词自己说话
+    share: 0.20
+  - name: ending
+    purpose: 落到人物的变化或没说出口的话上，留一点余味
+    share: 0.10
+hook_types:
+  - 以一个具体的日常细节开场（一杯凉掉的茶、一通没人接的电话）
+  - 引用片中最打动人的一句台词
+  - 用一个"如果"的问题引向主角的处境
+phrases:
+  - 也许，他只是想……
+  - 有些话，一直没能说出口。
+  - 后来，……
+  - 那一刻，他忽然明白……
+  - 日子就这样一天天过去，……
+banned_words:
+  - 这部电影讲述了
+  - 催泪
+  - 泪目
+  - 不得不说
+  - 人间清醒

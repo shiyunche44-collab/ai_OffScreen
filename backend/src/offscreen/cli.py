@@ -19,6 +19,7 @@ from offscreen.services.pipeline import (
 )
 from offscreen.services.prompts import list_prompts, render_prompt
 from offscreen.services.report import format_report
+from offscreen.services.styles import format_style, get_style, list_styles
 
 app = typer.Typer(help="AI OffScreen: movie commentary pipeline", no_args_is_help=True)
 config_app = typer.Typer(help="Configuration commands", no_args_is_help=True)
@@ -149,6 +150,27 @@ def prompt_render(
         raise typer.Exit(1) from e
     typer.echo(f"# {version}", err=True)
     typer.echo(body)
+
+
+style_app = typer.Typer(help="The writing style presets", no_args_is_help=True)
+app.add_typer(style_app, name="style")
+
+
+@style_app.command("list")
+def style_list() -> None:
+    """Every preset: id, name and who it suits."""
+    for preset in list_styles():
+        typer.echo(f"{preset.id:<12} {preset.name:<10} {preset.description}")
+
+
+@style_app.command("show")
+def style_show(style_id: Annotated[str, typer.Argument(help="Preset id, e.g. suspense")]) -> None:
+    """Print a preset in full: tone, structure, hooks, phrases, banned words."""
+    try:
+        typer.echo(format_style(get_style(style_id)))
+    except NotFound as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
 
 
 cuts_app = typer.Typer(
