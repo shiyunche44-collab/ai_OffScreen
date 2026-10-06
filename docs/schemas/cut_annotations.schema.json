@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "Rational": {
+      "additionalProperties": false,
+      "description": "Exact fraction, used for frame rates (23.976 -> 24000/1001).",
+      "properties": {
+        "den": {
+          "exclusiveMinimum": 0,
+          "title": "Den",
+          "type": "integer"
+        },
+        "num": {
+          "exclusiveMinimum": 0,
+          "title": "Num",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "num",
+        "den"
+      ],
+      "title": "Rational",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Where a person says the hard cuts of a movie are: the ground truth shot detection is\nmeasured against. Human work, kept apart from every analysis output.",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "cuts": {
+      "default": [],
+      "items": {
+        "type": "integer"
+      },
+      "title": "Cuts",
+      "type": "array"
+    },
+    "fps": {
+      "$ref": "#/$defs/Rational"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id",
+    "fps"
+  ],
+  "title": "CutAnnotations",
+  "type": "object"
+}

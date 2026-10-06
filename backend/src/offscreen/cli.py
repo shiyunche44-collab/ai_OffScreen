@@ -1,5 +1,6 @@
 """Typer CLI (thin layer: calls services only)."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -9,7 +10,7 @@ from offscreen.config import ConfigError, load_config
 from offscreen.server import default_web_dir, run_worker, serve
 from offscreen.services.app import AppServices
 from offscreen.services.config_view import show_config
-from offscreen.services.errors import NotFound
+from offscreen.services.errors import InvalidInput, NotFound
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
     EXPECTED_ERRORS,
@@ -117,6 +118,79 @@ def report_command(
     except (ConfigError, NotFound) as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(1) from e
+
+
+cuts_app = typer.Typer(
+    help="Hand-marked shot cuts and how detection measures up", no_args_is_help=True
+)
+app.add_typer(cuts_app, name="cuts")
+
+
+@cuts_app.command("evaluate")
+def cuts_evaluate(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    tolerance: Annotated[int, typer.Option(help="Frames of slack for a match")] = 2,
+    raw: Annotated[
+        bool, typer.Option("--raw", help="Run the detector itself (slow) instead of the shots")
+    ] = False,
+    config: ConfigOpt = None,
+) -> None:
+    """Precision / recall / F1 of detected cuts against the marked ones."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            r = services.annotations.evaluate_cuts(
+                asset, tolerance=tolerance, source="detector" if raw else "shots"
+            )
+    except (ConfigError, NotFound, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"{r.asset_id}  {r.source}  tolerance ±{r.tolerance} frames")
+    typer.echo(f"marked {r.marked}   detected {r.detected}   matched {r.true_positives}")
+    typer.echo(f"precision {r.precision:.3f}   recall {r.recall:.3f}   F1 {r.f1:.3f}")
+    typer.echo(f"false positives (frames): {', '.join(map(str, r.false_positives)) or '-'}")
+    typer.echo(f"missed (frames):          {', '.join(map(str, r.false_negatives)) or '-'}")
+
+
+@cuts_app.command("import")
+def cuts_import(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    file: Annotated[Path, typer.Argument(help='JSON: a list of frames, or {"cuts": [...]}')],
+    config: ConfigOpt = None,
+) -> None:
+    """Save marked cuts from a JSON file (frame numbers, counted at the movie's frame rate)."""
+    try:
+        raw = json.loads(file.read_text(encoding="utf-8"))
+        frames = raw["cuts"] if isinstance(raw, dict) else raw
+        if not isinstance(frames, list) or not all(isinstance(f, int) for f in frames):
+            raise ValueError("expected a list of frame numbers")
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            view = services.annotations.save_cuts(asset, frames)
+    except (OSError, ValueError, KeyError, ConfigError, NotFound, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"saved {len(view.cuts)} cuts for {asset}")
+
+
+@cuts_app.command("export")
+def cuts_export(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    config: ConfigOpt = None,
+) -> None:
+    """Print the marked cuts as JSON."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            view = services.annotations.cuts(asset)
+    except (ConfigError, NotFound) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(
+        json.dumps(
+            {"asset_id": view.asset_id, "fps": [view.fps_num, view.fps_den], "cuts": view.cuts}
+        )
+    )
 
 
 @app.command("serve")

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { mergeJobs } from "./events";
-import type { CharacterEdit, CharactersView, Job } from "./types";
+import type { CharacterEdit, CharactersView, CutsView, Job } from "./types";
 
 export const keys = {
   assets: ["assets"] as const,
@@ -93,6 +93,49 @@ export function useEditCharacter(assetId: string) {
         }),
       ),
     onSuccess: (view) => client.setQueryData(indexKey(assetId, "characters"), view),
+  });
+}
+
+export const cutsKey = (assetId: string) => [...keys.asset(assetId), "cuts"] as const;
+
+/** The hard cuts a person has marked in a movie (the ground truth for shot detection). */
+export function useCuts(assetId: string) {
+  return useQuery({
+    queryKey: cutsKey(assetId),
+    queryFn: async () =>
+      unwrap(await api.GET("/api/assets/{asset_id}/annotations/cuts", { params: { path: { asset_id: assetId } } })),
+  });
+}
+
+export function useSaveCuts(assetId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (cuts: number[]): Promise<CutsView> =>
+      unwrap(
+        await api.PUT("/api/assets/{asset_id}/annotations/cuts", {
+          params: { path: { asset_id: assetId } },
+          body: { cuts },
+        }),
+      ),
+    onSuccess: (view) => {
+      client.setQueryData(cutsKey(assetId), view);
+      void client.invalidateQueries({ queryKey: [...cutsKey(assetId), "evaluation"] });
+    },
+  });
+}
+
+/** Precision / recall / F1 of the detected shots against the saved marks. */
+export function useCutEvaluation(assetId: string, tolerance: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [...cutsKey(assetId), "evaluation", tolerance] as const,
+    enabled,
+    retry: false, // a 404 means the shots are not built yet
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/assets/{asset_id}/annotations/cuts/evaluation", {
+          params: { path: { asset_id: assetId }, query: { tolerance } },
+        }),
+      ),
   });
 }
 

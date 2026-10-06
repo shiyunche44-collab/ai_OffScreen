@@ -25,3 +25,5 @@ export type Story = Schemas["Story"];
 export type CharactersView = Schemas["CharactersView"];
 export type Character = CharactersView["characters"][number];
 export type CharacterEdit = Schemas["CharacterEdit"];
+export type CutsView = Schemas["CutsView"];
+export type CutEvaluation = Schemas["CutEvaluation"];

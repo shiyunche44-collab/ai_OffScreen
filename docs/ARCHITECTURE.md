@@ -729,6 +729,8 @@ data/
 │   └── …
 ├── overrides/{asset_id}/               # L1 人工修订层
 │   └── characters.overrides.json
+├── annotations/{asset_id}/             # 人工标注的真值（评估用，不属于任何分析产物）
+│   └── cuts.json                       # 真实切点（帧号）
 ├── projects/{project_id}/
 │   ├── docs/script/v{n}.json           # 版本化文档（不可变）
 │   ├── docs/plan/v{n}.json
@@ -767,6 +769,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | GET | `/assets`, `/assets/{id}` | 列表 / 详情（含各分析阶段状态） |
 | POST | `/assets/{id}/analyze` | 提交分析（可指定目标阶段） |
 | GET | `/assets/{id}/report` | 分析报告：各阶段耗时、模型调用与 token / 费用、镜头 / 台词 / 场景 / 人物数量 |
+| GET / PUT | `/assets/{id}/annotations/cuts` | 人工标注的真实切点（帧号，从 0 起，每个新镜头的第一帧；升序去重，≥ 1，不超过片长） |
+| GET | `/assets/{id}/annotations/cuts/evaluation?tolerance=2` | 镜头检测对标注的准确率 / 召回率 / F1（默认容差 ±2 帧，一对一匹配）；命令行 `offscreen cuts evaluate <asset> [--raw]`（`--raw` 直接跑检测器，不经过合并 / 拆分后处理） |
 | GET | `/assets/{id}/shots/search?q=` | 按画面描述搜镜头：`limit`、`scene_id`、`start_ms` / `end_ms`、`min_sharpness` / `min_brightness`、`exclude_credits`（默认排除片头片尾）；查询同时走图像空间和描述文本两路，倒数排名融合 |
 | GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / story（四个独立路由，各有类型；未构建 404）。`shots` 是展示视图：关键帧、雪碧图位置、镜头描述、代理视频路径（相对 data 目录，经 `/files` 取）。`characters` 是已合并人工修订的视图（名字、忽略、合并；见 §7 命名与修订） |
 | POST | `/assets/{id}/characters:build` | 人脸检测 → 聚类 → 命名（连同它需要的分析）→ job；不在「分析」按钮的链里，因为人脸检测慢（CPU 上两小时电影约 25 分钟） |

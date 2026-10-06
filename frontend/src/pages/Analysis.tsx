@@ -49,6 +49,10 @@ export function AnalysisPage() {
               <p className="mt-1 text-xs text-slate-500">
                 {formatDuration(asset.data.asset.duration_ms)} · {asset.data.asset.video.width}×
                 {asset.data.asset.video.height}
+                {" · "}
+                <Link className="text-sky-600 hover:underline dark:text-sky-400" to={`/library/${assetId}/cuts`}>
+                  标注切点
+                </Link>
               </p>
             </header>
 

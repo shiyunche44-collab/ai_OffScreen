@@ -88,6 +88,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/annotations/cuts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Marked Cuts
+         * @description The hard cuts a person marked in this movie (empty until saved), with its frame rate.
+         */
+        get: operations["get_marked_cuts_api_assets__asset_id__annotations_cuts_get"];
+        /**
+         * Put Marked Cuts
+         * @description Replace the marked cuts. Order and duplicates are tidied.
+         */
+        put: operations["put_marked_cuts_api_assets__asset_id__annotations_cuts_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/annotations/cuts/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Evaluate Marked Cuts
+         * @description Precision / recall / F1 of the detected shot boundaries against the marked cuts (404
+         *     before either exists). `tolerance` is in frames.
+         */
+        get: operations["evaluate_marked_cuts_api_assets__asset_id__annotations_cuts_evaluation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/characters/{character_id}": {
         parameters: {
             query?: never;
@@ -637,6 +682,44 @@ export interface components {
             name?: string | null;
             options?: components["schemas"]["ProjectOptions"];
         };
+        /** CutEvaluation */
+        CutEvaluation: {
+            /** Asset Id */
+            asset_id: string;
+            /** Detected */
+            detected: number;
+            /** F1 */
+            f1: number;
+            /** False Negatives */
+            false_negatives: number[];
+            /** False Positives */
+            false_positives: number[];
+            /** Marked */
+            marked: number;
+            /** Precision */
+            precision: number;
+            /** Recall */
+            recall: number;
+            /** Source */
+            source: string;
+            /** Tolerance */
+            tolerance: number;
+            /** True Positives */
+            true_positives: number;
+        };
+        /** CutsView */
+        CutsView: {
+            /** Asset Id */
+            asset_id: string;
+            /** Cuts */
+            cuts: number[];
+            /** Fps Den */
+            fps_den: number;
+            /** Fps Num */
+            fps_num: number;
+            /** Marked */
+            marked: boolean;
+        };
         /**
          * DerivedFiles
          * @description Paths relative to data_dir.
@@ -773,6 +856,14 @@ export interface components {
              * @default 0
              */
             out_tokens: number;
+        };
+        /** MarkedCuts */
+        MarkedCuts: {
+            /**
+             * Cuts
+             * @description First frame of each new shot, from 0; at least 1.
+             */
+            cuts: number[];
         };
         /** MediaAsset */
         MediaAsset: {
@@ -1502,6 +1593,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_marked_cuts_api_assets__asset_id__annotations_cuts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutsView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_marked_cuts_api_assets__asset_id__annotations_cuts_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkedCuts"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutsView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    evaluate_marked_cuts_api_assets__asset_id__annotations_cuts_evaluation_get: {
+        parameters: {
+            query?: {
+                tolerance?: number;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutEvaluation"];
                 };
             };
             /** @description Not found */

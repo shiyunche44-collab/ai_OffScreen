@@ -13,6 +13,7 @@ from offscreen.domain.common import (
     AssetId,
     CharacterId,
     LineId,
+    Rational,
     SceneId,
     ShotId,
     Strict,
@@ -316,3 +317,23 @@ class Story(Versioned):
     ending_scene_ids: list[SceneId] = []
     """The scenes the ending is drawn from (a claim about the plot, so it has its anchors too)."""
     themes: list[str] = []
+
+
+class CutAnnotations(Versioned):
+    """Where a person says the hard cuts of a movie are: the ground truth shot detection is
+    measured against. Human work, kept apart from every analysis output."""
+
+    asset_id: AssetId
+    fps: Rational
+    """The frame rate `cuts` is counted in (the movie's own)."""
+    cuts: list[int] = []
+    """Frame numbers (from 0) of the first frame of each new shot; ascending, no duplicates, and
+    never 0 (the film starts a shot by itself)."""
+
+    @model_validator(mode="after")
+    def _ascending(self) -> Self:
+        if any(c < 1 for c in self.cuts):
+            raise ValueError("a cut is the first frame of a new shot, so it is at least 1")
+        if self.cuts != sorted(set(self.cuts)):
+            raise ValueError("cuts must be ascending without duplicates")
+        return self

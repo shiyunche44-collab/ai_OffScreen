@@ -373,6 +373,111 @@
         "title": "CreateProject",
         "type": "object"
       },
+      "CutEvaluation": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "detected": {
+            "title": "Detected",
+            "type": "integer"
+          },
+          "f1": {
+            "title": "F1",
+            "type": "number"
+          },
+          "false_negatives": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "False Negatives",
+            "type": "array"
+          },
+          "false_positives": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "False Positives",
+            "type": "array"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          },
+          "precision": {
+            "title": "Precision",
+            "type": "number"
+          },
+          "recall": {
+            "title": "Recall",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tolerance": {
+            "title": "Tolerance",
+            "type": "integer"
+          },
+          "true_positives": {
+            "title": "True Positives",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "source",
+          "tolerance",
+          "marked",
+          "detected",
+          "true_positives",
+          "precision",
+          "recall",
+          "f1",
+          "false_positives",
+          "false_negatives"
+        ],
+        "title": "CutEvaluation",
+        "type": "object"
+      },
+      "CutsView": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "cuts": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cuts",
+            "type": "array"
+          },
+          "fps_den": {
+            "title": "Fps Den",
+            "type": "integer"
+          },
+          "fps_num": {
+            "title": "Fps Num",
+            "type": "integer"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "asset_id",
+          "fps_num",
+          "fps_den",
+          "cuts",
+          "marked"
+        ],
+        "title": "CutsView",
+        "type": "object"
+      },
       "DerivedFiles": {
         "additionalProperties": false,
         "description": "Paths relative to data_dir.",
@@ -682,6 +787,23 @@
           }
         },
         "title": "LlmUsage",
+        "type": "object"
+      },
+      "MarkedCuts": {
+        "properties": {
+          "cuts": {
+            "description": "First frame of each new shot, from 0; at least 1.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cuts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cuts"
+        ],
+        "title": "MarkedCuts",
         "type": "object"
       },
       "MediaAsset": {
@@ -2319,6 +2441,215 @@
           }
         },
         "summary": "Analyze Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/annotations/cuts": {
+      "get": {
+        "description": "The hard cuts a person marked in this movie (empty until saved), with its frame rate.",
+        "operationId": "get_marked_cuts_api_assets__asset_id__annotations_cuts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Get Marked Cuts",
+        "tags": [
+          "assets"
+        ]
+      },
+      "put": {
+        "description": "Replace the marked cuts. Order and duplicates are tidied.",
+        "operationId": "put_marked_cuts_api_assets__asset_id__annotations_cuts_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkedCuts"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Put Marked Cuts",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/annotations/cuts/evaluation": {
+      "get": {
+        "description": "Precision / recall / F1 of the detected shot boundaries against the marked cuts (404\nbefore either exists). `tolerance` is in frames.",
+        "operationId": "evaluate_marked_cuts_api_assets__asset_id__annotations_cuts_evaluation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tolerance",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "maximum": 50,
+              "minimum": 0,
+              "title": "Tolerance",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutEvaluation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Evaluate Marked Cuts",
         "tags": [
           "assets"
         ]

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AnalysisPage } from "./pages/Analysis";
 import { Layout } from "./components/Layout";
+import { CutsPage } from "./pages/Cuts";
 import { Jobs } from "./pages/Jobs";
 import { Library } from "./pages/Library";
 import { NotFound } from "./pages/NotFound";
@@ -14,6 +15,7 @@ export function App() {
         <Route index element={<Navigate to="/library" replace />} />
         <Route path="library" element={<Library />} />
         <Route path="library/:assetId" element={<AnalysisPage />} />
+        <Route path="library/:assetId/cuts" element={<CutsPage />} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />

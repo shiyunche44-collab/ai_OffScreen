@@ -1,0 +1,13 @@
+{
+  "asset_id": "ast_sintel01",
+  "cuts": [
+    192,
+    384,
+    576
+  ],
+  "fps": {
+    "den": 1,
+    "num": 24
+  },
+  "schema_version": 1
+}

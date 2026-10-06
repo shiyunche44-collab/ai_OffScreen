@@ -9,6 +9,7 @@ from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Job
 from offscreen.providers.ports import ShotFilter
+from offscreen.services.annotations import CutEvaluation, CutsView
 from offscreen.services.characters import CharacterEdit, CharactersView
 from offscreen.services.index import ShotsView
 from offscreen.services.library import AssetDetail, MediaListing
@@ -16,6 +17,10 @@ from offscreen.services.report import AnalysisReport
 from offscreen.services.search import ShotSearchResult
 
 router = APIRouter(prefix="/assets", tags=["assets"], responses=ERROR_RESPONSES)
+
+
+class MarkedCuts(BaseModel):
+    cuts: list[int] = Field(description="First frame of each new shot, from 0; at least 1.")
 
 
 class ImportAsset(BaseModel):
@@ -132,3 +137,24 @@ def search_shots(
             exclude_credits=exclude_credits,
         ),
     )
+
+
+@router.get("/{asset_id}/annotations/cuts")
+def get_marked_cuts(asset_id: str, services: Services) -> CutsView:
+    """The hard cuts a person marked in this movie (empty until saved), with its frame rate."""
+    return services.annotations.cuts(asset_id)
+
+
+@router.put("/{asset_id}/annotations/cuts")
+def put_marked_cuts(asset_id: str, body: MarkedCuts, services: Services) -> CutsView:
+    """Replace the marked cuts. Order and duplicates are tidied."""
+    return services.annotations.save_cuts(asset_id, body.cuts)
+
+
+@router.get("/{asset_id}/annotations/cuts/evaluation")
+def evaluate_marked_cuts(
+    asset_id: str, services: Services, tolerance: int = Query(default=2, ge=0, le=50)
+) -> CutEvaluation:
+    """Precision / recall / F1 of the detected shot boundaries against the marked cuts (404
+    before either exists). `tolerance` is in frames."""
+    return services.annotations.evaluate_cuts(asset_id, tolerance=tolerance)
