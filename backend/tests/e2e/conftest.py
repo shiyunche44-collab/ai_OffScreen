@@ -158,6 +158,13 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
         first = re.search(r"(seg_\d+)（依据", m[0].content).group(1)  # type: ignore[union-attr]
         return {"findings": [{"segment_id": first, "problem": "这一段的说法资料里没有依据"}]}
 
+    def script_rewrite(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        """A new text of the length asked for, citing the scene the old one did."""
+        text = m[0].content
+        chars = int(re.search(r"新文字约 (\d+) 字", text).group(1))  # type: ignore[union-attr]
+        ref = re.search(r"原文依据的场景：(sc_\d+)", text).group(1)  # type: ignore[union-attr]
+        return {"text": "改" * (chars - 1) + "。", "scene_refs": [ref]}
+
     return FakeLLM(
         {
             "shot_caption": caption,
@@ -167,6 +174,7 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             "script_outline": script_outline,
             "script_write": script,
             "script_critic": script_critic,
+            "script_rewrite": script_rewrite,
         },
         recorder=recorder,
     )
@@ -199,6 +207,7 @@ def cfg(tmp_path: Path) -> AppConfig:
                     "script_outline",
                     "script_write",
                     "script_critic",
+                    "script_rewrite",
                 )
             },
             "asr": {"provider": "faster_whisper"},

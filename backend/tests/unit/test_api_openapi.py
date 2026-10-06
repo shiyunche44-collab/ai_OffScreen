@@ -45,6 +45,7 @@ def test_the_documented_routes() -> None:
         "/api/projects/{project_id}/script",
         "/api/projects/{project_id}/script/versions",
         "/api/projects/{project_id}/script/diff",
+        "/api/projects/{project_id}/script/segments/{segment_id}:rewrite",
         "/api/projects/{project_id}/script:restore",
         "/api/projects/{project_id}/script:generate",
         "/api/projects/{project_id}/plan:build",

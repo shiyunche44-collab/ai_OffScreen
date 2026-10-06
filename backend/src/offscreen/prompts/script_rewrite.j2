@@ -1,0 +1,28 @@
+{# version: 1 #}
+现在不是写全文，而是改写已经写好的文案里的一段。其余各段保持不变，你只给出这一段的新文字。
+
+要改写的是 {{ segment_id }}{% if beat %}（节拍：{{ beat }}{% if focus %}，这一节要讲：{{ focus }}{% endif %}）{% endif %}。
+{% if before %}
+它前面的内容：
+{% for text in before %}
+{{ text }}
+{% endfor %}
+{% endif %}
+{% if after %}
+它后面的内容：
+{% for text in after %}
+{{ text }}
+{% endfor %}
+{% endif %}
+
+原文：{{ text }}
+原文依据的场景：{{ scene_refs | join("、") }}
+
+改写要求：{{ instruction }}
+
+注意：
+- 事实以上面的剧情资料为准，不要添加资料里没有的情节、人名或细节；要与前后文衔接，不重复它们已经说过的话
+- 新文字约 {{ target_chars }} 字（允许 {{ min_chars }}–{{ max_chars }} 字；标点和空格不计），仍然是要念出来的话
+- scene_refs 只能用上面出现过的场景编号，标出新文字依据的场景
+
+只输出 JSON：{"text": "…", "scene_refs": ["sc_…"]}

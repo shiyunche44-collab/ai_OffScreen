@@ -1359,6 +1359,29 @@
         "title": "RestoreScript",
         "type": "object"
       },
+      "RewriteSegment": {
+        "properties": {
+          "base_version": {
+            "description": "The script version being edited (409 if stale).",
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "instruction": {
+            "description": "How it should change, e.g. \"more colloquial\".",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instruction",
+          "base_version"
+        ],
+        "title": "RewriteSegment",
+        "type": "object"
+      },
       "SaveOutline": {
         "properties": {
           "beats": {
@@ -4890,6 +4913,88 @@
           }
         },
         "summary": "Script Diff",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/script/segments/{segment_id}:rewrite": {
+      "post": {
+        "description": "Rewrite one narration segment as instructed. The job stores the result as the next\nscript version (author ai); the other segments are untouched.",
+        "operationId": "rewrite_segment_api_projects__project_id__script_segments__segment_id__rewrite_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "segment_id",
+            "required": true,
+            "schema": {
+              "title": "Segment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewriteSegment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Rewrite Segment",
         "tags": [
           "projects"
         ]

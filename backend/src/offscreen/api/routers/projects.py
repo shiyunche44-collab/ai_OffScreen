@@ -45,6 +45,13 @@ class SaveScript(ScriptContent):
     )
 
 
+class RewriteSegment(BaseModel):
+    instruction: str = Field(
+        min_length=1, max_length=200, description='How it should change, e.g. "more colloquial".'
+    )
+    base_version: int = Field(ge=1, description="The script version being edited (409 if stale).")
+
+
 class RestoreScript(BaseModel):
     version: int = Field(ge=1, description="The old version to bring back as a new one.")
     base_version: int | None = Field(description="The current version, as for a save.")
@@ -73,6 +80,17 @@ def script_versions(project_id: str, services: Services) -> list[DocumentVersion
 def script_diff(project_id: str, a: int, b: int, services: Services) -> DocumentDiff:
     """Segment-by-segment difference between versions `a` and `b`."""
     return services.documents.diff_script(project_id, a, b)
+
+
+@router.post("/{project_id}/script/segments/{segment_id}:rewrite", status_code=202)
+def rewrite_segment(
+    project_id: str, segment_id: str, body: RewriteSegment, services: Services
+) -> Job:
+    """Rewrite one narration segment as instructed. The job stores the result as the next
+    script version (author ai); the other segments are untouched."""
+    return services.library.rewrite_segment(
+        project_id, segment_id, body.instruction, body.base_version
+    )
 
 
 @router.post("/{project_id}/script:restore")

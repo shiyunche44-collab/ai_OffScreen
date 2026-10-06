@@ -352,6 +352,88 @@ def test_edits_and_regeneration_share_one_version_history(
     assert client.get(url).json()["version"] == 4 and client.get(url).json()["author"] == "human"
 
 
+def test_one_segment_can_be_rewritten_into_a_new_version(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/script"
+    err(
+        client.post(f"{url}/segments/seg_01:rewrite", json={"instruction": "x", "base_version": 1}),
+        404,
+        "not_found",
+    )  # no script yet
+    client.post(f"{url}:generate")
+    drain(services)
+    v1 = client.get(url).json()
+    assert [a["segment_id"] for a in v1["annotations"]] == ["seg_01"]  # the critic flagged it
+
+    rewrite = f"{url}/segments/seg_01:rewrite"
+    job = client.post(rewrite, json={"instruction": "更口语化", "base_version": 1})
+    assert job.status_code == 202 and job.json()["stage"] == "creation.rewrite"
+    drain(services)
+    assert client.get(f"/api/jobs/{job.json()['id']}").json()["status"] == "succeeded"
+
+    v2 = client.get(url).json()
+    assert (v2["version"], v2["author"], v2["parent_version"]) == (2, "ai", 1)
+    assert v2["segments"][0]["text"] != v1["segments"][0]["text"]
+    assert v2["segments"][0]["text"].startswith("改")
+    assert v2["segments"][1:] == v1["segments"][1:]  # nothing else moved
+    assert v2["annotations"] == []  # the verdict on the old words is gone
+    diff = client.get(f"{url}/diff", params={"a": 1, "b": 2}).json()
+    assert [(c["segment_id"], c["status"]) for c in diff["changes"]] == [
+        ("seg_01", "changed"),
+        ("seg_02", "unchanged"),
+        ("seg_03", "unchanged"),
+    ]
+
+    err(client.post(rewrite, json={"instruction": "x", "base_version": 1}), 409, "conflict")
+    err(
+        client.post(f"{url}/segments/seg_99:rewrite", json={"instruction": "x", "base_version": 2}),
+        404,
+        "not_found",
+    )
+    err(
+        client.post(rewrite, json={"instruction": "  ", "base_version": 2}),
+        422,
+        "invalid_input",
+    )
+    err(client.post(rewrite, json={"instruction": "", "base_version": 2}), 422, "validation_error")
+    err(client.post(rewrite, json={"instruction": "x"}), 422, "validation_error")
+
+
+def test_a_rewrite_does_not_bury_an_edit_made_while_it_waited(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/script"
+    client.post(f"{url}:generate")
+    drain(services)
+    v1 = client.get(url).json()
+
+    job = client.post(
+        f"{url}/segments/seg_02:rewrite", json={"instruction": "短一点", "base_version": 1}
+    )
+    edit = {k: v1[k] for k in ("params", "outline", "segments", "annotations")}
+    edit["segments"][2]["text"] = "我在排队期间改了第三段。"
+    assert client.put(url, json={**edit, "base_version": 1}).status_code == 200
+    drain(services)
+
+    failed = client.get(f"/api/jobs/{job.json()['id']}").json()
+    assert (
+        failed["status"] == "failed"
+        and "changed while seg_02 was being rewritten" in failed["error"]
+    )
+    head = client.get(url).json()
+    assert (head["version"], head["author"]) == (2, "human")
+    assert head["segments"][2]["text"] == "我在排队期间改了第三段。"
+
+
 def test_without_a_configured_critic_the_script_is_stored_unreviewed(
     cfg: AppConfig, fakes: Providers, movie: Path
 ) -> None:

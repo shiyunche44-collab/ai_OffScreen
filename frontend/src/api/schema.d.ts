@@ -618,6 +618,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/script/segments/{segment_id}:rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rewrite Segment
+         * @description Rewrite one narration segment as instructed. The job stores the result as the next
+         *     script version (author ai); the other segments are untouched.
+         */
+        post: operations["rewrite_segment_api_projects__project_id__script_segments__segment_id__rewrite_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/script/versions": {
         parameters: {
             query?: never;
@@ -1193,6 +1214,19 @@ export interface components {
              * @description The old version to bring back as a new one.
              */
             version: number;
+        };
+        /** RewriteSegment */
+        RewriteSegment: {
+            /**
+             * Base Version
+             * @description The script version being edited (409 if stale).
+             */
+            base_version: number;
+            /**
+             * Instruction
+             * @description How it should change, e.g. "more colloquial".
+             */
+            instruction: string;
         };
         /** SaveOutline */
         SaveOutline: {
@@ -3384,6 +3418,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentDiff"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rewrite_segment_api_projects__project_id__script_segments__segment_id__rewrite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RewriteSegment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
                 };
             };
             /** @description Not found */

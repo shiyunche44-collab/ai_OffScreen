@@ -108,8 +108,13 @@ def test_every_prompt_a_stage_sends_is_part_of_its_cache_key(tmp_path: Path) -> 
         )
 
 
+NOT_A_STAGE = {"script_rewrite"}
+"""Sent by a job whose result is a new document version, not a cached artifact; the version
+rides along with every call (`prompt_version`), see test_rewrite."""
+
+
 def test_every_template_is_used_by_some_stage(tmp_path: Path) -> None:
-    used = {t for _, t, _ in stage_cache_inputs(tmp_path)}
+    used = {t for _, t, _ in stage_cache_inputs(tmp_path)} | NOT_A_STAGE
     assert set(prompts.names()) <= used
 
 

@@ -15,8 +15,9 @@ from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
+from offscreen.domain.script import Script
 from offscreen.media.probe import ProbeError
-from offscreen.services.errors import InvalidInput, NotFound
+from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.jobs import ANALYZE, RENDER, JobService
 from offscreen.services.pipeline import Pipeline, RunOptions
 from offscreen.stages.analysis.ingest import IngestError, ingest
@@ -196,6 +197,37 @@ class LibraryService:
             p.asset_id,
             run_options(p.options, p.id),
             base_version=self.jobs.docs.head(p.id, "script"),
+        )
+
+    def rewrite_segment(
+        self, project_id: str, segment_id: str, instruction: str, base_version: int
+    ) -> Job:
+        """Queue the rewrite of one narration segment of the script version `base_version`,
+        which must still be the current one."""
+        p = self._project(project_id)
+        if not instruction.strip():
+            raise InvalidInput("say how the segment should change")
+        head = self.jobs.docs.head(p.id, "script")
+        if head is None:
+            raise NotFound("the project has no script yet")
+        if head != base_version:
+            raise Conflict(
+                f"the script was updated (base_version {base_version}, current {head}); "
+                "reload it before rewriting"
+            )
+        script = self.jobs.docs.read(p.id, "script", Script, base_version)
+        segment = next((s for s in (script.segments if script else []) if s.id == segment_id), None)
+        if segment is None:
+            raise NotFound(f"the script has no segment {segment_id}")
+        if segment.kind != "narration":
+            raise InvalidInput(f"{segment_id} is an original-sound segment; it cannot be rewritten")
+        return self.jobs.rewrite_segment(
+            p.asset_id,
+            run_options(p.options, p.id),
+            project_id=p.id,
+            segment_id=segment_id,
+            instruction=instruction,
+            base_version=base_version,
         )
 
     def build_plan(self, project_id: str) -> Job:

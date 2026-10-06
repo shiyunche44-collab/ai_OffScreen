@@ -784,7 +784,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | GET / PUT | `/projects/{id}/script[?version=]` | 读 / 保存新版本（需 `base_version`） |
 | GET | `/projects/{id}/script/versions`, `/projects/{id}/script/diff?a=&b=` | 版本历史（新到旧）/ 两个版本按段对比 |
 | POST | `/projects/{id}/script:restore` | 把旧版本作为新版本取回（历史只增不改；需 `base_version`） |
-| POST | `/projects/{id}/script/segments/{sid}:rewrite` | 单段重写（带指令） |
+| POST | `/projects/{id}/script/segments/{sid}:rewrite` | 单段重写（带指令 + `base_version`）→ job；结果存为下一个版本（author ai），只改这一段，该段原有的审查批注随之作废 |
 | POST | `/projects/{id}/plan:build` | 构建 / 增量更新剪辑计划 → job |
 | GET / PATCH | `/projects/{id}/plan` | 读 / 编辑操作（换镜、裁剪、锁定、重排…，需 `base_version`） |
 | GET | `/projects/{id}/plan/segments/{sid}/candidates` | 该段候选镜头及分数 |

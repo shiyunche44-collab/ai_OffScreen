@@ -34,6 +34,7 @@ from offscreen.services.pipeline import (
     RunOptions,
     build_providers,
 )
+from offscreen.services.rewrite import run_rewrite
 from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.story import StoryStage
 from offscreen.stages.creation.outline import OutlineStage
@@ -48,6 +49,9 @@ from offscreen.store.repos import AssetRepo, JobRepo
 ANALYZE = StoryStage.name  # everything the script writer reads
 IDENTIFY_CHARACTERS = NamingStage.name  # faces, characters and their names
 GENERATE_OUTLINE = OutlineStage.name
+REWRITE_SEGMENT = "creation.rewrite"
+"""Not a pipeline stage (the result is a new script version, not a cached artifact), but a job
+with its own scope: project, segment, instruction, base version."""
 GENERATE_SCRIPT = ScriptStage.name
 BUILD_PLAN = PlanStage.name
 RENDER = RenderStage.name
@@ -58,6 +62,7 @@ USE_CASE_STAGES = (
     ANALYZE,
     IDENTIFY_CHARACTERS,
     GENERATE_OUTLINE,
+    REWRITE_SEGMENT,
     GENERATE_SCRIPT,
     BUILD_PLAN,
     RENDER,
@@ -133,6 +138,24 @@ class JobService:
     def generate_outline(self, asset_id: str, opts: RunOptions | None = None) -> Job:
         return self._submit(GENERATE_OUTLINE, asset_id, _checked(opts), OutlineStage.lane)
 
+    def rewrite_segment(
+        self,
+        asset_id: str,
+        opts: RunOptions,
+        *,
+        project_id: str,
+        segment_id: str,
+        instruction: str,
+        base_version: int,
+    ) -> Job:
+        extra = {
+            "project_id": project_id,
+            "segment_id": segment_id,
+            "instruction": instruction.strip(),
+            "base_version": base_version,
+        }
+        return self._submit(REWRITE_SEGMENT, asset_id, _checked(opts), "api", extra)
+
     def generate_script(
         self, asset_id: str, opts: RunOptions | None = None, *, base_version: int | None = None
     ) -> Job:
@@ -192,6 +215,9 @@ class JobService:
         """Run the job's target stage (and its missing upstream) to completion."""
         asset_id = str(job.scope["asset_id"])
         opts = options_from_scope(job.scope.get("options", {}))
+        if job.stage == REWRITE_SEGMENT:
+            run_rewrite(self.cfg, self.db, self.docs, self.providers, job, opts, ctx)
+            return
         done = 0
         total = 1
 

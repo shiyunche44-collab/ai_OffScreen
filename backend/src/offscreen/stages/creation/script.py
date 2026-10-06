@@ -14,7 +14,7 @@ stores it in the project's document history as a new version."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,12 +40,12 @@ from offscreen.algo.script_rules import (
     check,
 )
 from offscreen.algo.story import fmt_clock
-from offscreen.domain.index import Scenes, Story, Transcript
+from offscreen.domain.index import Scene, Scenes, Story, Transcript, TranscriptLine
 from offscreen.domain.job import Lane
 from offscreen.domain.script import OutlineBeat, Script, ScriptOutline, ScriptParams, ScriptSegment
 from offscreen.domain.style import StylePreset
 from offscreen.engine import ArtifactRef, Scope, Stage, StageContext, StageOutput
-from offscreen.prompts import render, template_version
+from offscreen.prompts import Prompt, render, template_version
 from offscreen.providers.ports import LLM, Message
 from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.story import STORY_FILE
@@ -95,6 +95,47 @@ class SegmentReply(BaseModel):
 
 class BeatReply(BaseModel):
     segments: list[SegmentReply] = Field(min_length=1)
+
+
+def render_context(
+    preset: StylePreset,
+    spoil_ending: bool,
+    story: Story,
+    scenes: Sequence[Scene],
+    lines: Sequence[TranscriptLine],
+    beats: Sequence[OutlineBeat],
+) -> Prompt:
+    """The part of every writing prompt that does not change from one call to the next (style,
+    story, scenes with key lines, the whole outline). Writing a beat and rewriting a segment
+    both start with it, so the provider's prompt cache serves them alike."""
+    return render(
+        "script_write",
+        style_name=preset.name,
+        style_description=preset.description,
+        tone=preset.tone,
+        perspective=preset.perspective,
+        phrases=preset.phrases,
+        banned_words=preset.banned_words,
+        spoil_ending=spoil_ending,
+        logline=story.logline,
+        synopsis=story.synopsis,
+        turning_points=story.turning_points,
+        ending=story.ending,
+        themes=story.themes,
+        scenes=[
+            {
+                "id": s.id,
+                "start": fmt_clock(s.start_ms),
+                "end": fmt_clock(s.end_ms),
+                "importance": s.importance,
+                "summary": s.summary,
+                "lines": key_lines(scene_lines(s, lines)),
+            }
+            for s in scenes
+        ],
+        outline=[b.model_dump() for b in beats],
+        total_s=sum(b.target_s for b in beats),
+    )
 
 
 class ScriptStage(Stage):
@@ -169,34 +210,7 @@ class ScriptStage(Stage):
                 f"the outline refers to scenes the movie does not have: {', '.join(unknown)}"
             )
 
-        context = render(
-            "script_write",
-            style_name=preset.name,
-            style_description=preset.description,
-            tone=preset.tone,
-            perspective=preset.perspective,
-            phrases=preset.phrases,
-            banned_words=preset.banned_words,
-            spoil_ending=cfg.spoil_ending,
-            logline=story.logline,
-            synopsis=story.synopsis,
-            turning_points=story.turning_points,
-            ending=story.ending,
-            themes=story.themes,
-            scenes=[
-                {
-                    "id": s.id,
-                    "start": fmt_clock(s.start_ms),
-                    "end": fmt_clock(s.end_ms),
-                    "importance": s.importance,
-                    "summary": s.summary,
-                    "lines": key_lines(scene_lines(s, lines)),
-                }
-                for s in scenes
-            ],
-            outline=[b.model_dump() for b in outline.beats],
-            total_s=outline.total_s,
-        )
+        context = render_context(preset, cfg.spoil_ending, story, scenes, lines, outline.beats)
 
         segments: list[ScriptSegment] = []
         for n, beat in enumerate(outline.beats, 1):
