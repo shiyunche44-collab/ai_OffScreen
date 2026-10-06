@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { mergeJobs } from "./events";
-import type { CharacterEdit, CharactersView, CutsView, Job } from "./types";
+import type { ScriptContent } from "../lib/script";
+import type { CharacterEdit, CharactersView, CutsView, Job, OutlineBeat, ProjectOptions } from "./types";
 
 export const keys = {
   assets: ["assets"] as const,
@@ -231,13 +232,178 @@ export function useProjects() {
   });
 }
 
-/** The generated script; only asked for once the project says it exists. */
-export function useScript(projectId: string, enabled: boolean) {
+const scriptKey = (projectId: string) => [...keys.project(projectId), "script"] as const;
+
+/** A version of the script (default: the current one). Everything of a project lives under
+ * `keys.project`, so a finished job (which invalidates it) refreshes the editor too. */
+export function useScript(projectId: string, enabled: boolean, version?: number) {
   return useQuery({
-    queryKey: [...keys.project(projectId), "script"] as const,
+    queryKey: [...scriptKey(projectId), version ?? "current"] as const,
     enabled,
+    retry: false, // 404: no script yet
     queryFn: async () =>
-      unwrap(await api.GET("/api/projects/{project_id}/script", { params: { path: { project_id: projectId } } })),
+      unwrap(
+        await api.GET("/api/projects/{project_id}/script", {
+          params: { path: { project_id: projectId }, query: { version } },
+        }),
+      ),
+  });
+}
+
+export function useScriptVersions(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...scriptKey(projectId), "versions"] as const,
+    enabled,
+    retry: false,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/projects/{project_id}/script/versions", { params: { path: { project_id: projectId } } }),
+      ),
+  });
+}
+
+export function useScriptDiff(projectId: string, a: number | null, b: number | null) {
+  return useQuery({
+    queryKey: [...scriptKey(projectId), "diff", a, b] as const,
+    enabled: a !== null && b !== null && a !== b,
+    retry: false,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/projects/{project_id}/script/diff", {
+          params: { path: { project_id: projectId }, query: { a: a ?? 0, b: b ?? 0 } },
+        }),
+      ),
+  });
+}
+
+function afterScriptWrite(client: ReturnType<typeof useQueryClient>, projectId: string) {
+  // Every version-dependent answer (current, history, diffs) may have changed.
+  void client.invalidateQueries({ queryKey: scriptKey(projectId) });
+}
+
+/** Save an edit as a new version. `baseVersion` is the version the edit started from (null: none yet). */
+export function useSaveScript(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ content, baseVersion }: { content: ScriptContent; baseVersion: number | null }) =>
+      unwrap(
+        await api.PUT("/api/projects/{project_id}/script", {
+          params: { path: { project_id: projectId } },
+          body: { ...content, base_version: baseVersion },
+        }),
+      ),
+    onSuccess: () => afterScriptWrite(client, projectId),
+  });
+}
+
+/** Bring an old version back as a new one. */
+export function useRestoreScript(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ version, baseVersion }: { version: number; baseVersion: number | null }) =>
+      unwrap(
+        await api.POST("/api/projects/{project_id}/script:restore", {
+          params: { path: { project_id: projectId } },
+          body: { version, base_version: baseVersion },
+        }),
+      ),
+    onSuccess: () => afterScriptWrite(client, projectId),
+  });
+}
+
+/** Queue the rewrite of one segment; the result arrives as a new version when the job succeeds. */
+export function useRewriteSegment(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      segmentId,
+      instruction,
+      baseVersion,
+    }: {
+      segmentId: string;
+      instruction: string;
+      baseVersion: number;
+    }): Promise<Job> =>
+      unwrap(
+        await api.POST("/api/projects/{project_id}/script/segments/{segment_id}:rewrite", {
+          params: { path: { project_id: projectId, segment_id: segmentId } },
+          body: { instruction, base_version: baseVersion },
+        }),
+      ),
+    onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}
+
+const outlineKey = (projectId: string) => [...keys.project(projectId), "outline"] as const;
+
+/** The outline (a person's edit if there is one); 404 until generated. */
+export function useOutline(projectId: string) {
+  return useQuery({
+    queryKey: outlineKey(projectId),
+    retry: false,
+    queryFn: async () =>
+      unwrap(await api.GET("/api/projects/{project_id}/outline", { params: { path: { project_id: projectId } } })),
+  });
+}
+
+export function useSaveOutline(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (beats: OutlineBeat[]) =>
+      unwrap(
+        await api.PUT("/api/projects/{project_id}/outline", {
+          params: { path: { project_id: projectId } },
+          body: { beats },
+        }),
+      ),
+    onSuccess: (view) => client.setQueryData(outlineKey(projectId), view),
+  });
+}
+
+/** Drop the person's edit and go back to the generated outline. */
+export function useResetOutline(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.DELETE("/api/projects/{project_id}/outline", { params: { path: { project_id: projectId } } })),
+    onSuccess: (view) => client.setQueryData(outlineKey(projectId), view),
+  });
+}
+
+export function useGenerateOutline(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<Job> =>
+      unwrap(
+        await api.POST("/api/projects/{project_id}/outline:generate", { params: { path: { project_id: projectId } } }),
+      ),
+    onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}
+
+export function useStyles() {
+  return useQuery({
+    queryKey: ["styles"] as const,
+    staleTime: Infinity, // presets are files shipped with the app
+    queryFn: async () => unwrap(await api.GET("/api/styles")),
+  });
+}
+
+/** Rename a project or change its options; what is built stays, the next run uses the new ones. */
+export function useUpdateProject(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (change: { name?: string; options?: ProjectOptions }) =>
+      unwrap(
+        await api.PATCH("/api/projects/{project_id}", {
+          params: { path: { project_id: projectId } },
+          body: change,
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.project(projectId) });
+      void client.invalidateQueries({ queryKey: keys.projects });
+    },
   });
 }
 

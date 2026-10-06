@@ -250,6 +250,41 @@ def test_create_project_defaults_and_validation(client: TestClient, movie: Path)
     err(client.get("/api/projects/prj_missing/script"), 404, "not_found")
 
 
+def test_styles_are_listed_and_project_options_can_be_changed(
+    client: TestClient, movie: Path
+) -> None:
+    styles = client.get("/api/styles").json()
+    assert [s["id"] for s in styles] == ["emotional", "roast", "suspense"]
+    assert {"name", "description", "tone", "structure"} <= set(styles[0])
+
+    asset = import_movie(client, movie)
+    pid = client.post("/api/projects", json={"asset_id": asset["id"]}).json()["id"]
+    url = f"/api/projects/{pid}"
+    changed = client.patch(
+        url,
+        json={"name": "新名字", "options": {"minutes": 2, "style": "roast", "spoil_ending": False}},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["name"] == "新名字"
+    assert changed.json()["options"] == {
+        "minutes": 2.0,
+        "voice": None,
+        "style": "roast",
+        "spoil_ending": False,
+    }
+    assert client.get(url).json()["project"]["options"]["style"] == "roast"
+
+    only_name = client.patch(url, json={"name": "  再改  "}).json()
+    assert only_name["name"] == "再改" and only_name["options"]["style"] == "roast"  # kept
+    assert client.patch(url, json={}).json()["name"] == "再改"
+
+    err(client.patch(url, json={"options": {"style": "funny"}}), 422, "invalid_input")
+    err(client.patch(url, json={"name": " "}), 422, "invalid_input")
+    err(client.patch(url, json={"options": {"minutes": 0}}), 422, "validation_error")
+    err(client.patch("/api/projects/prj_missing", json={"name": "x"}), 404, "not_found")
+    assert client.get(url).json()["project"]["options"]["style"] == "roast"  # nothing half-saved
+
+
 def test_a_project_goes_from_nothing_to_a_playable_video(
     client: TestClient, services: AppServices, movie: Path
 ) -> None:

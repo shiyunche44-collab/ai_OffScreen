@@ -155,6 +155,21 @@ class ProjectRepo:
             row = s.get(ProjectRow, project_id)
             return _project(row) if row else None
 
+    def update(
+        self, project_id: str, name: str | None = None, options: ProjectOptions | None = None
+    ) -> Project | None:
+        """Rename and / or replace the options; None if there is no such project."""
+        with self.db.session() as s:
+            row = s.get(ProjectRow, project_id)
+            if row is None:
+                return None
+            if name is not None:
+                row.name = name
+            if options is not None:
+                row.options_json = canonical_json(options)
+            s.add(row)
+            return _project(row)
+
     def list(self) -> list[Project]:
         """Newest first."""
         with self.db.session() as s:

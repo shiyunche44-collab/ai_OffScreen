@@ -16,6 +16,7 @@ from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
 from offscreen.domain.script import Script
+from offscreen.domain.style import StylePreset
 from offscreen.media.probe import ProbeError
 from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.jobs import ANALYZE, RENDER, JobService
@@ -166,11 +167,33 @@ class LibraryService:
         asset = self._asset(asset_id)
         label = (name or "").strip() or asset.title
         options = options or ProjectOptions()
+        self._check_style(options.style)
+        return self.projects.add(asset_id, label, options)
+
+    def update_project(
+        self, project_id: str, name: str | None = None, options: ProjectOptions | None = None
+    ) -> Project:
+        """Rename a project and / or change how its commentary is made. Nothing already built
+        is touched: the creative stages are keyed on the options, so the next run builds anew."""
+        self._project(project_id)
+        if name is not None and not name.strip():
+            raise InvalidInput("the name is empty")
+        if options is not None:
+            self._check_style(options.style)
+        updated = self.projects.update(project_id, name.strip() if name else None, options)
+        if updated is None:
+            raise NotFound(f"unknown project {project_id}")
+        return updated
+
+    def styles(self) -> list[StylePreset]:
+        return styles.all_presets()
+
+    @staticmethod
+    def _check_style(style: str) -> None:
         try:
-            styles.get(options.style)
+            styles.get(style)
         except styles.StyleError as e:
             raise InvalidInput(str(e)) from e
-        return self.projects.add(asset_id, label, options)
 
     def list_projects(self) -> list[Project]:
         return self.projects.list()

@@ -29,9 +29,22 @@ export function ProjectPage() {
 
             <StepList detail={data} jobs={jobs.data} />
 
+            {!data.stages.find((s) => s.stage === "creation.script")?.cached ? (
+              <p className="text-sm">
+                <Link className="text-sky-600 hover:underline dark:text-sky-400" to={`/projects/${projectId}/script`}>
+                  调整参数、大纲，编辑文案 →
+                </Link>
+              </p>
+            ) : null}
+
             {data.stages.find((s) => s.stage === "creation.script")?.cached ? (
               <div>
-                <h2 className="mb-3 text-lg font-medium">解说文案</h2>
+                <div className="mb-3 flex items-baseline gap-3">
+                  <h2 className="text-lg font-medium">解说文案</h2>
+                  <Link className="text-sm text-sky-600 hover:underline dark:text-sky-400" to={`/projects/${projectId}/script`}>
+                    编辑文案 →
+                  </Link>
+                </div>
                 <ScriptView projectId={projectId} />
               </div>
             ) : null}

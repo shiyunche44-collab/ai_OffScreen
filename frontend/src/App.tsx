@@ -6,6 +6,7 @@ import { Jobs } from "./pages/Jobs";
 import { Library } from "./pages/Library";
 import { NotFound } from "./pages/NotFound";
 import { ProjectPage } from "./pages/Project";
+import { ScriptEditorPage } from "./pages/ScriptEditor";
 import { Projects } from "./pages/Projects";
 
 export function App() {
@@ -19,6 +20,7 @@ export function App() {
         <Route path="jobs" element={<Jobs />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="projects/:projectId/script" element={<ScriptEditorPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

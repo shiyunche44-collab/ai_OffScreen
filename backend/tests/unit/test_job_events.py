@@ -255,3 +255,41 @@ def test_events_endpoint_is_documented_as_event_stream() -> None:
     spec = create_app().openapi()
     ok = spec["paths"]["/api/events"]["get"]["responses"]["200"]
     assert "text/event-stream" in ok["content"] and "snapshot" in ok["description"]
+
+
+def test_a_job_that_starts_and_finishes_between_two_polls_is_still_reported(jobs: JobRepo) -> None:
+    w = JobWatcher(jobs)
+    w.snapshot()
+
+    quick = jobs.enqueue("s", {}, "cpu")  # a cache hit, a short rewrite
+    run = jobs.claim("cpu", 1)
+    assert run is not None
+    jobs.finish(quick.id, run.attempt, "succeeded")
+
+    reported = w.poll()
+    assert ids(reported) == [quick.id] and reported[0].status == "succeeded"
+    assert w.poll() == []  # and only once
+
+
+def test_a_job_seen_running_is_reported_once_when_it_finishes(jobs: JobRepo) -> None:
+    job = jobs.enqueue("s", {}, "cpu")
+    w = JobWatcher(jobs)
+    w.snapshot()
+    run = jobs.claim("cpu", 1)
+    assert run is not None
+    assert ids(w.poll()) == [job.id]  # running
+
+    jobs.finish(job.id, run.attempt, "succeeded")
+    done = w.poll()
+    assert [(j.id, j.status) for j in done] == [(job.id, "succeeded")]  # not twice
+    assert w.poll() == []
+
+
+def test_jobs_finished_before_the_snapshot_are_not_replayed(jobs: JobRepo) -> None:
+    old = jobs.enqueue("s", {}, "cpu")
+    run = jobs.claim("cpu", 1)
+    assert run is not None
+    jobs.finish(old.id, run.attempt, "succeeded")
+    w = JobWatcher(jobs)
+    assert ids(w.snapshot()) == [old.id]
+    assert w.poll() == []

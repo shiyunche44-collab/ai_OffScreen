@@ -2281,6 +2281,111 @@
         "title": "Story",
         "type": "object"
       },
+      "StyleBeat": {
+        "additionalProperties": false,
+        "description": "One step of the style's structure template.",
+        "properties": {
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "purpose": {
+            "minLength": 1,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "share": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "purpose",
+          "share"
+        ],
+        "title": "StyleBeat",
+        "type": "object"
+      },
+      "StylePreset": {
+        "additionalProperties": false,
+        "properties": {
+          "banned_words": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Banned Words",
+            "type": "array"
+          },
+          "description": {
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "hook_types": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Hook Types",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "perspective": {
+            "default": "third",
+            "enum": [
+              "first",
+              "third"
+            ],
+            "title": "Perspective",
+            "type": "string"
+          },
+          "phrases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Phrases",
+            "type": "array"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/StyleBeat"
+            },
+            "minItems": 1,
+            "title": "Structure",
+            "type": "array"
+          },
+          "tone": {
+            "minLength": 1,
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "tone",
+          "structure",
+          "hook_types"
+        ],
+        "title": "StylePreset",
+        "type": "object"
+      },
       "Transcript": {
         "additionalProperties": false,
         "properties": {
@@ -2388,6 +2493,35 @@
           "what"
         ],
         "title": "TurningPoint",
+        "type": "object"
+      },
+      "UpdateProject": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Leave out to keep the name.",
+            "title": "Name"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The full options to use from now on; leave out to keep them."
+          }
+        },
+        "title": "UpdateProject",
         "type": "object"
       },
       "VideoInfo": {
@@ -4303,6 +4437,77 @@
         "tags": [
           "projects"
         ]
+      },
+      "patch": {
+        "description": "Rename a project or change its options. What is already built stays; the creative\nsteps are rebuilt with the new options the next time they run.",
+        "operationId": "update_project_api_projects__project_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Update Project",
+        "tags": [
+          "projects"
+        ]
       }
     },
     "/api/projects/{project_id}/outline": {
@@ -5199,6 +5404,62 @@
         "summary": "Restore Script",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/styles": {
+      "get": {
+        "description": "The writing style presets a project can choose from.",
+        "operationId": "list_styles_api_styles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StylePreset"
+                  },
+                  "title": "Response List Styles Api Styles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "List Styles",
+        "tags": [
+          "styles"
         ]
       }
     }

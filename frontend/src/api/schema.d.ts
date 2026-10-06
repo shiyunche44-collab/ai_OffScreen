@@ -488,7 +488,12 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Project
+         * @description Rename a project or change its options. What is already built stays; the creative
+         *     steps are rebuilt with the new options the next time they run.
+         */
+        patch: operations["update_project_api_projects__project_id__patch"];
         trace?: never;
     };
     "/api/projects/{project_id}/outline": {
@@ -690,6 +695,26 @@ export interface paths {
          * @description Bring an old version back as a new one (the history only grows).
          */
         post: operations["restore_script_api_projects__project_id__script_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/styles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Styles
+         * @description The writing style presets a project can choose from.
+         */
+        get: operations["list_styles_api_styles_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1593,6 +1618,49 @@ export interface components {
              */
             turning_points: components["schemas"]["TurningPoint"][];
         };
+        /**
+         * StyleBeat
+         * @description One step of the style's structure template.
+         */
+        StyleBeat: {
+            /** Name */
+            name: string;
+            /** Purpose */
+            purpose: string;
+            /** Share */
+            share: number;
+        };
+        /** StylePreset */
+        StylePreset: {
+            /**
+             * Banned Words
+             * @default []
+             */
+            banned_words: string[];
+            /** Description */
+            description: string;
+            /** Hook Types */
+            hook_types: string[];
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Perspective
+             * @default third
+             * @enum {string}
+             */
+            perspective: "first" | "third";
+            /**
+             * Phrases
+             * @default []
+             */
+            phrases: string[];
+            /** Structure */
+            structure: components["schemas"]["StyleBeat"][];
+            /** Tone */
+            tone: string;
+        };
         /** Transcript */
         Transcript: {
             /** Asset Id */
@@ -1633,6 +1701,16 @@ export interface components {
             scene_id: string;
             /** What */
             what: string;
+        };
+        /** UpdateProject */
+        UpdateProject: {
+            /**
+             * Name
+             * @description Leave out to keep the name.
+             */
+            name?: string | null;
+            /** @description The full options to use from now on; leave out to keep them. */
+            options?: components["schemas"]["ProjectOptions"] | null;
         };
         /** VideoInfo */
         VideoInfo: {
@@ -2995,6 +3073,59 @@ export interface operations {
             };
         };
     };
+    update_project_api_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_outline_api_projects__project_id__outline_get: {
         parameters: {
             query?: never;
@@ -3623,6 +3754,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Script"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_styles_api_styles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePreset"][];
                 };
             };
             /** @description Not found */

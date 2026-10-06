@@ -50,6 +50,7 @@ def test_the_documented_routes() -> None:
         "/api/projects/{project_id}/script:generate",
         "/api/projects/{project_id}/plan:build",
         "/api/projects/{project_id}/render",
+        "/api/styles",
         "/api/jobs",
         "/api/jobs/{job_id}",
         "/api/jobs/{job_id}/log",

@@ -18,6 +18,9 @@ RECENT_WINDOW_S = 600.0
 """A fresh connection also learns about jobs that finished while it was away."""
 
 _ACTIVE = ("queued", "running")
+_OVERLAP = timedelta(seconds=2)
+"""Finished jobs are looked up from a little before the last poll, so one that finished while the
+previous poll was reading is not missed; `_seen` keeps it from being reported twice."""
 
 
 def _signature(job: Job) -> tuple[object, ...]:
@@ -36,16 +39,19 @@ class JobWatcher:
         self._window = timedelta(seconds=window_s)
         self._clock = clock
         self._seen: dict[str, Job] = {}
+        self._since = clock() - self._window
 
     def snapshot(self) -> list[Job]:
         """Active jobs plus those finished within the window; also the baseline for `poll`."""
         jobs = [*self._jobs.active(), *self._jobs.finished_since(self._clock() - self._window)]
         self._seen = {j.id: j for j in jobs}
+        self._since = self._clock() - _OVERLAP
         return sorted(jobs, key=lambda j: (j.created_at, j.id))
 
     def poll(self) -> list[Job]:
         """Jobs whose state differs from the last `snapshot` / `poll`, oldest first."""
         changed: list[Job] = []
+        polled_at = self._clock()
         active = self._jobs.active()
         active_ids = {j.id for j in active}
         for job in active:
@@ -62,4 +68,13 @@ class JobWatcher:
                     self._seen[job_id] = final
                 else:
                     del self._seen[job_id]
-        return sorted(changed, key=lambda j: (j.created_at, j.id))
+        # A job can be queued, run and finish between two polls (a cache hit, a short rewrite):
+        # it was never active here, so look for what finished since the last poll.
+        for job in self._jobs.finished_since(self._since):
+            before = self._seen.get(job.id)
+            if before is None or _signature(before) != _signature(job):
+                changed.append(job)
+                self._seen[job.id] = job
+        self._since = polled_at - _OVERLAP
+        by_id = {j.id: j for j in changed}
+        return sorted(by_id.values(), key=lambda j: (j.created_at, j.id))

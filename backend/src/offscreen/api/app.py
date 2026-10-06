@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from offscreen.api.errors import install_error_handlers
-from offscreen.api.routers import assets, events, files, jobs, projects
+from offscreen.api.routers import assets, events, files, jobs, projects, styles
 from offscreen.api.sse import EventSettings
 from offscreen.api.static import mount_frontend
 from offscreen.config import load_config
@@ -46,7 +46,7 @@ def create_app(
     app = FastAPI(title=TITLE, version=VERSION, lifespan=lifespan)
     app.state.event_settings = events_settings or EventSettings()
     install_error_handlers(app)
-    for module in (assets, projects, jobs, files, events):
+    for module in (assets, projects, styles, jobs, files, events):
         app.include_router(module.router, prefix=API_PREFIX)
     if web_dir is not None:
         mount_frontend(app, web_dir)  # last: its catch-all must not shadow the API

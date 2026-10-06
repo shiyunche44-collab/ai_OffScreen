@@ -27,9 +27,23 @@ def create_project(body: CreateProject, services: Services) -> Project:
     return services.library.create_project(body.asset_id, body.name, body.options)
 
 
+class UpdateProject(BaseModel):
+    name: str | None = Field(default=None, description="Leave out to keep the name.")
+    options: ProjectOptions | None = Field(
+        default=None, description="The full options to use from now on; leave out to keep them."
+    )
+
+
 @router.get("")
 def list_projects(services: Services) -> list[Project]:
     return services.library.list_projects()
+
+
+@router.patch("/{project_id}")
+def update_project(project_id: str, body: UpdateProject, services: Services) -> Project:
+    """Rename a project or change its options. What is already built stays; the creative
+    steps are rebuilt with the new options the next time they run."""
+    return services.library.update_project(project_id, body.name, body.options)
 
 
 @router.get("/{project_id}")
