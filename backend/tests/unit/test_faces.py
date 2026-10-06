@@ -100,6 +100,13 @@ def test_box_area_and_unit_vector() -> None:
     assert unit_vector((math.inf, 1.0)) is None
 
 
+def test_tiny_and_huge_vectors_are_still_scaled_to_length_one() -> None:
+    for scale in (3e-160, 1e-300, 5e200):
+        out = unit_vector([scale, 2 * scale])
+        assert out is not None and math.isclose(sum(x * x for x in out), 1.0, rel_tol=1e-12)
+    assert unit_vector([]) is None
+
+
 @given(st.lists(st.floats(-1e6, 1e6), min_size=1, max_size=16))
 def test_unit_vectors_have_length_one(v: list[float]) -> None:
     out = unit_vector(v)

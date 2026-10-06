@@ -44,3 +44,26 @@ def render(name: str, **variables: Any) -> Prompt:
     return Prompt(
         _env.get_template(f"{name}.j2").render(**variables).strip(), template_version(name)
     )
+
+
+def names() -> list[str]:
+    """Every template, by name (the file name without `.j2`)."""
+    return sorted(p.stem for p in _DIR.glob("*.j2"))
+
+
+def variables(name: str) -> list[str]:
+    """The variables a template reads (what `render` must be given)."""
+    from jinja2 import meta
+
+    ast = _env.parse((_DIR / f"{name}.j2").read_text(encoding="utf-8"))
+    return sorted(meta.find_undeclared_variables(ast))
+
+
+def preview(name: str, **values: Any) -> Prompt:
+    """Like `render`, but a variable not given shows up as `{{ name }}` instead of failing, so a
+    template's wording and layout can be read without data. For looking, never for sending."""
+    from jinja2 import DebugUndefined
+
+    env = _env.overlay(undefined=DebugUndefined)
+    text = env.get_template(f"{name}.j2").render(**values).strip()
+    return Prompt(text, template_version(name))

@@ -17,6 +17,7 @@ from offscreen.services.pipeline import (
     Pipeline,
     RunOptions,
 )
+from offscreen.services.prompts import list_prompts, render_prompt
 from offscreen.services.report import format_report
 
 app = typer.Typer(help="AI OffScreen: movie commentary pipeline", no_args_is_help=True)
@@ -118,6 +119,36 @@ def report_command(
     except (ConfigError, NotFound) as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(1) from e
+
+
+prompt_app = typer.Typer(help="The prompt templates models are given", no_args_is_help=True)
+app.add_typer(prompt_app, name="prompt")
+
+
+@prompt_app.command("list")
+def prompt_list() -> None:
+    """Every template with its version and the variables it reads."""
+    for _name, version, names in list_prompts():
+        typer.echo(f"{version:<28} {', '.join(names) or '-'}")
+
+
+@prompt_app.command("render")
+def prompt_render(
+    name: Annotated[str, typer.Argument(help="Template name, e.g. story_acts")],
+    vars_: Annotated[
+        Path | None,
+        typer.Option("--vars", help="JSON file with the variables (missing ones show as {{ x }})"),
+    ] = None,
+) -> None:
+    """Print a template as the model would get it."""
+    try:
+        text = vars_.read_text(encoding="utf-8") if vars_ else None
+        version, body = render_prompt(name, text)
+    except (OSError, NotFound, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"# {version}", err=True)
+    typer.echo(body)
 
 
 cuts_app = typer.Typer(

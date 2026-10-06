@@ -13,8 +13,14 @@ def box_area(bbox: Sequence[float]) -> float:
 
 
 def unit_vector(v: Sequence[float]) -> list[float] | None:
-    """`v` scaled to length 1, or None for a zero / non-finite vector (nothing to compare)."""
-    norm = math.sqrt(sum(x * x for x in v))
-    if not math.isfinite(norm) or norm == 0.0:
+    """`v` scaled to length 1, or None for a zero / non-finite vector (nothing to compare).
+    Scaled by the largest component first, so tiny or huge values neither underflow nor overflow
+    while squaring."""
+    if not v:
         return None
-    return [x / norm for x in v]
+    largest = max(abs(x) for x in v)
+    if not math.isfinite(largest) or largest == 0.0:
+        return None
+    scaled = [x / largest for x in v]
+    norm = math.sqrt(sum(x * x for x in scaled))
+    return [x / norm for x in scaled]

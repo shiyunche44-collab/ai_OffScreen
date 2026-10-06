@@ -61,4 +61,7 @@ make api-types    # 由 OpenAPI 生成前端类型
 offscreen --help
 offscreen run-all movie.mkv --minutes 3          # 电影 -> 解说视频，命中缓存的阶段自动跳过
 offscreen stage analysis.shots --asset ast_…     # 只跑某个阶段（--asset 也可直接给电影路径）
+offscreen prompt list / render <name> [--vars v.json]   # 看提示词模板及其版本、变量；未给的变量显示为 {{ x }}
+offscreen report <asset>                         # 分析的耗时、模型用量、数量
+offscreen cuts evaluate <asset> [--raw]          # 镜头检测对人工标注切点的 P / R / F1
 ```
