@@ -27,7 +27,7 @@ from .conftest import two_people_faces
 CHAIN = [
     "analysis.proxy", "analysis.shots", "analysis.keyframes", "analysis.transcript",
     "analysis.captions", "analysis.scenes", "analysis.story",
-    "creation.script", "creation.plan", "output.compile", "output.render",
+    "creation.outline", "creation.script", "creation.plan", "output.compile", "output.render",
 ]  # fmt: skip
 OPTS = RunOptions(minutes=0.25)  # 15 s of commentary
 
@@ -131,12 +131,12 @@ def test_cli_run_all_and_stage(
 
     r = runner.invoke(app, ["run-all", str(movie), "--minutes", "0.25", "--config", str(conf)])
     assert r.exit_code == 0, r.output
-    assert "done    output.render" in r.output and "11 run, 0 cached" in r.output
+    assert "done    output.render" in r.output and "12 run, 0 cached" in r.output
     final = next(line for line in r.output.splitlines() if line.startswith("video")).split()[-1]
     assert Path(final).is_file() and Path(final).name == "final.mp4"
 
     again = runner.invoke(app, ["run-all", str(movie), "--minutes", "0.25", "--config", str(conf)])
-    assert again.exit_code == 0 and "0 run, 11 cached" in again.output
+    assert again.exit_code == 0 and "0 run, 12 cached" in again.output
     asset = next(line for line in again.output.splitlines() if line.startswith("asset")).split()[1]
 
     s = runner.invoke(app, ["stage", "analysis.story", "--asset", asset, "--config", str(conf)])

@@ -5,11 +5,16 @@ from __future__ import annotations
 import unicodedata
 from collections.abc import Sequence
 
+from offscreen.domain.index import Scene, TranscriptLine
 from offscreen.domain.script import OutlineBeat, ScriptSegment
 
 DEFAULT_CHARS_PER_S = 4.5
 """Spoken characters per second for narration; calibrated per voice in M6."""
 LENGTH_TOLERANCE = 0.15
+BEAT_TOLERANCE = 0.2
+"""How far one beat's text may stray from its share of the target length."""
+KEY_LINES_PER_SCENE = 3
+KEY_LINE_CHARS = 40
 MIN_SEGMENT_CHARS = 5
 MAX_SEGMENT_CHARS = 200
 
@@ -34,6 +39,7 @@ def check_draft(
     *,
     target: int,
     tolerance: float = LENGTH_TOLERANCE,
+    whole: str = "全文",
 ) -> list[str]:
     """Rule violations of a draft (one entry per segment), as messages to show the model.
 
@@ -57,7 +63,7 @@ def check_draft(
     lo, hi = round(target * (1 - tolerance)), round(target * (1 + tolerance))
     if not lo <= total <= hi:
         advice = "删减" if total > hi else "补充"
-        errors.append(f"全文共 {total} 字，目标 {target} 字（允许 {lo}–{hi}）；请{advice}")
+        errors.append(f"{whole}共 {total} 字，目标 {target} 字（允许 {lo}–{hi}）；请{advice}")
     return errors
 
 
@@ -79,3 +85,48 @@ def build_outline(segments: Sequence[ScriptSegment], chars_per_s: float) -> list
         OutlineBeat(beat=b, scene_refs=refs, target_s=max(1, round(chars / chars_per_s)))
         for b, refs, chars in runs
     ]
+
+
+def check_beat(
+    texts: Sequence[str],
+    scene_refs: Sequence[Sequence[str]],
+    valid_scene_ids: Sequence[str],
+    *,
+    target: int,
+    banned_words: Sequence[str] = (),
+    tolerance: float = BEAT_TOLERANCE,
+) -> list[str]:
+    """Rule violations of one beat's segments, as messages to show the model: scene refs exist,
+    segment lengths are sane, no banned words, and the beat's length is near `target` chars."""
+    errors = check_draft(
+        texts, scene_refs, valid_scene_ids, target=target, tolerance=tolerance, whole="本节"
+    )
+    for n, text in enumerate(texts, 1):
+        used = [w for w in banned_words if w in text]
+        if used:
+            errors.append(f"第 {n} 段含有禁用词：{', '.join(used)}")
+    return errors
+
+
+def scene_lines(scene: Scene, lines: Sequence[TranscriptLine]) -> list[TranscriptLine]:
+    """The dialogue of a scene: the lines it lists, else the lines that overlap its time range."""
+    if scene.line_ids:
+        wanted = set(scene.line_ids)
+        return [ln for ln in lines if ln.id in wanted]
+    return [ln for ln in lines if ln.start_ms < scene.end_ms and ln.end_ms > scene.start_ms]
+
+
+def key_lines(
+    lines: Sequence[TranscriptLine],
+    limit: int = KEY_LINES_PER_SCENE,
+    max_chars: int = KEY_LINE_CHARS,
+) -> list[str]:
+    """The most telling lines of a scene, in time order: the longest ones (short interjections
+    say little), each cut to `max_chars`."""
+    ranked = sorted(range(len(lines)), key=lambda i: (-count_chars(lines[i].text), i))[:limit]
+    out: list[str] = []
+    for i in sorted(ranked):
+        text = " ".join(lines[i].text.split())
+        if text:
+            out.append(text if len(text) <= max_chars else text[: max_chars - 1] + "…")
+    return out

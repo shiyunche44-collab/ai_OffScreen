@@ -17,7 +17,8 @@ class ProjectOptions(Strict):
     """Target length of the commentary."""
     voice: str | None = Field(default=None, min_length=1)
     """Voice id; None: the configured default."""
-    style: str = Field(default="neutral", min_length=1)
+    style: str = Field(default="suspense", min_length=1)
+    """A style preset id (`offscreen style list`)."""
     spoil_ending: bool = True
 
 

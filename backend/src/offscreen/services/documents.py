@@ -91,3 +91,34 @@ class DocumentService:
 
 def _dump(script: Script) -> dict[str, object]:
     return script.model_dump(mode="json")
+
+
+def adopt_generated_script(
+    store: DocumentStore, project_id: str, draft: Script, base_version: int | None
+) -> Script:
+    """Store an AI-written script as the project's next version. `base_version` is the head the
+    request was made against: if a person saved something meanwhile, nothing is stored and the
+    job fails (the draft stays cached, so pressing generate again is cheap). A draft identical
+    to the current version is not stored twice."""
+    head = store.read(project_id, "script", Script)
+    if head is not None and ScriptContent.of(head) == ScriptContent.of(draft):
+        return head
+
+    def build(doc_id: str, version: int, parent: int | None) -> Script:
+        return draft.model_copy(
+            update={
+                "id": doc_id,
+                "project_id": project_id,
+                "version": version,
+                "parent_version": parent,
+                "author": "ai",
+            }
+        )
+
+    try:
+        return store.append(project_id, "script", base_version, build, author="ai")
+    except StaleBase as e:
+        raise Conflict(
+            f"the script changed while it was being generated (it was version {base_version}, "
+            f"now {e.current}); generate again to build on the current one"
+        ) from e

@@ -51,10 +51,11 @@ from offscreen.stages.creation.script import ScriptError, ScriptSettings, Script
 from offscreen.stages.output.compile import CompileStage, CompileStageError
 from offscreen.stages.output.render import FINAL_FILE, RenderError, RenderStage
 from offscreen.store.db import Database
+from offscreen.store.outline_edits import OutlineEditStore
 from offscreen.store.repos import AssetRepo, StageRunRepo
 
 FINAL_STAGE = "output.render"
-DEFAULT_STYLE = "neutral"
+DEFAULT_STYLE = "suspense"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
     ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, CharactersError,
@@ -89,7 +90,10 @@ class RunOptions:
     voice: str | None = None
     """Voice id; None: the configured default."""
     style: str = DEFAULT_STYLE
+    """A style preset id (`offscreen style list`)."""
     spoil_ending: bool = True
+    project_id: str | None = None
+    """The project the run is for; its edited outline, if any, is what the script follows."""
 
 
 @dataclass
@@ -188,6 +192,9 @@ class Pipeline:
             voice_id=voice,
             style=opts.style,
             spoil_ending=opts.spoil_ending,
+            outline=OutlineEditStore(cfg.data_dir).read(opts.project_id)
+            if opts.project_id
+            else None,
         )
         models = task_models(
             cfg,

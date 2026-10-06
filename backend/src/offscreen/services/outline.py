@@ -42,7 +42,7 @@ class OutlineService:
 
     def generate(self, project_id: str) -> Job:
         p = self._project(project_id)
-        return self.jobs.generate_outline(p.asset_id, run_options(p.options))
+        return self.jobs.generate_outline(p.asset_id, run_options(p.options, p.id))
 
     def get(self, project_id: str) -> OutlineView:
         project = self._project(project_id)
@@ -90,14 +90,18 @@ class OutlineService:
 
     def _generated(self, project: Project) -> ScriptOutline:
         with self._pipeline() as p:
-            artifact = p.peek(GENERATE_OUTLINE, project.asset_id, run_options(project.options))
+            artifact = p.peek(
+                GENERATE_OUTLINE, project.asset_id, run_options(project.options, project.id)
+            )
         if artifact is None:
             raise NotFound("the outline has not been generated yet")
         return artifact.read_model(OUTLINE_FILE, ScriptOutline)
 
     def _scene_ids(self, project: Project) -> list[str]:
         with self._pipeline() as p:
-            artifact = p.peek("analysis.scenes", project.asset_id, run_options(project.options))
+            artifact = p.peek(
+                "analysis.scenes", project.asset_id, run_options(project.options, project.id)
+            )
         if artifact is None:
             raise NotFound("the movie's scenes have not been built yet")
         return [s.id for s in artifact.read_model(SCENES_FILE, Scenes).scenes]

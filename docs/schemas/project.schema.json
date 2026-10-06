@@ -17,7 +17,7 @@
           "type": "boolean"
         },
         "style": {
-          "default": "neutral",
+          "default": "suspense",
           "minLength": 1,
           "title": "Style",
           "type": "string"

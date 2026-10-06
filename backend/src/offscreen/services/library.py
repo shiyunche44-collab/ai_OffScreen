@@ -10,17 +10,16 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from offscreen import styles
 from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
-from offscreen.domain.script import Script
 from offscreen.media.probe import ProbeError
 from offscreen.services.errors import InvalidInput, NotFound
-from offscreen.services.jobs import ANALYZE, GENERATE_SCRIPT, RENDER, JobService
+from offscreen.services.jobs import ANALYZE, RENDER, JobService
 from offscreen.services.pipeline import Pipeline, RunOptions
 from offscreen.stages.analysis.ingest import IngestError, ingest
-from offscreen.stages.creation.script import SCRIPT_FILE
 from offscreen.stages.output.render import FINAL_FILE
 from offscreen.store.db import Database
 from offscreen.store.repos import AssetRepo, ProjectRepo
@@ -69,8 +68,8 @@ class ProjectDetail(BaseModel):
     """The finished video, relative to the data directory (None until rendered)."""
 
 
-def run_options(opts: ProjectOptions) -> RunOptions:
-    return RunOptions(opts.minutes, opts.voice, opts.style, opts.spoil_ending)
+def run_options(opts: ProjectOptions, project_id: str | None = None) -> RunOptions:
+    return RunOptions(opts.minutes, opts.voice, opts.style, opts.spoil_ending, project_id)
 
 
 class LibraryService:
@@ -165,14 +164,19 @@ class LibraryService:
     ) -> Project:
         asset = self._asset(asset_id)
         label = (name or "").strip() or asset.title
-        return self.projects.add(asset_id, label, options or ProjectOptions())
+        options = options or ProjectOptions()
+        try:
+            styles.get(options.style)
+        except styles.StyleError as e:
+            raise InvalidInput(str(e)) from e
+        return self.projects.add(asset_id, label, options)
 
     def list_projects(self) -> list[Project]:
         return self.projects.list()
 
     def project(self, project_id: str) -> ProjectDetail:
         project = self._project(project_id)
-        opts = run_options(project.options)
+        opts = run_options(project.options, project.id)
         with self._pipeline() as p:
             stages = [
                 StageStatus(stage=n, cached=p.peek(n, project.asset_id, opts) is not None)
@@ -186,26 +190,21 @@ class LibraryService:
             )
         return ProjectDetail(project=project, stages=stages, video=video)
 
-    def script(self, project_id: str) -> Script:
-        """The commentary text generated for this project's options (read-only for now)."""
-        project = self._project(project_id)
-        with self._pipeline() as p:
-            artifact = p.peek(GENERATE_SCRIPT, project.asset_id, run_options(project.options))
-        if artifact is None:
-            raise NotFound("the script has not been generated yet")
-        return artifact.read_model(SCRIPT_FILE, Script)
-
     def generate_script(self, project_id: str) -> Job:
         p = self._project(project_id)
-        return self.jobs.generate_script(p.asset_id, run_options(p.options))
+        return self.jobs.generate_script(
+            p.asset_id,
+            run_options(p.options, p.id),
+            base_version=self.jobs.docs.head(p.id, "script"),
+        )
 
     def build_plan(self, project_id: str) -> Job:
         p = self._project(project_id)
-        return self.jobs.build_plan(p.asset_id, run_options(p.options))
+        return self.jobs.build_plan(p.asset_id, run_options(p.options, p.id))
 
     def render(self, project_id: str) -> Job:
         p = self._project(project_id)
-        return self.jobs.render(p.asset_id, run_options(p.options))
+        return self.jobs.render(p.asset_id, run_options(p.options, p.id))
 
     # ---- internals -------------------------------------------------------------------------
     def _pipeline(self) -> Pipeline:

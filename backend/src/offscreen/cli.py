@@ -28,7 +28,7 @@ app.add_typer(config_app, name="config")
 ConfigOpt = Annotated[Path | None, typer.Option("--config", "-c", help="Path to config.yaml")]
 MinutesOpt = Annotated[float, typer.Option(help="Target length of the commentary, in minutes")]
 VoiceOpt = Annotated[str | None, typer.Option(help="Voice id (default: tts.default_voice)")]
-StyleOpt = Annotated[str, typer.Option(help="Writing style hint for the script")]
+StyleOpt = Annotated[str, typer.Option(help="Writing style preset (see: offscreen style list)")]
 NoSpoilOpt = Annotated[bool, typer.Option("--no-spoilers", help="Keep the ending out of it")]
 
 

@@ -15,15 +15,17 @@ jobs never share the GPU (ARCHITECTURE §3.3).
 from __future__ import annotations
 
 import threading
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any, Protocol
 
 from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job, JobCanceled, JobStatus, Lane
+from offscreen.domain.script import Script
 from offscreen.engine.stage import StageCanceled
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.providers.ports import AsrCanceled, DetectionCanceled
+from offscreen.services.documents import adopt_generated_script
 from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
@@ -36,9 +38,10 @@ from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.story import StoryStage
 from offscreen.stages.creation.outline import OutlineStage
 from offscreen.stages.creation.plan import PlanStage
-from offscreen.stages.creation.script import ScriptStage
+from offscreen.stages.creation.script import SCRIPT_FILE, ScriptStage
 from offscreen.stages.output.render import RenderStage
 from offscreen.store.db import Database
+from offscreen.store.documents import DocumentStore
 from offscreen.store.repos import AssetRepo, JobRepo
 
 ANALYZE = StoryStage.name  # everything the script writer reads
@@ -75,7 +78,9 @@ def options_to_scope(opts: RunOptions) -> dict[str, Any]:
 
 
 def options_from_scope(raw: dict[str, Any]) -> RunOptions:
-    known = {k: raw[k] for k in ("minutes", "voice", "style", "spoil_ending") if k in raw}
+    known = {
+        k: raw[k] for k in ("minutes", "voice", "style", "spoil_ending", "project_id") if k in raw
+    }
     return RunOptions(**known)
 
 
@@ -93,6 +98,7 @@ class JobService:
         self._owns_db = db is None
         self.db = db or Database(cfg.data_dir / "offscreen.db")
         self.jobs = JobRepo(self.db)
+        self.docs = DocumentStore(self.db, cfg.data_dir)
         self.assets = AssetRepo(self.db)
         self._providers = providers
         self._lock = threading.Lock()
@@ -126,8 +132,14 @@ class JobService:
     def generate_outline(self, asset_id: str, opts: RunOptions | None = None) -> Job:
         return self._submit(GENERATE_OUTLINE, asset_id, _checked(opts), OutlineStage.lane)
 
-    def generate_script(self, asset_id: str, opts: RunOptions | None = None) -> Job:
-        return self._submit(GENERATE_SCRIPT, asset_id, _checked(opts), ScriptStage.lane)
+    def generate_script(
+        self, asset_id: str, opts: RunOptions | None = None, *, base_version: int | None = None
+    ) -> Job:
+        """With `opts.project_id`, the result is also stored as the project's next script
+        version, which must follow `base_version` (the current one when the button was pressed)."""
+        checked = _checked(opts)
+        extra = {"base_version": base_version} if checked.project_id else None
+        return self._submit(GENERATE_SCRIPT, asset_id, checked, ScriptStage.lane, extra)
 
     def build_plan(self, asset_id: str, opts: RunOptions | None = None) -> Job:
         return self._submit(BUILD_PLAN, asset_id, _checked(opts), PlanStage.lane)
@@ -200,9 +212,14 @@ class JobService:
         ) as pipeline:
             total = len(pipeline.stage_chain(job.stage, asset_id, opts))
             try:
-                pipeline.run_stage(job.stage, asset_id, opts)
+                result = pipeline.run_stage(job.stage, asset_id, opts)
             except _CANCEL_ERRORS as e:
                 raise JobCanceled(str(e)) from e
+            if job.stage == GENERATE_SCRIPT and opts.project_id:
+                draft = result.artifact.read_model(SCRIPT_FILE, Script)
+                adopt_generated_script(
+                    self.docs, opts.project_id, draft, job.scope.get("base_version")
+                )
 
     # ---- internals --------------------------------------------------------------------------
     def _asset(self, asset_id: str) -> MediaAsset:
@@ -211,9 +228,16 @@ class JobService:
             raise NotFound(f"unknown asset {asset_id}")
         return asset
 
-    def _submit(self, stage: str, asset_id: str, opts: RunOptions, lane: Lane) -> Job:
+    def _submit(
+        self,
+        stage: str,
+        asset_id: str,
+        opts: RunOptions,
+        lane: Lane,
+        extra: dict[str, Any] | None = None,
+    ) -> Job:
         self._asset(asset_id)
-        scope = {"asset_id": asset_id, "options": options_to_scope(opts)}
+        scope = {"asset_id": asset_id, "options": options_to_scope(opts), **(extra or {})}
         with self._submit_lock:
             for status in ("queued", "running"):  # pressing a button twice must not queue twice
                 for job in self.jobs.list(status=status):
@@ -227,5 +251,5 @@ def _checked(opts: RunOptions | None) -> RunOptions:
     if opts.minutes <= 0:
         raise InvalidInput("minutes must be positive")
     if not opts.style.strip():
-        return RunOptions(opts.minutes, opts.voice, DEFAULT_STYLE, opts.spoil_ending)
+        return replace(opts, style=DEFAULT_STYLE)
     return opts

@@ -1,40 +1,50 @@
-"""script: story + scenes -> script.json (v0: one narration pass, no versioning).
+"""script: outline + story + scenes -> script.json, written beat by beat.
 
-One LLM call (task `script_write`) writes the narration segments, each citing the scenes it
-is based on. Deterministic rules then check scene refs, segment lengths and the total length
-against the target (`target_duration_s * chars_per_s`); violations go back to the model for
-at most two repair rounds. The outline is derived from the written segments. M1 has no
-projects or document store, so ids and `version` are fixed: `scr_`/`prj_` + the asset's id
-suffix, version 1."""
+The outline (M4-04) says which beats the text has, which scenes each draws on and how many
+seconds each gets. A person's edit of it, when there is one, comes in through the settings and
+replaces the generated one. One LLM call (task `script_write`) writes each beat. Every call
+starts with the same context (style, story, scenes with their key lines, the whole outline) and
+differs only in the beat instructions at the end, so the provider's prompt cache is reused
+across beats and, later, across single-segment rewrites.
+
+Deterministic rules check each beat (scene refs, segment lengths, banned words, length against
+the beat's share of the target); violations go back to the model for at most two repair rounds.
+The artifact has fixed ids (`scr_`/`prj_` + the asset's id suffix, version 1); the job service
+stores it in the project's document history as a new version."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, Field
 
+from offscreen import styles
 from offscreen.algo.script import (
+    BEAT_TOLERANCE,
     DEFAULT_CHARS_PER_S,
-    LENGTH_TOLERANCE,
     MAX_SEGMENT_CHARS,
     MIN_SEGMENT_CHARS,
-    build_outline,
-    check_draft,
+    check_beat,
     count_chars,
     estimate_duration_s,
+    key_lines,
+    scene_lines,
     target_chars,
 )
 from offscreen.algo.story import fmt_clock
-from offscreen.domain.index import Scenes, Story
+from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Lane
-from offscreen.domain.script import Script, ScriptParams, ScriptSegment
+from offscreen.domain.script import OutlineBeat, Script, ScriptOutline, ScriptParams, ScriptSegment
+from offscreen.domain.style import StylePreset
 from offscreen.engine import ArtifactRef, Scope, Stage, StageContext, StageOutput
 from offscreen.prompts import render, template_version
 from offscreen.providers.ports import LLM, Message
 from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.story import STORY_FILE
+from offscreen.stages.analysis.transcript import TRANSCRIPT_FILE
+from offscreen.stages.creation.outline import OUTLINE_FILE
 from offscreen.store.files import write_model
 
 SCRIPT_FILE = "script.json"
@@ -42,6 +52,8 @@ WRITE_TASK = "script_write"
 REPAIR_ROUNDS = 2
 SEGMENT_CHARS_HINT = 45
 """Average segment length the prompt aims for; sets the suggested number of segments."""
+PREVIOUS_SEGMENTS = 3
+"""How many of the segments already written the next beat is shown, for continuity."""
 
 
 class ScriptError(RuntimeError):
@@ -52,16 +64,16 @@ class ScriptError(RuntimeError):
 class ScriptSettings:
     target_duration_s: int
     voice_id: str
-    style: str = "neutral"
-    perspective: Literal["first", "third"] = "third"
+    style: str = "suspense"
+    """A style preset id (`offscreen style list`)."""
     spoil_ending: bool = True
     chars_per_s: float = DEFAULT_CHARS_PER_S
+    outline: ScriptOutline | None = None
+    """A person's edit of the outline; None: use the generated one (`creation.outline`)."""
 
     def __post_init__(self) -> None:
         if self.target_duration_s < 1:
             raise ValueError("target_duration_s must be positive")
-        if self.perspective not in ("first", "third"):
-            raise ValueError("perspective must be 'first' or 'third'")
         if self.chars_per_s <= 0:
             raise ValueError("chars_per_s must be positive")
 
@@ -69,18 +81,17 @@ class ScriptSettings:
 class SegmentReply(BaseModel):
     """One written segment (lenient: unknown fields are ignored)."""
 
-    beat: str | None = None
     text: str = Field(min_length=1)
     scene_refs: list[str] = []
 
 
-class ScriptReply(BaseModel):
+class BeatReply(BaseModel):
     segments: list[SegmentReply] = Field(min_length=1)
 
 
 class ScriptStage(Stage):
     name = "creation.script"
-    version = 1
+    version = 2
     lane: Lane = "api"
 
     def __init__(
@@ -91,44 +102,73 @@ class ScriptStage(Stage):
         self.models = dict(models or {})
         """`task -> "provider/model"` for the tasks this stage uses; part of the cache key."""
 
+    def _preset(self) -> StylePreset:
+        try:
+            return styles.get(self.settings.style)
+        except styles.StyleError as e:
+            raise ScriptError(str(e)) from e
+
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
-        return [ArtifactRef("analysis.story", scope), ArtifactRef("analysis.scenes", scope)]
+        refs = [
+            ArtifactRef("analysis.story", scope),
+            ArtifactRef("analysis.scenes", scope),
+            ArtifactRef("analysis.transcript", scope),
+        ]
+        if self.settings.outline is None:
+            refs.append(ArtifactRef("creation.outline", scope))
+        return refs
 
     def params(self, scope: Scope) -> dict[str, Any]:
+        cfg = self.settings
         return {
             "asset_id": scope["asset_id"],
-            **asdict(self.settings),
-            "tolerance": LENGTH_TOLERANCE,
+            "target_duration_s": cfg.target_duration_s,
+            "voice_id": cfg.voice_id,
+            "style": self._preset().model_dump(mode="json"),  # editing a preset invalidates
+            "spoil_ending": cfg.spoil_ending,
+            "chars_per_s": cfg.chars_per_s,
+            "outline": cfg.outline.model_dump(mode="json") if cfg.outline else None,
+            "tolerance": BEAT_TOLERANCE,
             "language": "zh",
         }
 
     def provider_info(self, scope: Scope) -> dict[str, Any]:
         return {
             "models": {WRITE_TASK: self.models.get(WRITE_TASK)},
-            "prompts": {WRITE_TASK: template_version("script_write")},
+            "prompts": {
+                WRITE_TASK: template_version("script_write"),
+                "script_beat": template_version("script_beat"),
+            },
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
         cfg = self.settings
+        preset = self._preset()
         asset_id = ctx.scope["asset_id"]
         story = ctx.input("analysis.story").read_model(STORY_FILE, Story)
         scenes = ctx.input("analysis.scenes").read_model(SCENES_FILE, Scenes).scenes
+        lines = ctx.input("analysis.transcript").read_model(TRANSCRIPT_FILE, Transcript).lines
         if not scenes:
             raise ScriptError("no scenes to write from")
+        outline = cfg.outline or ctx.input("creation.outline").read_model(
+            OUTLINE_FILE, ScriptOutline
+        )
+        scene_ids = [s.id for s in scenes]
+        unknown = sorted({r for b in outline.beats for r in b.scene_refs} - set(scene_ids))
+        if unknown:
+            raise ScriptError(
+                f"the outline refers to scenes the movie does not have: {', '.join(unknown)}"
+            )
 
-        target = target_chars(cfg.target_duration_s, cfg.chars_per_s)
-        lo, hi = round(target * (1 - LENGTH_TOLERANCE)), round(target * (1 + LENGTH_TOLERANCE))
-        prompt = render(
+        context = render(
             "script_write",
-            style=cfg.style,
-            perspective=cfg.perspective,
+            style_name=preset.name,
+            style_description=preset.description,
+            tone=preset.tone,
+            perspective=preset.perspective,
+            phrases=preset.phrases,
+            banned_words=preset.banned_words,
             spoil_ending=cfg.spoil_ending,
-            target_chars=target,
-            min_chars=lo,
-            max_chars=hi,
-            approx_segments=max(1, round(target / SEGMENT_CHARS_HINT)),
-            min_seg=MIN_SEGMENT_CHARS * 3,
-            max_seg=MAX_SEGMENT_CHARS // 2,
             logline=story.logline,
             synopsis=story.synopsis,
             turning_points=story.turning_points,
@@ -141,37 +181,46 @@ class ScriptStage(Stage):
                     "end": fmt_clock(s.end_ms),
                     "importance": s.importance,
                     "summary": s.summary,
+                    "lines": key_lines(scene_lines(s, lines)),
                 }
                 for s in scenes
             ],
+            outline=[b.model_dump() for b in outline.beats],
+            total_s=outline.total_s,
         )
-        ctx.progress(0.05, "writing")
-        draft = self._write(prompt.text, prompt.version, [s.id for s in scenes], target, ctx)
+
+        segments: list[ScriptSegment] = []
+        for n, beat in enumerate(outline.beats, 1):
+            ctx.progress(0.9 * (n - 1) / len(outline.beats), f"writing {beat.beat}")
+            written = self._write_beat(
+                context.text, context.version, preset, outline, n, beat, segments, scene_ids, ctx
+            )
+            first = len(segments) + 1
+            segments.extend(
+                ScriptSegment(
+                    id=f"seg_{first + i:02d}",
+                    kind="narration",
+                    beat=beat.beat,
+                    text=seg.text.strip(),
+                    scene_refs=list(dict.fromkeys(seg.scene_refs)),
+                )
+                for i, seg in enumerate(written)
+            )
 
         suffix = asset_id.split("_", 1)[1]
-        segments = [
-            ScriptSegment(
-                id=f"seg_{i:02d}",
-                kind="narration",
-                beat=(seg.beat or "").strip() or None,
-                text=seg.text.strip(),
-                scene_refs=list(dict.fromkeys(seg.scene_refs)),
-            )
-            for i, seg in enumerate(draft.segments, 1)
-        ]
         script = Script(
             id=f"scr_{suffix}",
             project_id=f"prj_{suffix}",
             version=1,
             author="ai",
             params=ScriptParams(
-                style=cfg.style,
+                style=preset.id,
                 target_duration_s=cfg.target_duration_s,
-                perspective=cfg.perspective,
+                perspective=preset.perspective,
                 spoil_ending=cfg.spoil_ending,
                 voice_id=cfg.voice_id,
             ),
-            outline=build_outline(segments, cfg.chars_per_s),
+            outline=outline.beats,
             segments=segments,
         )
         write_model(ctx.out_dir / SCRIPT_FILE, script)
@@ -181,34 +230,67 @@ class ScriptStage(Stage):
             meta={
                 "segments": len(segments),
                 "chars": chars,
-                "target_chars": target,
+                "target_chars": target_chars(outline.total_s, cfg.chars_per_s),
                 "estimated_s": round(estimate_duration_s(chars, cfg.chars_per_s), 1),
             }
         )
 
-    def _write(
+    def _write_beat(
         self,
-        prompt_text: str,
-        prompt_version: str,
+        context: str,
+        context_version: str,
+        preset: StylePreset,
+        outline: ScriptOutline,
+        index: int,
+        beat: OutlineBeat,
+        written: list[ScriptSegment],
         scene_ids: list[str],
-        target: int,
         ctx: StageContext,
-    ) -> ScriptReply:
-        messages = [Message("user", prompt_text)]
+    ) -> list[SegmentReply]:
+        cfg = self.settings
+        target = max(1, target_chars(beat.target_s, cfg.chars_per_s))
+        lo, hi = round(target * (1 - BEAT_TOLERANCE)), round(target * (1 + BEAT_TOLERANCE))
+        purpose = next((b.purpose for b in preset.structure if b.name == beat.beat), None)
+        instructions = render(
+            "script_beat",
+            index=index,
+            count=len(outline.beats),
+            beat=beat.beat,
+            focus=beat.focus,
+            purpose=purpose,
+            scene_refs=beat.scene_refs,
+            is_first=index == 1,
+            hook_types=preset.hook_types,
+            is_last=index == len(outline.beats),
+            previous=[s.text for s in written[-PREVIOUS_SEGMENTS:]],
+            target_chars=target,
+            min_chars=lo,
+            max_chars=hi,
+            approx_segments=max(1, round(target / SEGMENT_CHARS_HINT)),
+            min_seg=MIN_SEGMENT_CHARS * 3,
+            max_seg=MAX_SEGMENT_CHARS // 2,
+        )
+        # the context comes first and is identical for every beat: that is the cacheable prefix
+        messages = [Message("user", f"{context}\n\n{instructions.text}")]
+        version = f"{context_version}+{instructions.version}"
         problems: list[str] = []
-        for attempt in range(REPAIR_ROUNDS + 1):
+        for round_ in range(REPAIR_ROUNDS + 1):
             reply = self.llm.generate(
-                WRITE_TASK, messages, ScriptReply, prompt_version=prompt_version, max_tokens=8192
+                WRITE_TASK, messages, BeatReply, prompt_version=version, max_tokens=4096
             )
-            problems = check_draft(
+            problems = check_beat(
                 [s.text for s in reply.segments],
                 [s.scene_refs for s in reply.segments],
                 scene_ids,
                 target=target,
+                banned_words=preset.banned_words,
             )
             if not problems:
-                return reply
-            ctx.progress(0.3 + 0.3 * attempt, f"repairing draft ({len(problems)} problems)")
+                return reply.segments
+            ctx.progress(
+                0.9 * (index - 1) / len(outline.beats),
+                f"repairing {beat.beat} (round {round_ + 1}, {len(problems)} problems)",
+            )
             messages = [
                 *messages,
                 Message("assistant", reply.model_dump_json()),
@@ -216,7 +298,10 @@ class ScriptStage(Stage):
                     "user",
                     "上一稿有以下问题：\n- "
                     + "\n- ".join(problems)
-                    + f"\n场景编号只能用：{', '.join(scene_ids)}。请修改后重新输出完整 JSON。",
+                    + f"\n场景编号只能用：{', '.join(scene_ids)}。"
+                    + "请修改后重新输出这一节的完整 JSON。",
                 ),
             ]
-        raise ScriptError("script still breaks the rules after repair: " + "; ".join(problems))
+        raise ScriptError(
+            f"beat {beat.beat!r} still breaks the rules after repair: " + "; ".join(problems)
+        )

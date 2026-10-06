@@ -52,12 +52,8 @@ class RestoreScript(BaseModel):
 
 @router.get("/{project_id}/script")
 def get_script(project_id: str, services: Services, version: int | None = None) -> Script:
-    """A version of the commentary text (default: the current one); 404 until there is one.
-    Until the writing step stores its output in the document history, the generated draft is
-    served as the current version."""
-    if version is not None or services.documents.script_head(project_id) is not None:
-        return services.documents.script(project_id, version)
-    return services.library.script(project_id)
+    """A version of the commentary text (default: the current one); 404 until there is one."""
+    return services.documents.script(project_id, version)
 
 
 @router.put("/{project_id}/script")

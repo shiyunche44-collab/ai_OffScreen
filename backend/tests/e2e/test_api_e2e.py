@@ -225,7 +225,7 @@ def test_create_project_defaults_and_validation(client: TestClient, movie: Path)
     assert project["options"] == {
         "minutes": 3.0,
         "voice": None,
-        "style": "neutral",
+        "style": "suspense",
         "spoil_ending": True,
     }
 
@@ -234,7 +234,7 @@ def test_create_project_defaults_and_validation(client: TestClient, movie: Path)
         json={
             "asset_id": asset["id"],
             "name": "短版",
-            "options": {"minutes": 0.25, "style": "funny"},
+            "options": {"minutes": 0.25, "style": "roast"},
         },
     ).json()
     assert named["name"] == "短版" and named["options"]["minutes"] == 0.25
@@ -244,6 +244,8 @@ def test_create_project_defaults_and_validation(client: TestClient, movie: Path)
     err(client.post("/api/projects", json={"asset_id": "nonsense"}), 422, "validation_error")
     bad = {"asset_id": asset["id"], "options": {"minutes": 0}}
     err(client.post("/api/projects", json=bad), 422, "validation_error")
+    unknown_style = {"asset_id": asset["id"], "options": {"style": "funny"}}
+    err(client.post("/api/projects", json=unknown_style), 422, "invalid_input")
     err(client.get("/api/projects/prj_missing"), 404, "not_found")
     err(client.get("/api/projects/prj_missing/script"), 404, "not_found")
 
@@ -273,6 +275,9 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     assert script["params"]["target_duration_s"] == 15
     assert [seg["kind"] for seg in script["segments"]] == ["narration"] * 3
     assert all(seg["text"] for seg in script["segments"])
+    # the generated draft is the project's first script version, with the project's own ids
+    assert (script["version"], script["author"], script["project_id"]) == (1, "ai", pid)
+    assert [v["version"] for v in client.get(f"/api/projects/{pid}/script/versions").json()] == [1]
 
     after = client.get(f"/api/projects/{pid}").json()
     assert all(s["cached"] for s in after["stages"])
@@ -297,6 +302,85 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
         "analysis.story",
     }
     assert client.get(f"/api/projects/{other['id']}").json()["video"] is None
+
+
+def test_edits_and_regeneration_share_one_version_history(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/script"
+
+    def generate() -> dict[str, Any]:
+        job = client.post(f"{url}:generate").json()
+        drain(services)
+        return client.get(f"/api/jobs/{job['id']}").json()  # type: ignore[no-any-return]
+
+    assert generate()["status"] == "succeeded"
+    v1 = client.get(url).json()
+    assert generate()["status"] == "succeeded"  # same draft again: nothing new is stored
+    assert client.get(url).json()["version"] == 1
+
+    # a person edits; regenerating then stacks the AI draft on top of the edit, nothing is lost
+    edit = {k: v1[k] for k in ("params", "outline", "segments", "annotations")}
+    edit["segments"][0]["text"] = "我改过的开场白。"
+    saved = client.put(url, json={**edit, "base_version": 1}).json()
+    assert (saved["version"], saved["author"]) == (2, "human")
+    assert generate()["status"] == "succeeded"
+    head = client.get(url).json()
+    assert (head["version"], head["author"], head["parent_version"]) == (3, "ai", 2)
+    assert head["segments"][0]["text"] != "我改过的开场白。"
+    assert (
+        client.get(url, params={"version": 2}).json()["segments"][0]["text"] == "我改过的开场白。"
+    )
+
+    # a person saves while a generation is queued: the job must not bury that edit
+    job = client.post(f"{url}:generate").json()
+    edit["segments"][0]["text"] = "又一次修改。"
+    assert client.put(url, json={**edit, "base_version": 3}).status_code == 200
+    drain(services)
+    failed = client.get(f"/api/jobs/{job['id']}").json()
+    assert (
+        failed["status"] == "failed" and "changed while it was being generated" in failed["error"]
+    )
+    assert client.get(url).json()["version"] == 4 and client.get(url).json()["author"] == "human"
+
+
+def test_the_script_follows_the_outline_a_person_edited(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    err(client.get(f"/api/projects/{pid}/outline"), 404, "not_found")
+    assert client.post(f"/api/projects/{pid}/outline:generate").status_code == 202
+    drain(services)
+
+    outline = client.get(f"/api/projects/{pid}/outline").json()
+    assert outline["edited"] is False and [b["beat"] for b in outline["outline"]["beats"]] == [
+        "hook",
+        "development",
+        "ending",
+    ]
+    first = outline["outline"]["beats"][0]
+    edit = [{**first, "beat": "opening", "target_s": 5, "focus": "我改的"}]
+    edit += [{**b, "target_s": 5} for b in outline["outline"]["beats"][1:]]
+    assert client.put(f"/api/projects/{pid}/outline", json={"beats": edit}).status_code == 200
+
+    client.post(f"/api/projects/{pid}/script:generate")
+    drain(services)
+    script = client.get(f"/api/projects/{pid}/script").json()
+    assert [b["beat"] for b in script["outline"]] == ["opening", "development", "ending"]
+    assert script["segments"][0]["beat"] == "opening"
+
+    # dropping the edit goes back to the generated outline, and the next script follows it
+    client.delete(f"/api/projects/{pid}/outline")
+    client.post(f"/api/projects/{pid}/script:generate")
+    drain(services)
+    assert client.get(f"/api/projects/{pid}/script").json()["segments"][0]["beat"] == "hook"
 
 
 # --- jobs -------------------------------------------------------------------------------

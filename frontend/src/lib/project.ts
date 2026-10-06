@@ -14,7 +14,7 @@ export type StepState =
   | { kind: "failed"; job: Job }
   | { kind: "none" };
 
-const DEFAULTS = { minutes: 3, voice: null, style: "neutral", spoil_ending: true };
+const DEFAULTS = { minutes: 3, voice: null, style: "suspense", spoil_ending: true };
 
 /** The project's options with the schema defaults filled in. */
 export function optionsOf(detail: ProjectDetail): Required<Pick<ProjectOptions, "minutes" | "style" | "spoil_ending">> & {

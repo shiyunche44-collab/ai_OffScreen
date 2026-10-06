@@ -584,8 +584,6 @@ export interface paths {
         /**
          * Get Script
          * @description A version of the commentary text (default: the current one); 404 until there is one.
-         *     Until the writing step stores its output in the document history, the generated draft is
-         *     served as the current version.
          */
         get: operations["get_script_api_projects__project_id__script_get"];
         /**
@@ -1144,7 +1142,7 @@ export interface components {
             spoil_ending: boolean;
             /**
              * Style
-             * @default neutral
+             * @default suspense
              */
             style: string;
             /** Voice */

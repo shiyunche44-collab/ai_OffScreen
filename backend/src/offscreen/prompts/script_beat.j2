@@ -1,0 +1,29 @@
+{# version: 1 #}
+现在写第 {{ index }} 节（共 {{ count }} 节）：{{ beat }}
+{% if focus %}
+这一节要讲：{{ focus }}
+{% endif %}
+{% if purpose %}
+这一节的作用：{{ purpose }}
+{% endif %}
+依据的场景：{{ scene_refs | join("、") }}（也可以引用其他场景里确实发生过的事，但必须在 scene_refs 里标出）
+{% if is_first %}
+这是全文的开头，要先抓住人。可以这样开场：
+{% for h in hook_types %}
+- {{ h }}
+{% endfor %}
+不要从「这部电影讲了」开始。
+{% endif %}
+{% if is_last %}
+这是全文的最后一节，要把故事收住。
+{% endif %}
+{% if previous %}
+前面已经写好的内容（接着它往下写，不要重复）：
+{% for text in previous %}
+{{ text }}
+{% endfor %}
+{% endif %}
+
+长度：这一节约 {{ target_chars }} 字（允许 {{ min_chars }}–{{ max_chars }} 字；标点和空格不计），分成 {{ approx_segments }} 段左右，每段 {{ min_seg }}–{{ max_seg }} 字。
+
+只输出这一节的 JSON：{"segments": [{"text": "…", "scene_refs": ["sc_…"]}]}

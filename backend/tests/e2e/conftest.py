@@ -130,16 +130,28 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             ]
         }
 
-    def script(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+    def script_outline(_t: str, m: Any, _s: Any) -> dict[str, Any]:
         found = ids(m)
-        target = int(re.search(r"全文约 (\d+) 字", m[0].content).group(1))  # type: ignore[union-attr]
-        per = target // 3
+        total = int(re.search(r"解说总时长：(\d+) 秒", m[0].content).group(1))  # type: ignore[union-attr]
+        per = total // 3
         return {
-            "segments": [
-                {"beat": b, "text": "字" * (per - 1) + "。", "scene_refs": [found[i % len(found)]]}
+            "beats": [
+                {
+                    "beat": b,
+                    "focus": f"讲{b}",
+                    "scene_refs": [found[i % len(found)]],
+                    "target_s": per,
+                }
                 for i, b in enumerate(["hook", "development", "ending"])
             ]
         }
+
+    def script(_t: str, m: Any, _s: Any) -> dict[str, Any]:
+        """One beat per call: a single segment of exactly the asked length."""
+        text = m[0].content
+        chars = int(re.search(r"这一节约 (\d+) 字", text).group(1))  # type: ignore[union-attr]
+        refs = re.search(r"依据的场景：(sc_\d+)", text).group(1)  # type: ignore[union-attr]
+        return {"segments": [{"text": "字" * (chars - 1) + "。", "scene_refs": [refs]}]}
 
     return FakeLLM(
         {
@@ -147,6 +159,7 @@ def scripted_llm(recorder: Recorder | None = None) -> FakeLLM:
             "scene_segment": scene_segment,
             "story": story,
             "character_name": character_name,
+            "script_outline": script_outline,
             "script_write": script,
         },
         recorder=recorder,
@@ -177,6 +190,7 @@ def cfg(tmp_path: Path) -> AppConfig:
                     "scene_segment",
                     "story",
                     "character_name",
+                    "script_outline",
                     "script_write",
                 )
             },

@@ -1211,7 +1211,7 @@
             "type": "boolean"
           },
           "style": {
-            "default": "neutral",
+            "default": "suspense",
             "minLength": 1,
             "title": "Style",
             "type": "string"
@@ -4666,7 +4666,7 @@
     },
     "/api/projects/{project_id}/script": {
       "get": {
-        "description": "A version of the commentary text (default: the current one); 404 until there is one.\nUntil the writing step stores its output in the document history, the generated draft is\nserved as the current version.",
+        "description": "A version of the commentary text (default: the current one); 404 until there is one.",
         "operationId": "get_script_api_projects__project_id__script_get",
         "parameters": [
           {

@@ -18,7 +18,7 @@ function detail(opts: { cached?: string[]; video?: string | null; options?: obje
       id: "prj_1",
       asset_id: "ast_1",
       name: "三分钟版",
-      options: (options ?? { minutes: 0.25, voice: null, style: "neutral", spoil_ending: true }) as ProjectDetail["project"]["options"],
+      options: (options ?? { minutes: 0.25, voice: null, style: "suspense", spoil_ending: true }) as ProjectDetail["project"]["options"],
       created_at: "2026-10-05T08:00:00Z",
     },
     stages: STAGES.map((stage) => ({ stage, cached: cached.includes(stage) })),
@@ -26,7 +26,7 @@ function detail(opts: { cached?: string[]; video?: string | null; options?: obje
   };
 }
 
-const jobFor = (stage: string, o: Partial<Job> = {}, options: object = { minutes: 0.25, voice: null, style: "neutral", spoil_ending: true }) =>
+const jobFor = (stage: string, o: Partial<Job> = {}, options: object = { minutes: 0.25, voice: null, style: "suspense", spoil_ending: true }) =>
   job({ id: `job_${stage}`, stage, scope: { asset_id: "ast_1", options }, ...o });
 
 const script = {
@@ -36,7 +36,7 @@ const script = {
   version: 1,
   parent_version: null,
   author: "ai",
-  params: { style: "neutral", target_duration_s: 15, voice_id: "v" },
+  params: { style: "suspense", target_duration_s: 15, voice_id: "v" },
   outline: [],
   segments: [
     { id: "seg_01", kind: "narration", beat: "hook", text: "她站在荒原上，喊着那个名字。", scene_refs: ["sc_001"], line_refs: [] },
@@ -57,7 +57,7 @@ describe("stepState", () => {
   });
 
   it("ignores a job of the same film run with other options", () => {
-    const other = jobFor("creation.script", { status: "running" }, { minutes: 5, voice: null, style: "neutral", spoil_ending: true });
+    const other = jobFor("creation.script", { status: "running" }, { minutes: 5, voice: null, style: "suspense", spoil_ending: true });
     expect(stepState("creation.script", detail(), [other]).kind).toBe("none");
   });
 
@@ -74,7 +74,7 @@ describe("stepState", () => {
   });
 
   it("treats a missing voice like null", () => {
-    const j = jobFor("creation.plan", { status: "queued" }, { minutes: 0.25, style: "neutral", spoil_ending: true });
+    const j = jobFor("creation.plan", { status: "queued" }, { minutes: 0.25, style: "suspense", spoil_ending: true });
     expect(stepState("creation.plan", detail(), [j]).kind).toBe("queued");
   });
 });
@@ -83,7 +83,7 @@ describe("helpers", () => {
   it("fills in default options", () => {
     const bare = detail();
     delete (bare.project as { options?: unknown }).options;
-    expect(optionsOf(bare)).toEqual({ minutes: 3, voice: null, style: "neutral", spoil_ending: true });
+    expect(optionsOf(bare)).toEqual({ minutes: 3, voice: null, style: "suspense", spoil_ending: true });
   });
 
   it("builds file URLs with each path segment encoded", () => {
@@ -99,7 +99,7 @@ describe("project page", () => {
     stubApi({ ...base, "GET /api/jobs": () => json([]), "GET /api/projects/prj_1": () => json(detail({ cached: ["analysis.story"] })) });
     renderWithProviders(<App />, "/projects/prj_1");
     expect(await screen.findByRole("heading", { name: "三分钟版" })).toBeInTheDocument();
-    expect(screen.getByText(/0\.25 分钟 · 风格 neutral · 音色 默认 · 含结局/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.25 分钟 · 风格 suspense · 音色 默认 · 含结局/)).toBeInTheDocument();
     const steps = within(screen.getByRole("list", { name: "流程" })).getAllByRole("listitem");
     expect(steps.map((s) => s.getAttribute("aria-label"))).toEqual(["分析影片", "解说文案", "剪辑计划与配音", "渲染成片"]);
     const analysis = screen.getByRole("listitem", { name: "分析影片" });
