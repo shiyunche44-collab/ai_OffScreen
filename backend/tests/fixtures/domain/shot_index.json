@@ -1,0 +1,18 @@
+{
+  "asset_id": "ast_sintel01",
+  "image_model": "sentence-transformers/clip-ViT-B-32+clip-ViT-B-32-multilingual-v1@1",
+  "schema_version": 1,
+  "shots": [
+    {
+      "brightness": 0.41,
+      "caption": "女孩跪在雪地里，抱着受伤的小龙。动作：抱起。情绪：悲伤",
+      "end_ms": 1237100,
+      "is_credits": false,
+      "scene_id": "sc_031",
+      "sharpness": 0.82,
+      "shot_id": "sh_0412",
+      "start_ms": 1234000
+    }
+  ],
+  "text_model": "sentence-transformers/-+BAAI/bge-m3@1"
+}

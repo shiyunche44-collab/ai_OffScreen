@@ -7,6 +7,7 @@ dependencies = [
   "fastapi>=0.142.2",
   "httpx>=0.27",
   "jinja2>=3.1",
+  "lancedb>=0.39.0",
   "numpy>=2.4.6",
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
@@ -63,7 +64,8 @@ strict = true
 
 [[tool.mypy.overrides]]
 module = ["scenedetect", "scenedetect.*", "faster_whisper", "faster_whisper.*",
-  "insightface", "insightface.*", "cv2", "cv2.*"]
+  "insightface", "insightface.*", "cv2", "cv2.*", "sentence_transformers",
+  "sentence_transformers.*", "PIL", "PIL.*", "pyarrow", "pyarrow.*", "lancedb", "lancedb.*"]
 ignore_missing_imports = true  # no type information / not installed by default
 
 [tool.pytest.ini_options]
@@ -126,7 +128,7 @@ source_modules = [
 ]
 forbidden_modules = [
   "anthropic", "openai", "faster_whisper", "insightface", "edge_tts", "demucs",
-  "scenedetect", "lancedb",
+  "scenedetect", "lancedb", "sentence_transformers",
 ]
 allow_indirect_imports = true  # importing an adapter (services wiring) is fine; the SDK itself is not
 

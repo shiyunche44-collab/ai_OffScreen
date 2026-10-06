@@ -211,7 +211,13 @@ M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l
 - 关键帧是 540p 代理上取的缩略图，小脸（面积 < 画面 0.4%）会被阶段丢弃；动画片的脸检测效果未验证（Sintel 待测）
 - 依赖不在默认安装里（和 faster-whisper 一样按需装）：`uv pip install insightface onnxruntime`
 
-## 7. 云环境网络备注
+## 7. 向量模型（sentence-transformers，本地；M3-10）
+
+- 图像：`clip-ViT-B-32`（关键帧）；查询文本：`clip-ViT-B-32-multilingual-v1`（与图像同空间，支持中文）；描述文本：`BAAI/bge-m3`。都通过 `sentence-transformers` 加载，首次使用从 Hugging Face 下载。
+- **未实测**：M3-10 开发所在的云环境网络策略拒绝 huggingface.co（403，镜像站也不通），所以没有跑过真实模型，也没有测过「龙在天上飞」的检索质量；适配器只用替身模型测过，索引与融合用真实的 LanceDB 测过。要验证需要能访问模型下载的环境，装 `sentence-transformers`。
+- 依赖：`lancedb` 在默认依赖里（轻量）；`sentence-transformers`（含 torch，约数 GB）按需装。
+
+## 8. 云环境网络备注
 
 - 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
 - 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）

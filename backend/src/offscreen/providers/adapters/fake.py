@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import wave
 from collections import defaultdict, deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -152,3 +152,51 @@ class FakeFaceAnalyzer:
     def detect_and_embed(self, image: Path) -> list[DetectedFace]:
         self.images.append(image)
         return self._faces_in(image)
+
+
+class FakeEmbedder:
+    """Offline embeddings: texts become a hashed bag of character 1-3-grams (so texts that share
+    words are close, deterministic); images come from `image_of(path)` (default: from the file's
+    bytes). Records what it was asked to embed."""
+
+    def __init__(
+        self,
+        dim: int = 256,
+        *,
+        image_of: Callable[[Path], str] | None = None,
+        id: str = "fake-embedder@1",
+        images: bool = True,
+    ) -> None:
+        self._dim = dim
+        self._image_of = image_of
+        self.id = id
+        self._images = images
+        self.image_calls: list[list[Path]] = []
+        self.text_calls: list[list[str]] = []
+
+    @property
+    def dim(self) -> int:
+        return self._dim
+
+    def _vector(self, text: str) -> list[float]:
+        import hashlib
+        import math
+
+        v = [0.0] * self._dim
+        grams = [text[i : i + n] for n in (1, 2, 3) for i in range(max(1, len(text) - n + 1))]
+        for g in grams:
+            h = int.from_bytes(hashlib.sha256(g.encode()).digest()[:4], "big")
+            v[h % self._dim] += 1.0
+        norm = math.sqrt(sum(x * x for x in v)) or 1.0
+        return [x / norm for x in v]
+
+    def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
+        self.text_calls.append(list(texts))
+        return [self._vector(t) for t in texts]
+
+    def embed_images(self, images: Sequence[Path]) -> list[list[float]]:
+        if not self._images:
+            raise RuntimeError("this embedder embeds text only")
+        self.image_calls.append(list(images))
+        of = self._image_of or (lambda p: p.read_bytes().hex())
+        return [self._vector(of(p)) for p in images]

@@ -1,0 +1,119 @@
+{
+  "$defs": {
+    "ShotIndexEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "brightness": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Brightness",
+          "type": "number"
+        },
+        "caption": {
+          "default": "",
+          "title": "Caption",
+          "type": "string"
+        },
+        "end_ms": {
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "is_credits": {
+          "default": false,
+          "title": "Is Credits",
+          "type": "boolean"
+        },
+        "scene_id": {
+          "anyOf": [
+            {
+              "pattern": "^sc_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scene Id"
+        },
+        "sharpness": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Sharpness",
+          "type": "number"
+        },
+        "shot_id": {
+          "pattern": "^sh_[0-9A-Za-z]+$",
+          "title": "Shot Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shot_id",
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "ShotIndexEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the search over shots reads: one entry per shot, in shot order. The vectors are the\nrows of `image_vectors.npy` / `text_vectors.npy` next to the document (float32, unit length,\nsame order); a file is absent when that embedder was not configured.",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "image_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Image Model"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "shots": {
+      "items": {
+        "$ref": "#/$defs/ShotIndexEntry"
+      },
+      "title": "Shots",
+      "type": "array"
+    },
+    "text_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text Model"
+    }
+  },
+  "required": [
+    "asset_id",
+    "shots"
+  ],
+  "title": "ShotIndex",
+  "type": "object"
+}

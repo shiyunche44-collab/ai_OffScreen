@@ -1435,6 +1435,69 @@
         "title": "ShotCaption",
         "type": "object"
       },
+      "ShotHit": {
+        "properties": {
+          "caption": {
+            "default": "",
+            "title": "Caption",
+            "type": "string"
+          },
+          "end_ms": {
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "scene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Id"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "shot_id": {
+            "title": "Shot Id",
+            "type": "string"
+          },
+          "similarity": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Similarity",
+            "type": "object"
+          },
+          "start_ms": {
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail"
+          }
+        },
+        "required": [
+          "shot_id",
+          "start_ms",
+          "end_ms",
+          "score",
+          "similarity"
+        ],
+        "title": "ShotHit",
+        "type": "object"
+      },
       "ShotQuality": {
         "additionalProperties": false,
         "properties": {
@@ -1456,6 +1519,36 @@
           "brightness"
         ],
         "title": "ShotQuality",
+        "type": "object"
+      },
+      "ShotSearchResult": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/ShotHit"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "rankings": {
+            "description": "Which rankings were used: image, text.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Rankings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "rankings",
+          "hits"
+        ],
+        "title": "ShotSearchResult",
         "type": "object"
       },
       "ShotView": {
@@ -2749,6 +2842,193 @@
           }
         },
         "summary": "Analysis Report",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/shots/search": {
+      "get": {
+        "description": "Shots matching a description, best first (404 until the embeddings stage is built).",
+        "operationId": "search_shots_api_assets__asset_id__shots_search_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "What to look for, in words (Chinese or English).",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "What to look for, in words (Chinese or English).",
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scene_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scene Id"
+            }
+          },
+          {
+            "description": "Shots starting at or after.",
+            "in": "query",
+            "name": "start_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shots starting at or after.",
+              "title": "Start Ms"
+            }
+          },
+          {
+            "description": "Shots ending at or before.",
+            "in": "query",
+            "name": "end_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shots ending at or before.",
+              "title": "End Ms"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_sharpness",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Sharpness"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_brightness",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Brightness"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exclude_credits",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Exclude Credits",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShotSearchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Search Shots",
         "tags": [
           "assets"
         ]

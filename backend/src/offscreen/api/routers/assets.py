@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from offscreen.api.deps import Services
@@ -8,10 +8,12 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.index import Scenes, Story, Transcript
 from offscreen.domain.job import Job
+from offscreen.providers.ports import ShotFilter
 from offscreen.services.characters import CharacterEdit, CharactersView
 from offscreen.services.index import ShotsView
 from offscreen.services.library import AssetDetail, MediaListing
 from offscreen.services.report import AnalysisReport
+from offscreen.services.search import ShotSearchResult
 
 router = APIRouter(prefix="/assets", tags=["assets"], responses=ERROR_RESPONSES)
 
@@ -101,3 +103,32 @@ def edit_character(
     """Rename, ignore, merge or reset one character. Edits go to the revision layer; the AI
     output is untouched. Returns the characters as they now read."""
     return services.characters.edit(asset_id, character_id, change)
+
+
+@router.get("/{asset_id}/shots/search")
+def search_shots(
+    asset_id: str,
+    services: Services,
+    q: str = Query(min_length=1, description="What to look for, in words (Chinese or English)."),
+    limit: int = Query(default=10, ge=1, le=100),
+    scene_id: str | None = None,
+    start_ms: int | None = Query(default=None, ge=0, description="Shots starting at or after."),
+    end_ms: int | None = Query(default=None, ge=0, description="Shots ending at or before."),
+    min_sharpness: float | None = Query(default=None, ge=0, le=1),
+    min_brightness: float | None = Query(default=None, ge=0, le=1),
+    exclude_credits: bool = True,
+) -> ShotSearchResult:
+    """Shots matching a description, best first (404 until the embeddings stage is built)."""
+    return services.search.search(
+        asset_id,
+        q,
+        limit=limit,
+        where=ShotFilter(
+            scene_id=scene_id,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            min_sharpness=min_sharpness,
+            min_brightness=min_brightness,
+            exclude_credits=exclude_credits,
+        ),
+    )

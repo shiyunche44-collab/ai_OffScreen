@@ -11,6 +11,7 @@ from offscreen.services.jobs import JobService
 from offscreen.services.library import LibraryService
 from offscreen.services.pipeline import Providers
 from offscreen.services.report import ReportService
+from offscreen.services.search import SearchService
 from offscreen.store.db import Database
 
 
@@ -23,6 +24,7 @@ class AppServices:
         self.library = LibraryService(cfg, self.db, self.jobs)
         self.characters = CharacterService(cfg, self.db, self.jobs)
         self.index = IndexService(cfg, self.db, self.jobs)
+        self.search = SearchService(cfg, self.db, self.jobs)
         self.report = ReportService(cfg, self.db, self.jobs)
         self.files = FileService(cfg)
 

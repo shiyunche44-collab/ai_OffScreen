@@ -19,10 +19,12 @@ from offscreen.media.probe import ProbeError
 from offscreen.providers.adapters.faster_whisper_asr import FasterWhisperAsr
 from offscreen.providers.adapters.insightface_faces import InsightFaceAnalyzer
 from offscreen.providers.adapters.scenedetect_adapter import SceneDetectShots
+from offscreen.providers.adapters.st_embedder import SentenceTransformerEmbedder
 from offscreen.providers.ports import (
     ASR,
     LLM,
     TTS,
+    Embedder,
     FaceAnalyzer,
     LLMError,
     ShotDetector,
@@ -32,6 +34,7 @@ from offscreen.services.llm import build_llm, task_models
 from offscreen.services.tts import build_tts
 from offscreen.stages.analysis.captions import DEFAULT_BATCH, CaptionsError, CaptionsStage
 from offscreen.stages.analysis.characters import CharactersError, CharactersStage
+from offscreen.stages.analysis.embeddings import EmbeddingsError, EmbeddingsStage
 from offscreen.stages.analysis.faces import FacesError, FacesStage
 from offscreen.stages.analysis.ingest import IngestError, ingest
 from offscreen.stages.analysis.keyframes import KeyframesStage
@@ -53,8 +56,9 @@ DEFAULT_STYLE = "neutral"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
     ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, CharactersError,
-    TranscriptError, StoryError, ScriptError, CaptionsError, ScenesError, PlanError,
-    CompileStageError, RenderError, FFmpegError, FFmpegCanceled, LLMError, TTSError, ValueError,
+    EmbeddingsError, TranscriptError, StoryError, ScriptError, CaptionsError, ScenesError,
+    PlanError, CompileStageError, RenderError, FFmpegError, FFmpegCanceled, LLMError, TTSError,
+    ValueError,
 )  # fmt: skip
 """Failures with a message meant for the person at the terminal (not bugs)."""
 
@@ -71,6 +75,10 @@ class Providers:
     """None: the transcript stage needs an external subtitle file."""
     faces: FaceAnalyzer | None = None
     """None: the faces stage cannot run."""
+    image_embedder: Embedder | None = None
+    """Embeds keyframes and, into the same space, search queries."""
+    text_embedder: Embedder | None = None
+    """Embeds shot descriptions and search queries as text."""
 
 
 @dataclass(frozen=True)
@@ -104,12 +112,27 @@ def build_providers(cfg: AppConfig, db: Database) -> Providers:
     asr: ASR | None = None
     if cfg.asr.provider == "faster_whisper":
         asr = FasterWhisperAsr(cfg.asr.model, device=cfg.asr.device)
+    emb = cfg.embeddings
+    image_embedder = (
+        SentenceTransformerEmbedder(
+            emb.image_text_model, image_model=emb.image_model, device=emb.device
+        )
+        if emb.image_model
+        else None
+    )
+    text_embedder = (
+        SentenceTransformerEmbedder(emb.caption_model, device=emb.device)
+        if emb.caption_model
+        else None
+    )
     return Providers(
         llm=build_llm(cfg, db),
         tts=build_tts(cfg),
         detector=SceneDetectShots(),
         asr=asr,
         faces=InsightFaceAnalyzer(cfg.faces.model, device=cfg.faces.device),
+        image_embedder=image_embedder,
+        text_embedder=text_embedder,
     )
 
 
@@ -170,6 +193,7 @@ class Pipeline:
             FacesStage(p.faces),
             CharactersStage(),
             NamingStage(p.llm, models),
+            EmbeddingsStage(p.image_embedder, p.text_embedder),
             CaptionsStage(
                 p.llm,
                 models,

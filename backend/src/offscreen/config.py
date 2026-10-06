@@ -69,6 +69,21 @@ class FacesCfg(_Cfg):
     """Face detection on keyframes is light work; the CPU is fine."""
 
 
+class EmbeddingsCfg(_Cfg):
+    """Vectors for searching shots by what they show (ARCHITECTURE §7.1, embeddings). A picture
+    and a sentence are compared in a joint image-text space; the captions are also searched as
+    text. Either side can be switched off with null."""
+
+    provider: Literal["sentence_transformers"] = "sentence_transformers"
+    image_model: str | None = "clip-ViT-B-32"
+    """Embeds the keyframes."""
+    image_text_model: str = "clip-ViT-B-32-multilingual-v1"
+    """Embeds the query into the same space as `image_model` (multilingual: Chinese works)."""
+    caption_model: str | None = "BAAI/bge-m3"
+    """Embeds the shot descriptions and the query as text."""
+    device: Literal["cuda", "cpu"] = "cpu"
+
+
 class TtsCfg(_Cfg):
     provider: str = "minimax"
     model: str = "speech-2.8-hd"
@@ -96,6 +111,7 @@ class AppConfig(_Cfg):
     tasks: dict[str, TaskCfg] = {}
     asr: AsrCfg = AsrCfg()
     faces: FacesCfg = FacesCfg()
+    embeddings: EmbeddingsCfg = EmbeddingsCfg()
     tts: TtsCfg = TtsCfg()
     budget: BudgetCfg = BudgetCfg()
     worker: WorkerCfg = WorkerCfg()

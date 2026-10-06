@@ -57,6 +57,13 @@ faces:
   model: buffalo_l
   device: cpu             # 关键帧上检测，CPU 够用；有 GPU 可改 cuda（装 onnxruntime-gpu）
 
+embeddings:             # 按画面描述搜镜头（search_shots）；任一项设为 null 即关闭那一路
+  provider: sentence_transformers   # 本地；需要 sentence-transformers（含 torch），首次使用下载模型
+  image_model: clip-ViT-B-32                     # 关键帧 -> 向量
+  image_text_model: clip-ViT-B-32-multilingual-v1 # 查询 -> 同一个空间（支持中文）
+  caption_model: BAAI/bge-m3                     # 镜头描述 / 查询 -> 文本向量
+  device: cpu
+
 tts:
   provider: minimax
   model: speech-2.8-hd

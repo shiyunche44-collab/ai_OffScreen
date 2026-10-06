@@ -349,6 +349,8 @@ ai_OffScreen/
 
 `characters` 阶段（M3-08）把特征聚成人物（相似度合并，不依赖 HDBSCAN）：`ch_01` 是出现最多的人；太小或只在一个镜头出现的簇算路人 / 误检，不成为人物。产物：`characters.json`（人数、`centroid_ref` = `centroids.npy#行号`、最多 3 张从关键帧裁出的缩略图 `faces/<id>_<n>.jpg`，名字留空）、填了 `character_id` 的 `faces.json`、`cast.json`（每个镜头出现的人物及其占该镜头人脸面积的比例，下游只读它而不碰人脸）、`centroids.npy`。
 
+`embeddings` 阶段（M3-10）：每个镜头的中间关键帧经图像嵌入器（图文联合模型，句子可以和画面直接比较），描述（所见 + 动作 + 情绪）经文本嵌入器，各得一个单位向量；任一路可关。产物是确定性的 `shot_index.json`（每镜头的过滤字段和描述）+ `image_vectors.npy` / `text_vectors.npy`（同序）。可搜索的 LanceDB 索引是**派生物**：第一次搜索时由这个产物在 `data/index/{asset_id}/` 下建出（产物变了就重建，丢了无损失）。过滤条件在排名之前生效。
+
 `naming` 阶段（M3-09，任务 `character_name`，一次请求）：把每个人物的几张脸部截图、几个代表镜头（时间、描述、附近台词）和全片台词交给模型，问「这是谁」。名字必须附 `evidence`——逐字摘自台词的原句，校验不过的名字有一轮修正机会，仍不过就不保留（人物留空，由人来命名；不靠演员表或外部知识猜）。`name_source = "ai"`。产物是一份自包含的 `characters.json`（缩略图和 `centroids.npy` 一并复制）。
 
 **人工修订**存在 `data/overrides/{asset_id}/characters.overrides.json`，AI 产物不动。每条修订（名字 / 别名 / 忽略 / 合并到）带着当时的人脸簇中心（`centroid`、`merged_into_centroid`）：重聚类会让编号变化，读取和编辑时先按簇中心相似度（余弦 ≥ 0.6，一对一）把修订重新对应到现在的人物，对不上任何人的修订原样留在文件里（`unmatched_edits`），人物回来时还能对上。读取（`GET /assets/{id}/index/characters`）时合并：人工名字优先（`name_source = "human"`），忽略的不显示，合并的并入目标并累加人脸数。
@@ -765,6 +767,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | GET | `/assets`, `/assets/{id}` | 列表 / 详情（含各分析阶段状态） |
 | POST | `/assets/{id}/analyze` | 提交分析（可指定目标阶段） |
 | GET | `/assets/{id}/report` | 分析报告：各阶段耗时、模型调用与 token / 费用、镜头 / 台词 / 场景 / 人物数量 |
+| GET | `/assets/{id}/shots/search?q=` | 按画面描述搜镜头：`limit`、`scene_id`、`start_ms` / `end_ms`、`min_sharpness` / `min_brightness`、`exclude_credits`（默认排除片头片尾）；查询同时走图像空间和描述文本两路，倒数排名融合 |
 | GET | `/assets/{id}/index/{part}` | 读 transcript / shots / scenes / story（四个独立路由，各有类型；未构建 404）。`shots` 是展示视图：关键帧、雪碧图位置、镜头描述、代理视频路径（相对 data 目录，经 `/files` 取）。`characters` 是已合并人工修订的视图（名字、忽略、合并；见 §7 命名与修订） |
 | POST | `/assets/{id}/characters:build` | 人脸检测 → 聚类 → 命名（连同它需要的分析）→ job；不在「分析」按钮的链里，因为人脸检测慢（CPU 上两小时电影约 25 分钟） |
 | PATCH | `/assets/{id}/characters/{cid}` | 改名 / 别名 / 忽略 / 合并 / 还原（写 overrides），返回合并后的人物视图 |

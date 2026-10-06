@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, TypeVar
@@ -96,6 +96,84 @@ class FaceAnalyzer(Protocol):
     def detect_and_embed(self, image: Path) -> list[DetectedFace]:
         """Every face in the image file, with its feature vector. May be empty. Raises
         RuntimeError when the engine is not installed or the image cannot be read."""
+        ...
+
+
+class Embedder(Protocol):
+    @property
+    def id(self) -> str:
+        """Engine, model(s) and settings; part of the cache key of anything embedded."""
+        ...
+
+    @property
+    def dim(self) -> int:
+        """Length of every vector this embedder returns."""
+        ...
+
+    def embed_images(self, images: Sequence[Path]) -> list[list[float]]:
+        """One unit-length vector per image file. Raises RuntimeError if the engine is not
+        installed, does not embed images, or a file cannot be read."""
+        ...
+
+    def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
+        """One unit-length vector per text. For a joint image-text model these live in the same
+        space as the image vectors (so a sentence can be compared with a picture)."""
+        ...
+
+
+@dataclass(frozen=True)
+class ShotFilter:
+    """What a shot search is limited to (all given conditions must hold)."""
+
+    scene_id: str | None = None
+    start_ms: int | None = None
+    """Only shots starting at or after this time."""
+    end_ms: int | None = None
+    """Only shots ending at or before this time."""
+    min_sharpness: float | None = None
+    min_brightness: float | None = None
+    exclude_credits: bool = True
+
+
+@dataclass(frozen=True)
+class IndexedShot:
+    """One row of the shot index: what is filtered on, and the vectors searched."""
+
+    shot_id: str
+    scene_id: str | None
+    start_ms: int
+    end_ms: int
+    sharpness: float
+    brightness: float
+    is_credits: bool
+    image: Sequence[float] | None = None
+    text: Sequence[float] | None = None
+
+
+@dataclass(frozen=True)
+class IndexHit:
+    shot_id: str
+    similarity: float
+    """Cosine similarity of the query and the shot's vector."""
+
+
+class VectorIndex(Protocol):
+    def build(self, path: Path, shots: Sequence[IndexedShot]) -> None:
+        """Write the index of `shots` to the directory `path` (replacing what is there). A
+        vector column exists only if every shot has that vector."""
+        ...
+
+    def search(
+        self,
+        path: Path,
+        column: Literal["image", "text"],
+        vector: Sequence[float],
+        *,
+        limit: int,
+        where: ShotFilter,
+    ) -> list[IndexHit]:
+        """The shots nearest to `vector` in `column` that satisfy `where`, best first. Raises
+        LookupError when the index has no such column."""
         ...
 
 

@@ -250,6 +250,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/shots/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Shots
+         * @description Shots matching a description, best first (404 until the embeddings stage is built).
+         */
+        get: operations["search_shots_api_assets__asset_id__shots_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -1050,12 +1070,48 @@ export interface components {
              */
             shot_size: "extreme_close_up" | "close_up" | "medium" | "wide" | "extreme_wide" | "other";
         };
+        /** ShotHit */
+        ShotHit: {
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /** End Ms */
+            end_ms: number;
+            /** Scene Id */
+            scene_id?: string | null;
+            /** Score */
+            score: number;
+            /** Shot Id */
+            shot_id: string;
+            /** Similarity */
+            similarity: {
+                [key: string]: number;
+            };
+            /** Start Ms */
+            start_ms: number;
+            /** Thumbnail */
+            thumbnail?: string | null;
+        };
         /** ShotQuality */
         ShotQuality: {
             /** Brightness */
             brightness: number;
             /** Sharpness */
             sharpness: number;
+        };
+        /** ShotSearchResult */
+        ShotSearchResult: {
+            /** Hits */
+            hits: components["schemas"]["ShotHit"][];
+            /** Query */
+            query: string;
+            /**
+             * Rankings
+             * @description Which rankings were used: image, text.
+             */
+            rankings: string[];
         };
         /** ShotView */
         ShotView: {
@@ -1843,6 +1899,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisReport"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    search_shots_api_assets__asset_id__shots_search_get: {
+        parameters: {
+            query: {
+                /** @description What to look for, in words (Chinese or English). */
+                q: string;
+                limit?: number;
+                scene_id?: string | null;
+                /** @description Shots starting at or after. */
+                start_ms?: number | null;
+                /** @description Shots ending at or before. */
+                end_ms?: number | null;
+                min_sharpness?: number | null;
+                min_brightness?: number | null;
+                exclude_credits?: boolean;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotSearchResult"];
                 };
             };
             /** @description Not found */

@@ -198,6 +198,29 @@ class Cast(Versioned):
     shots: list[ShotCast]
 
 
+class ShotIndexEntry(Strict):
+    shot_id: ShotId
+    scene_id: SceneId | None = None
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    sharpness: Unit = 0.0
+    brightness: Unit = 0.0
+    is_credits: bool = False
+    caption: str = ""
+    """The description the text vector was made from (what a result shows)."""
+
+
+class ShotIndex(Versioned):
+    """What the search over shots reads: one entry per shot, in shot order. The vectors are the
+    rows of `image_vectors.npy` / `text_vectors.npy` next to the document (float32, unit length,
+    same order); a file is absent when that embedder was not configured."""
+
+    asset_id: AssetId
+    image_model: str | None = None
+    text_model: str | None = None
+    shots: list[ShotIndexEntry]
+
+
 # ---- scenes, characters, story ----------------------------------------------
 class Scene(TimeRange):
     id: SceneId
