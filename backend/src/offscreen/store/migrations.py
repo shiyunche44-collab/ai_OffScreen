@@ -151,6 +151,26 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX ix_llm_calls_asset_id ON llm_calls (asset_id)",
         ),
     ),
+    Migration(
+        6,
+        (
+            """
+            CREATE TABLE documents (
+                id TEXT NOT NULL,
+                project_id TEXT NOT NULL REFERENCES projects (id),
+                kind TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                parent_version INTEGER,
+                author TEXT NOT NULL,
+                path TEXT NOT NULL,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY (project_id, kind, version)
+            )
+            """,
+            "ALTER TABLE projects ADD COLUMN current_script_version INTEGER",
+            "ALTER TABLE projects ADD COLUMN current_plan_version INTEGER",
+        ),
+    ),
 )
 
 LATEST_VERSION = MIGRATIONS[-1].version

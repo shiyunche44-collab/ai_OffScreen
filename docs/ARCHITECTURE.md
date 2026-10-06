@@ -747,7 +747,7 @@ data/
 | 表 | 主要字段 |
 |----|---------|
 | `assets` | id, title, source_path, fingerprint, probe_json, created_at |
-| `projects` | id, asset_id, name, options_json（时长 / 音色 / 风格 / 是否剧透）, created_at；`current_script_version`、`current_plan_version` 随版本化文档（M4 / M5）加入 |
+| `projects` | id, asset_id, name, options_json（时长 / 音色 / 风格 / 是否剧透）, created_at；`current_script_version`、`current_plan_version` 是文档的当前版本指针（M4-03），写入时用带条件的 UPDATE 比对 `base_version` 并移动指针 |
 | `documents` | id, project_id, kind(script/plan), version, parent_version, author(ai/human), path, created_at |
 | `artifacts` | cache_key, stage, stage_version, scope, path, content_hash, size, created_at, last_used_at |
 | `jobs` | id, stage, scope_json, lane, status, progress, message, cache_key, attempt, error, log_path, cancel_requested, not_before（重试退避）, heartbeat_at, 时间戳 |
@@ -779,6 +779,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | POST | `/projects` | 新建项目（绑定一个资产） |
 | POST | `/projects/{id}/script:generate` | 生成文案 → job |
 | GET / PUT | `/projects/{id}/script[?version=]` | 读 / 保存新版本（需 `base_version`） |
+| GET | `/projects/{id}/script/versions`, `/projects/{id}/script/diff?a=&b=` | 版本历史（新到旧）/ 两个版本按段对比 |
+| POST | `/projects/{id}/script:restore` | 把旧版本作为新版本取回（历史只增不改；需 `base_version`） |
 | POST | `/projects/{id}/script/segments/{sid}:rewrite` | 单段重写（带指令） |
 | POST | `/projects/{id}/plan:build` | 构建 / 增量更新剪辑计划 → job |
 | GET / PATCH | `/projects/{id}/plan` | 读 / 编辑操作（换镜、裁剪、锁定、重排…，需 `base_version`） |

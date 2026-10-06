@@ -534,9 +534,55 @@ export interface paths {
         };
         /**
          * Get Script
-         * @description The generated commentary text; 404 until the script job has run.
+         * @description A version of the commentary text (default: the current one); 404 until there is one.
+         *     Until the writing step stores its output in the document history, the generated draft is
+         *     served as the current version.
          */
         get: operations["get_script_api_projects__project_id__script_get"];
+        /**
+         * Save Script
+         * @description Save an edit as a new version. `base_version` must be the current one (409 otherwise).
+         */
+        put: operations["save_script_api_projects__project_id__script_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/script/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Script Diff
+         * @description Segment-by-segment difference between versions `a` and `b`.
+         */
+        get: operations["script_diff_api_projects__project_id__script_diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/script/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Script Versions
+         * @description The history, newest first.
+         */
+        get: operations["script_versions_api_projects__project_id__script_versions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -556,6 +602,26 @@ export interface paths {
         put?: never;
         /** Generate Script */
         post: operations["generate_script_api_projects__project_id__script_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/script:restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Script
+         * @description Bring an old version back as a new one (the history only grows).
+         */
+        post: operations["restore_script_api_projects__project_id__script_restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -731,6 +797,52 @@ export interface components {
             audio_48k?: string | null;
             /** Proxy */
             proxy?: string | null;
+        };
+        /** DocumentDiff */
+        DocumentDiff: {
+            /** A */
+            a: number;
+            /** B */
+            b: number;
+            /** Changes */
+            changes: components["schemas"]["SegmentChange"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "script" | "plan";
+            /**
+             * Params Changed
+             * @default []
+             */
+            params_changed: string[];
+            /** Reordered */
+            reordered: boolean;
+        };
+        /**
+         * DocumentVersion
+         * @description One entry of a document's history.
+         */
+        DocumentVersion: {
+            /**
+             * Author
+             * @enum {string}
+             */
+            author: "ai" | "human";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "script" | "plan";
+            /** Parent Version */
+            parent_version: number | null;
+            /** Version */
+            version: number;
         };
         /** ErrorBody */
         ErrorBody: {
@@ -1009,6 +1121,40 @@ export interface components {
             /** Transcript Lines */
             transcript_lines?: number | null;
         };
+        /** RestoreScript */
+        RestoreScript: {
+            /**
+             * Base Version
+             * @description The current version, as for a save.
+             */
+            base_version: number | null;
+            /**
+             * Version
+             * @description The old version to bring back as a new one.
+             */
+            version: number;
+        };
+        /** SaveScript */
+        SaveScript: {
+            /**
+             * Annotations
+             * @default []
+             */
+            annotations: components["schemas"]["Annotation"][];
+            /**
+             * Base Version
+             * @description The version this edit started from; null when the project has no script yet. 409 if it is no longer the current one.
+             */
+            base_version: number | null;
+            /**
+             * Outline
+             * @default []
+             */
+            outline: components["schemas"]["OutlineBeat"][];
+            params: components["schemas"]["ScriptParams"];
+            /** Segments */
+            segments: components["schemas"]["ScriptSegment"][];
+        };
         /** Scene */
         Scene: {
             /**
@@ -1133,6 +1279,24 @@ export interface components {
             scene_refs: string[];
             /** Text */
             text: string;
+        };
+        /**
+         * SegmentChange
+         * @description How one segment differs between two versions of a document.
+         */
+        SegmentChange: {
+            /**
+             * Fields
+             * @default []
+             */
+            fields: string[];
+            /** Segment Id */
+            segment_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "added" | "removed" | "changed" | "unchanged";
         };
         /** ShotCaption */
         ShotCaption: {
@@ -2812,7 +2976,9 @@ export interface operations {
     };
     get_script_api_projects__project_id__script_get: {
         parameters: {
-            query?: never;
+            query?: {
+                version?: number | null;
+            };
             header?: never;
             path: {
                 project_id: string;
@@ -2828,6 +2994,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Script"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    save_script_api_projects__project_id__script_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveScript"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Script"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    script_diff_api_projects__project_id__script_diff_get: {
+        parameters: {
+            query: {
+                a: number;
+                b: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDiff"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    script_versions_api_projects__project_id__script_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentVersion"][];
                 };
             };
             /** @description Not found */
@@ -2877,6 +3197,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    restore_script_api_projects__project_id__script_restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreScript"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Script"];
                 };
             };
             /** @description Not found */

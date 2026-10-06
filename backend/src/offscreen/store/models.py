@@ -46,6 +46,25 @@ class ProjectRow(SQLModel, table=True):
     name: str
     options_json: str  # canonical JSON of the domain ProjectOptions
     created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+    current_script_version: int | None = None  # the versioned documents' head (see DocumentRow)
+    current_plan_version: int | None = None
+
+
+class DocumentRow(SQLModel, table=True):
+    """One immutable version of a project's script or plan (ARCHITECTURE §5.4, §9.2). The
+    content is the file at `path`; `id` is the document's own id (`scr_…`), shared by all its
+    versions. The head version is `projects.current_<kind>_version`."""
+
+    __tablename__ = "documents"
+
+    id: str
+    project_id: str = Field(primary_key=True, foreign_key="projects.id")
+    kind: str = Field(primary_key=True)  # "script" | "plan"
+    version: int = Field(primary_key=True)
+    parent_version: int | None = None
+    author: str  # "ai" | "human"
+    path: str  # relative to data_dir
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
 
 
 class JobRow(SQLModel, table=True):

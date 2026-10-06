@@ -82,3 +82,22 @@ class Script(Versioned):
         if self.parent_version is not None and self.parent_version >= self.version:
             raise ValueError("parent_version must be < version")
         return self
+
+
+class ScriptContent(Strict):
+    """What a person (or the writing step) supplies to save a new version: everything of a
+    `Script` except the identity and history, which the document store assigns."""
+
+    params: ScriptParams
+    outline: list[OutlineBeat] = []
+    segments: list[ScriptSegment]
+    annotations: list[Annotation] = []
+
+    @classmethod
+    def of(cls, script: Script) -> ScriptContent:
+        return cls(
+            params=script.params,
+            outline=script.outline,
+            segments=script.segments,
+            annotations=script.annotations,
+        )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from offscreen.config import AppConfig
 from offscreen.services.annotations import AnnotationService
 from offscreen.services.characters import CharacterService
+from offscreen.services.documents import DocumentService
 from offscreen.services.events import JobWatcher
 from offscreen.services.files import FileService
 from offscreen.services.index import IndexService
@@ -23,6 +24,7 @@ class AppServices:
         self.db = Database(cfg.data_dir / "offscreen.db")
         self.jobs = JobService(cfg, providers=providers, db=self.db)
         self.library = LibraryService(cfg, self.db, self.jobs)
+        self.documents = DocumentService(cfg, self.db)
         self.annotations = AnnotationService(cfg, self.db, self.jobs)
         self.characters = CharacterService(cfg, self.db, self.jobs)
         self.index = IndexService(cfg, self.db, self.jobs)

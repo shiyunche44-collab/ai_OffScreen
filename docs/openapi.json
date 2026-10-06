@@ -519,6 +519,106 @@
         "title": "DerivedFiles",
         "type": "object"
       },
+      "DocumentDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "title": "A",
+            "type": "integer"
+          },
+          "b": {
+            "title": "B",
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "script",
+              "plan"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "params_changed": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Params Changed",
+            "type": "array"
+          },
+          "reordered": {
+            "title": "Reordered",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "a",
+          "b",
+          "reordered",
+          "changes"
+        ],
+        "title": "DocumentDiff",
+        "type": "object"
+      },
+      "DocumentVersion": {
+        "additionalProperties": false,
+        "description": "One entry of a document's history.",
+        "properties": {
+          "author": {
+            "enum": [
+              "ai",
+              "human"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "script",
+              "plan"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "parent_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "parent_version",
+          "author",
+          "created_at"
+        ],
+        "title": "DocumentVersion",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -1204,6 +1304,84 @@
         "title": "ReportCounts",
         "type": "object"
       },
+      "RestoreScript": {
+        "properties": {
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current version, as for a save.",
+            "title": "Base Version"
+          },
+          "version": {
+            "description": "The old version to bring back as a new one.",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "base_version"
+        ],
+        "title": "RestoreScript",
+        "type": "object"
+      },
+      "SaveScript": {
+        "additionalProperties": false,
+        "properties": {
+          "annotations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Annotation"
+            },
+            "title": "Annotations",
+            "type": "array"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version this edit started from; null when the project has no script yet. 409 if it is no longer the current one.",
+            "title": "Base Version"
+          },
+          "outline": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OutlineBeat"
+            },
+            "title": "Outline",
+            "type": "array"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ScriptParams"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/ScriptSegment"
+            },
+            "title": "Segments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "params",
+          "segments",
+          "base_version"
+        ],
+        "title": "SaveScript",
+        "type": "object"
+      },
       "Scene": {
         "additionalProperties": false,
         "properties": {
@@ -1490,6 +1668,40 @@
           "text"
         ],
         "title": "ScriptSegment",
+        "type": "object"
+      },
+      "SegmentChange": {
+        "additionalProperties": false,
+        "description": "How one segment differs between two versions of a document.",
+        "properties": {
+          "fields": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "segment_id": {
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "added",
+              "removed",
+              "changed",
+              "unchanged"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "status"
+        ],
+        "title": "SegmentChange",
         "type": "object"
       },
       "ShotCaption": {
@@ -4111,7 +4323,7 @@
     },
     "/api/projects/{project_id}/script": {
       "get": {
-        "description": "The generated commentary text; 404 until the script job has run.",
+        "description": "A version of the commentary text (default: the current one); 404 until there is one.\nUntil the writing step stores its output in the document history, the generated draft is\nserved as the current version.",
         "operationId": "get_script_api_projects__project_id__script_get",
         "parameters": [
           {
@@ -4121,6 +4333,22 @@
             "schema": {
               "title": "Project Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
             }
           }
         ],
@@ -4167,6 +4395,225 @@
           }
         },
         "summary": "Get Script",
+        "tags": [
+          "projects"
+        ]
+      },
+      "put": {
+        "description": "Save an edit as a new version. `base_version` must be the current one (409 otherwise).",
+        "operationId": "save_script_api_projects__project_id__script_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveScript"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Script"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Save Script",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/script/diff": {
+      "get": {
+        "description": "Segment-by-segment difference between versions `a` and `b`.",
+        "operationId": "script_diff_api_projects__project_id__script_diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "a",
+            "required": true,
+            "schema": {
+              "title": "A",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "b",
+            "required": true,
+            "schema": {
+              "title": "B",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDiff"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Script Diff",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/script/versions": {
+      "get": {
+        "description": "The history, newest first.",
+        "operationId": "script_versions_api_projects__project_id__script_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentVersion"
+                  },
+                  "title": "Response Script Versions Api Projects  Project Id  Script Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Script Versions",
         "tags": [
           "projects"
         ]
@@ -4229,6 +4676,79 @@
           }
         },
         "summary": "Generate Script",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/script:restore": {
+      "post": {
+        "description": "Bring an old version back as a new one (the history only grows).",
+        "operationId": "restore_script_api_projects__project_id__script_restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreScript"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Script"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Restore Script",
         "tags": [
           "projects"
         ]
