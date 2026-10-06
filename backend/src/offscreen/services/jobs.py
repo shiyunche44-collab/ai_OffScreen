@@ -34,6 +34,7 @@ from offscreen.services.pipeline import (
 )
 from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.story import StoryStage
+from offscreen.stages.creation.outline import OutlineStage
 from offscreen.stages.creation.plan import PlanStage
 from offscreen.stages.creation.script import ScriptStage
 from offscreen.stages.output.render import RenderStage
@@ -42,13 +43,21 @@ from offscreen.store.repos import AssetRepo, JobRepo
 
 ANALYZE = StoryStage.name  # everything the script writer reads
 IDENTIFY_CHARACTERS = NamingStage.name  # faces, characters and their names
+GENERATE_OUTLINE = OutlineStage.name
 GENERATE_SCRIPT = ScriptStage.name
 BUILD_PLAN = PlanStage.name
 RENDER = RenderStage.name
 
 LOG_TAIL_BYTES = 256 * 1024
 
-USE_CASE_STAGES = (ANALYZE, IDENTIFY_CHARACTERS, GENERATE_SCRIPT, BUILD_PLAN, RENDER)
+USE_CASE_STAGES = (
+    ANALYZE,
+    IDENTIFY_CHARACTERS,
+    GENERATE_OUTLINE,
+    GENERATE_SCRIPT,
+    BUILD_PLAN,
+    RENDER,
+)
 
 _CANCEL_ERRORS = (StageCanceled, FFmpegCanceled, DetectionCanceled, AsrCanceled)
 
@@ -113,6 +122,9 @@ class JobService:
         detection is the heavy part: on the gpu lane when the model runs on the GPU, else cpu."""
         lane: Lane = "gpu" if self.cfg.faces.device == "cuda" else "cpu"
         return self._submit(IDENTIFY_CHARACTERS, asset_id, RunOptions(), lane)
+
+    def generate_outline(self, asset_id: str, opts: RunOptions | None = None) -> Job:
+        return self._submit(GENERATE_OUTLINE, asset_id, _checked(opts), OutlineStage.lane)
 
     def generate_script(self, asset_id: str, opts: RunOptions | None = None) -> Job:
         return self._submit(GENERATE_SCRIPT, asset_id, _checked(opts), ScriptStage.lane)

@@ -40,6 +40,8 @@ def test_the_documented_routes() -> None:
         "/api/assets/{asset_id}/characters/{character_id}",
         "/api/projects",
         "/api/projects/{project_id}",
+        "/api/projects/{project_id}/outline",
+        "/api/projects/{project_id}/outline:generate",
         "/api/projects/{project_id}/script",
         "/api/projects/{project_id}/script/versions",
         "/api/projects/{project_id}/script/diff",

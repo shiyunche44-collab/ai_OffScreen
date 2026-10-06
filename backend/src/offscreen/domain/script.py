@@ -7,6 +7,7 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from offscreen.domain.common import (
+    AssetId,
     LineId,
     ProjectId,
     SceneId,
@@ -32,6 +33,8 @@ class OutlineBeat(Strict):
     beat: str
     scene_refs: list[SceneId] = Field(min_length=1)
     target_s: int = Field(gt=0)
+    focus: str = ""
+    """What this part tells, in a sentence: the instruction the writing step follows."""
 
 
 class ScriptSegment(Strict):
@@ -101,3 +104,26 @@ class ScriptContent(Strict):
             segments=script.segments,
             annotations=script.annotations,
         )
+
+
+class ScriptOutline(Versioned):
+    """The plan of a script before it is written: which beats, which scenes each draws on, how
+    many seconds each gets. A person can edit it before the text is written (ARCHITECTURE §7.2)."""
+
+    asset_id: AssetId
+    style: str
+    target_duration_s: int = Field(gt=0)
+    beats: list[OutlineBeat] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _unique_beats(self) -> Self:
+        names = [b.beat for b in self.beats]
+        if any(not n.strip() for n in names):
+            raise ValueError("beat names must not be empty")
+        if len(names) != len(set(names)):
+            raise ValueError("beat names must be unique")
+        return self
+
+    @property
+    def total_s(self) -> int:
+        return sum(b.target_s for b in self.beats)

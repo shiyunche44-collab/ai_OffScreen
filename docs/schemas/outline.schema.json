@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "OutlineBeat": {
+      "additionalProperties": false,
+      "properties": {
+        "beat": {
+          "title": "Beat",
+          "type": "string"
+        },
+        "focus": {
+          "default": "",
+          "title": "Focus",
+          "type": "string"
+        },
+        "scene_refs": {
+          "items": {
+            "pattern": "^sc_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Scene Refs",
+          "type": "array"
+        },
+        "target_s": {
+          "exclusiveMinimum": 0,
+          "title": "Target S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "beat",
+        "scene_refs",
+        "target_s"
+      ],
+      "title": "OutlineBeat",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The plan of a script before it is written: which beats, which scenes each draws on, how\nmany seconds each gets. A person can edit it before the text is written (ARCHITECTURE §7.2).",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "beats": {
+      "items": {
+        "$ref": "#/$defs/OutlineBeat"
+      },
+      "minItems": 1,
+      "title": "Beats",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "style": {
+      "title": "Style",
+      "type": "string"
+    },
+    "target_duration_s": {
+      "exclusiveMinimum": 0,
+      "title": "Target Duration S",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id",
+    "style",
+    "target_duration_s",
+    "beats"
+  ],
+  "title": "ScriptOutline",
+  "type": "object"
+}

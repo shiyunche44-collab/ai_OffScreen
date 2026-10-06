@@ -1,0 +1,20 @@
+{
+  "asset_id": "ast_demo01",
+  "beats": [
+    {
+      "beat": "hook",
+      "focus": "从龙被带走的一幕开场",
+      "scene_refs": ["sc_040"],
+      "target_s": 15
+    },
+    {
+      "beat": "ending",
+      "focus": "女孩与小龙的结局",
+      "scene_refs": ["sc_041", "sc_042"],
+      "target_s": 45
+    }
+  ],
+  "schema_version": 1,
+  "style": "suspense",
+  "target_duration_s": 60
+}

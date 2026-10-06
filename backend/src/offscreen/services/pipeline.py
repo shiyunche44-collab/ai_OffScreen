@@ -45,6 +45,7 @@ from offscreen.stages.analysis.scenes import ScenesError, ScenesStage
 from offscreen.stages.analysis.shots import ShotsError, ShotsStage
 from offscreen.stages.analysis.story import StoryError, StoryStage
 from offscreen.stages.analysis.transcript import TranscriptError, TranscriptStage
+from offscreen.stages.creation.outline import OutlineError, OutlineSettings, OutlineStage
 from offscreen.stages.creation.plan import PlanError, PlanStage
 from offscreen.stages.creation.script import ScriptError, ScriptSettings, ScriptStage
 from offscreen.stages.output.compile import CompileStage, CompileStageError
@@ -57,9 +58,9 @@ DEFAULT_STYLE = "neutral"
 
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
     ConfigError, IngestError, ProbeError, ProxyError, ShotsError, FacesError, CharactersError,
-    EmbeddingsError, TranscriptError, StoryError, ScriptError, CaptionsError, ScenesError,
-    PlanError, CompileStageError, RenderError, FFmpegError, FFmpegCanceled, LLMError, TTSError,
-    ValueError,
+    EmbeddingsError, TranscriptError, StoryError, OutlineError, ScriptError, CaptionsError,
+    ScenesError, PlanError, CompileStageError, RenderError, FFmpegError, FFmpegCanceled,
+    LLMError, TTSError, ValueError,
 )  # fmt: skip
 """Failures with a message meant for the person at the terminal (not bugs)."""
 
@@ -189,7 +190,15 @@ class Pipeline:
             spoil_ending=opts.spoil_ending,
         )
         models = task_models(
-            cfg, ["story", "script_write", "shot_caption", "scene_segment", "character_name"]
+            cfg,
+            [
+                "story",
+                "script_outline",
+                "script_write",
+                "shot_caption",
+                "scene_segment",
+                "character_name",
+            ],
         )
         caption_task = cfg.tasks.get("shot_caption")
         return [
@@ -208,6 +217,11 @@ class Pipeline:
             ScenesStage(p.llm, models),
             TranscriptStage(self.assets, p.asr),
             StoryStage(p.llm, models),
+            OutlineStage(
+                p.llm,
+                OutlineSettings(script.target_duration_s, opts.style, opts.spoil_ending),
+                models,
+            ),
             ScriptStage(p.llm, script, models),
             PlanStage(p.tts),
             CompileStage(self.assets),

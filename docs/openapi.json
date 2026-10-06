@@ -1076,6 +1076,11 @@
             "title": "Beat",
             "type": "string"
           },
+          "focus": {
+            "default": "",
+            "title": "Focus",
+            "type": "string"
+          },
           "scene_refs": {
             "items": {
               "pattern": "^sc_[0-9A-Za-z]+$",
@@ -1097,6 +1102,28 @@
           "target_s"
         ],
         "title": "OutlineBeat",
+        "type": "object"
+      },
+      "OutlineView": {
+        "properties": {
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "outline": {
+            "$ref": "#/components/schemas/ScriptOutline"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outline",
+          "edited",
+          "total_s"
+        ],
+        "title": "OutlineView",
         "type": "object"
       },
       "Project": {
@@ -1330,6 +1357,23 @@
           "base_version"
         ],
         "title": "RestoreScript",
+        "type": "object"
+      },
+      "SaveOutline": {
+        "properties": {
+          "beats": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineBeat"
+            },
+            "minItems": 1,
+            "title": "Beats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "beats"
+        ],
+        "title": "SaveOutline",
         "type": "object"
       },
       "SaveScript": {
@@ -1566,6 +1610,47 @@
           "segments"
         ],
         "title": "Script",
+        "type": "object"
+      },
+      "ScriptOutline": {
+        "additionalProperties": false,
+        "description": "The plan of a script before it is written: which beats, which scenes each draws on, how\nmany seconds each gets. A person can edit it before the text is written (ARCHITECTURE §7.2).",
+        "properties": {
+          "asset_id": {
+            "pattern": "^ast_[0-9A-Za-z]+$",
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "beats": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineBeat"
+            },
+            "minItems": 1,
+            "title": "Beats",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "style": {
+            "title": "Style",
+            "type": "string"
+          },
+          "target_duration_s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Target Duration S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "style",
+          "target_duration_s",
+          "beats"
+        ],
+        "title": "ScriptOutline",
         "type": "object"
       },
       "ScriptParams": {
@@ -4192,6 +4277,264 @@
           }
         },
         "summary": "Get Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/outline": {
+      "delete": {
+        "description": "Drop the edit and return the generated outline.",
+        "operationId": "reset_outline_api_projects__project_id__outline_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutlineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Reset Outline",
+        "tags": [
+          "projects"
+        ]
+      },
+      "get": {
+        "description": "The outline: the person's edit if there is one, else the generated one; 404 until\ngenerated.",
+        "operationId": "get_outline_api_projects__project_id__outline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutlineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Get Outline",
+        "tags": [
+          "projects"
+        ]
+      },
+      "put": {
+        "description": "Edit the outline before the text is written. Kept apart from the generated one.",
+        "operationId": "save_outline_api_projects__project_id__outline_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOutline"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutlineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Save Outline",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/outline:generate": {
+      "post": {
+        "description": "Propose the script's beats, scenes and timing (after the analysis is done).",
+        "operationId": "generate_outline_api_projects__project_id__outline_generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Generate Outline",
         "tags": [
           "projects"
         ]

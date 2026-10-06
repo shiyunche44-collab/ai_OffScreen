@@ -1,0 +1,45 @@
+{# version: 1 #}
+你是电影解说的编剧。请先为这部电影的解说文案列出大纲（还不要写正文）：决定分几个节拍、每个节拍讲哪些场景、各占多少秒。
+
+风格：{{ style_name }}（{{ style_description }}）
+语气：{{ tone }}
+叙述人称：{{ "第一人称" if perspective == "first" else "第三人称" }}
+解说总时长：{{ target_s }} 秒
+
+这种风格的结构模板（可以按剧情增减节拍，但第一个节拍必须是用来抓人的开场）：
+{% for b in structure %}
+- {{ b.name }}（约 {{ b.seconds }} 秒）：{{ b.purpose }}
+{% endfor %}
+开场可以这样做：
+{% for h in hook_types %}
+- {{ h }}
+{% endfor %}
+
+要求：
+- 节拍名用英文小写字母和下划线，不能重复；按解说的先后顺序排列
+- 每个节拍用 focus 写一句话说明它要讲什么，用 scene_refs 列出它依据的场景（只能用下面出现过的场景编号，不要编造）
+- 各节拍的 target_s 为整数秒，合计约为 {{ target_s }} 秒，每个至少 3 秒
+{% if spoil_ending %}
+- 可以讲出结局
+{% else %}
+- 不要透露结局：最后一个节拍停在高潮之前，留下悬念
+{% endif %}
+- 重要度高的场景多分一些时间；整部电影的主线要讲清楚，枝节可以略去
+
+剧情资料
+一句话：{{ logline }}
+梗概：{{ synopsis }}
+{% if turning_points %}
+关键转折：
+{% for t in turning_points %}
+- {{ t.scene_id }}：{{ t.what }}
+{% endfor %}
+{% endif %}
+{% if spoil_ending and ending %}
+结局：{{ ending }}
+{% endif %}
+
+场景（按时间顺序）：
+{% for s in scenes %}
+{{ s.id }}（{{ s.start }} – {{ s.end }}，重要度 {{ "%.1f" | format(s.importance) }}）{{ s.summary }}
+{% endfor %}

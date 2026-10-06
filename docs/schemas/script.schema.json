@@ -37,6 +37,11 @@
           "title": "Beat",
           "type": "string"
         },
+        "focus": {
+          "default": "",
+          "title": "Focus",
+          "type": "string"
+        },
         "scene_refs": {
           "items": {
             "pattern": "^sc_[0-9A-Za-z]+$",

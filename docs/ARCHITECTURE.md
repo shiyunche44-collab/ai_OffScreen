@@ -732,6 +732,7 @@ data/
 ├── annotations/{asset_id}/             # 人工标注的真值（评估用，不属于任何分析产物）
 │   └── cuts.json                       # 真实切点（帧号）
 ├── projects/{project_id}/
+│   ├── outline.json                    # 大纲的人工修改（生成版在 artifacts/creation.outline/ 里）
 │   ├── docs/script/v{n}.json           # 版本化文档（不可变）
 │   ├── docs/plan/v{n}.json
 │   ├── renders/{render_id}/            # 成片 + render_manifest.json
@@ -777,6 +778,8 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | PATCH | `/assets/{id}/characters/{cid}` | 改名 / 别名 / 忽略 / 合并 / 还原（写 overrides），返回合并后的人物视图 |
 | GET | `/assets/{id}/shots/search?q=` | 文本检索镜头 |
 | POST | `/projects` | 新建项目（绑定一个资产） |
+| POST | `/projects/{id}/outline:generate` | 按风格预设生成大纲（节拍、场景、时长分配）→ job |
+| GET / PUT / DELETE | `/projects/{id}/outline` | 读（有人工修改则返回修改版，`edited=true`）/ 保存人工修改 / 丢弃修改回到生成版；修改存在 `projects/{id}/outline.json`，不在产物里，重新生成不会冲掉 |
 | POST | `/projects/{id}/script:generate` | 生成文案 → job |
 | GET / PUT | `/projects/{id}/script[?version=]` | 读 / 保存新版本（需 `base_version`） |
 | GET | `/projects/{id}/script/versions`, `/projects/{id}/script/diff?a=&b=` | 版本历史（新到旧）/ 两个版本按段对比 |

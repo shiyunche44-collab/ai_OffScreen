@@ -9,8 +9,9 @@ from offscreen.domain.common import AssetId
 from offscreen.domain.document import DocumentDiff, DocumentVersion
 from offscreen.domain.job import Job
 from offscreen.domain.project import Project, ProjectOptions
-from offscreen.domain.script import Script, ScriptContent
+from offscreen.domain.script import OutlineBeat, Script, ScriptContent
 from offscreen.services.library import ProjectDetail
+from offscreen.services.outline import OutlineView
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
 
@@ -82,6 +83,35 @@ def script_diff(project_id: str, a: int, b: int, services: Services) -> Document
 def restore_script(project_id: str, body: RestoreScript, services: Services) -> Script:
     """Bring an old version back as a new one (the history only grows)."""
     return services.documents.restore_script(project_id, body.version, body.base_version)
+
+
+class SaveOutline(BaseModel):
+    beats: list[OutlineBeat] = Field(min_length=1)
+
+
+@router.post("/{project_id}/outline:generate", status_code=202)
+def generate_outline(project_id: str, services: Services) -> Job:
+    """Propose the script's beats, scenes and timing (after the analysis is done)."""
+    return services.outline.generate(project_id)
+
+
+@router.get("/{project_id}/outline")
+def get_outline(project_id: str, services: Services) -> OutlineView:
+    """The outline: the person's edit if there is one, else the generated one; 404 until
+    generated."""
+    return services.outline.get(project_id)
+
+
+@router.put("/{project_id}/outline")
+def save_outline(project_id: str, body: SaveOutline, services: Services) -> OutlineView:
+    """Edit the outline before the text is written. Kept apart from the generated one."""
+    return services.outline.save(project_id, body.beats)
+
+
+@router.delete("/{project_id}/outline")
+def reset_outline(project_id: str, services: Services) -> OutlineView:
+    """Drop the edit and return the generated outline."""
+    return services.outline.reset(project_id)
 
 
 @router.post("/{project_id}/script:generate", status_code=202)

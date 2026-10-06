@@ -491,6 +491,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/outline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outline
+         * @description The outline: the person's edit if there is one, else the generated one; 404 until
+         *     generated.
+         */
+        get: operations["get_outline_api_projects__project_id__outline_get"];
+        /**
+         * Save Outline
+         * @description Edit the outline before the text is written. Kept apart from the generated one.
+         */
+        put: operations["save_outline_api_projects__project_id__outline_put"];
+        post?: never;
+        /**
+         * Reset Outline
+         * @description Drop the edit and return the generated outline.
+         */
+        delete: operations["reset_outline_api_projects__project_id__outline_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/outline:generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Outline
+         * @description Propose the script's beats, scenes and timing (after the analysis is done).
+         */
+        post: operations["generate_outline_api_projects__project_id__outline_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/plan:build": {
         parameters: {
             query?: never;
@@ -1036,10 +1085,23 @@ export interface components {
         OutlineBeat: {
             /** Beat */
             beat: string;
+            /**
+             * Focus
+             * @default
+             */
+            focus: string;
             /** Scene Refs */
             scene_refs: string[];
             /** Target S */
             target_s: number;
+        };
+        /** OutlineView */
+        OutlineView: {
+            /** Edited */
+            edited: boolean;
+            outline: components["schemas"]["ScriptOutline"];
+            /** Total S */
+            total_s: number;
         };
         /** Project */
         Project: {
@@ -1133,6 +1195,11 @@ export interface components {
              * @description The old version to bring back as a new one.
              */
             version: number;
+        };
+        /** SaveOutline */
+        SaveOutline: {
+            /** Beats */
+            beats: components["schemas"]["OutlineBeat"][];
         };
         /** SaveScript */
         SaveScript: {
@@ -1230,6 +1297,26 @@ export interface components {
             segments: components["schemas"]["ScriptSegment"][];
             /** Version */
             version: number;
+        };
+        /**
+         * ScriptOutline
+         * @description The plan of a script before it is written: which beats, which scenes each draws on, how
+         *     many seconds each gets. A person can edit it before the text is written (ARCHITECTURE §7.2).
+         */
+        ScriptOutline: {
+            /** Asset Id */
+            asset_id: string;
+            /** Beats */
+            beats: components["schemas"]["OutlineBeat"][];
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Style */
+            style: string;
+            /** Target Duration S */
+            target_duration_s: number;
         };
         /** ScriptParams */
         ScriptParams: {
@@ -2845,6 +2932,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_outline_api_projects__project_id__outline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    save_outline_api_projects__project_id__outline_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveOutline"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reset_outline_api_projects__project_id__outline_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineView"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_outline_api_projects__project_id__outline_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
                 };
             };
             /** @description Not found */
