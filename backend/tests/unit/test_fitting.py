@@ -1,4 +1,4 @@
-"""Unit and property tests for duration fitting algorithm."""
+"""Unit and property tests for duration fitting."""
 
 from __future__ import annotations
 
@@ -11,168 +11,150 @@ from offscreen.algo.fitting import (
     MAX_SPEED,
     MIN_CLIP_MS,
     MIN_SPEED,
-    Rational,
+    Clip,
     Shot,
     fit_duration,
 )
 
+EPS = 1e-9
+FRAME_MS_24 = 1000 / 24
 
-class TestFitDurationBasic:
-    """Basic fitting scenarios."""
 
-    def test_fit_single_shot_exact(self) -> None:
-        """Fit a single shot with trimming and optional speed adjustment."""
-        shots = [Shot(shot_id="sh_001", available_ms=3000)]
-        target_ms = 2000
+def total_ms(clips: list[Clip]) -> int:
+    return sum(c.playback_duration_ms() for c in clips)
 
-        clips = fit_duration(shots, target_ms)
+
+def check_limits(clips: list[Clip], shots: list[Shot]) -> None:
+    by_id = {s.shot_id: s for s in shots}
+    for c in clips:
+        shot = by_id[c.shot_id]
+        assert MIN_SPEED - EPS <= c.speed <= MAX_SPEED + EPS
+        assert c.source_duration_ms <= MAX_CLIP_MS
+        assert c.source_duration_ms >= min(MIN_CLIP_MS, shot.available_ms)
+        assert shot.start_ms <= c.src_in_ms < c.src_out_ms <= shot.start_ms + shot.available_ms
+
+
+class TestBasic:
+    def test_single_shot_at_normal_speed(self) -> None:
+        clips = fit_duration([Shot("sh_001", 3000)], 2000)
 
         assert len(clips) == 1
-        assert clips[0].playback_duration_ms() == target_ms
-        assert MIN_CLIP_MS <= clips[0].source_duration_ms <= MAX_CLIP_MS
+        assert clips[0].playback_duration_ms() == 2000
+        assert clips[0].speed == pytest.approx(1.0)
 
-    def test_fit_single_shot_with_speed(self) -> None:
-        """Fit by adjusting playback speed."""
-        shots = [Shot(shot_id="sh_001", available_ms=4000)]
-        target_ms = 2000  # need 2x speedup
-
-        clips = fit_duration(shots, target_ms)
+    def test_speed_makes_up_the_difference(self) -> None:
+        clips = fit_duration([Shot("sh_001", 4000)], 4500)  # 4000 ms of footage, slowed 0.89x
 
         assert len(clips) == 1
-        assert clips[0].playback_duration_ms() == target_ms
-        # speed should be 2.0 / 4.0 = 0.5, but that's outside [0.85, 1.15]
-        # so this should have failed... but let me check the logic
+        assert clips[0].playback_duration_ms() == 4500
+        assert MIN_SPEED <= clips[0].speed < 1.0
 
-    def test_fit_multiple_shots(self) -> None:
-        """Fit across multiple shots."""
-        shots = [
-            Shot(shot_id="sh_001", available_ms=3000),
-            Shot(shot_id="sh_002", available_ms=3000),
-        ]
-        target_ms = 3500  # requires parts of both shots
+    def test_long_target_uses_several_shots(self) -> None:
+        shots = [Shot(f"sh_{i}", 3000, start_ms=i * 10_000) for i in range(6)]
 
-        clips = fit_duration(shots, target_ms)
+        clips = fit_duration(shots, 12_000)
 
-        assert len(clips) >= 1
-        total_ms = sum(c.playback_duration_ms() for c in clips)
-        assert total_ms == target_ms
+        assert total_ms(clips) == 12_000
+        assert len(clips) >= 3
+        check_limits(clips, shots)
 
-    def test_fit_target_too_small_single_shot(self) -> None:
-        """Target smaller than MIN_CLIP_MS should fail."""
-        shots = [Shot(shot_id="sh_001", available_ms=5000)]
-        target_ms = 100  # way too small
+    def test_a_segment_length_that_is_not_on_the_frame_grid(self) -> None:
+        shots = [Shot(f"sh_{i}", 3000) for i in range(4)]
 
+        assert total_ms(fit_duration(shots, 5230)) == 5230
+
+    def test_prefers_not_slowing_down_when_more_footage_is_available(self) -> None:
+        shots = [Shot("sh_a", 4000), Shot("sh_b", 4000)]
+
+        clips = fit_duration(shots, 4700)
+
+        assert len(clips) == 2
+        assert all(c.speed >= 1.0 - EPS for c in clips)
+
+    def test_clip_is_cut_from_the_middle_of_the_shot_in_source_time(self) -> None:
+        (clip,) = fit_duration([Shot("sh_a", 10_000, start_ms=50_000)], 2000)
+
+        assert (clip.src_in_ms, clip.src_out_ms) == (50_000 + 4000, 50_000 + 6000)
+
+    def test_short_shot_is_used_whole(self) -> None:
+        shots = [Shot("sh_short", 500, start_ms=1000), Shot("sh_long", 3000)]
+
+        clips = fit_duration(shots, 3000)
+
+        assert clips[0].shot_id == "sh_short"
+        assert (clips[0].src_in_ms, clips[0].src_out_ms) == (1000, 1500)
+        assert total_ms(clips) == 3000
+        check_limits(clips, shots)
+
+    def test_shots_wrap_around_when_there_are_too_few(self) -> None:
+        clips = fit_duration([Shot("sh_a", 2000)], 9000)
+
+        assert total_ms(clips) == 9000
+        assert {c.shot_id for c in clips} == {"sh_a"}
+        assert len(clips) >= 4
+
+    def test_a_gap_the_first_shot_cannot_cover_is_filled_by_a_longer_one(self) -> None:
+        shots = [Shot("sh_short", 800), Shot("sh_long", 4000)]  # 942-1391 ms: not 1 or 2 shorts
+
+        clips = fit_duration(shots, 1000)
+
+        assert total_ms(clips) == 1000
+        assert [c.shot_id for c in clips] == ["sh_long"]
+
+    def test_footage_less_shot_is_skipped(self) -> None:
+        clips = fit_duration([Shot("sh_zero", 0), Shot("sh_a", 3000)], 2000)
+
+        assert [c.shot_id for c in clips] == ["sh_a"]
+
+    def test_target_shorter_than_any_clip_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="cannot fill"):
-            fit_duration(shots, target_ms)
+            fit_duration([Shot("sh_001", 5000)], 100)
 
-    def test_fit_respects_speed_limits(self) -> None:
-        """Fitted clips must have speed in [0.85, 1.15]."""
-        shots = [Shot(shot_id="sh_001", available_ms=4000)]
-        target_ms = 3000  # realistic target
+    def test_no_shots_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="no shots"):
+            fit_duration([], 2000)
+        with pytest.raises(ValueError, match="no shots"):
+            fit_duration([Shot("sh_zero", 0)], 2000)
 
-        clips = fit_duration(shots, target_ms)
-
-        for clip in clips:
-            assert MIN_SPEED <= clip.speed <= MAX_SPEED
-
-    def test_fit_respects_clip_duration_limits(self) -> None:
-        """Each clip source duration must be in [MIN_CLIP_MS, MAX_CLIP_MS]."""
-        shots = [
-            Shot(shot_id="sh_001", available_ms=5000),
-            Shot(shot_id="sh_002", available_ms=5000),
-        ]
-        target_ms = 3500
-
-        clips = fit_duration(shots, target_ms)
-
-        for clip in clips:
-            assert MIN_CLIP_MS <= clip.source_duration_ms <= MAX_CLIP_MS
-
-    def test_fit_middle_extraction(self) -> None:
-        """Clips are extracted from middle of shots (not edges)."""
-        shot = Shot(shot_id="sh_001", available_ms=10000)
-        target_ms = 2000
-
-        clips = fit_duration([shot], target_ms)
-
-        # Clip should start somewhere in the middle, not at 0
-        if clips[0].source_duration_ms < 10000:
-            expected_offset = (10000 - clips[0].source_duration_ms) // 2
-            assert clips[0].src_in_ms >= expected_offset - 100  # allow small rounding error
+    def test_non_positive_target_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            fit_duration([Shot("sh_001", 3000)], 0)
 
 
-class TestFitDurationFrameAccuracy:
-    """Frame-exact duration verification."""
-
-    def test_frame_exact_duration_30fps(self) -> None:
-        """Fitted duration must be frame-exact at 30 fps."""
-        shots = [Shot(shot_id="sh_001", available_ms=3000)]
-        target_ms = 1000  # 30 frames at 30fps
-
-        clips = fit_duration(shots, target_ms, fps=Rational(30, 1))
-
-        # verify: sum of playback durations = target_ms
-        total_ms = sum(c.playback_duration_ms() for c in clips)
-        assert total_ms == target_ms
-
-    def test_frame_exact_duration_24fps(self) -> None:
-        """Fitted duration is frame-exact at 24 fps (film)."""
-        shots = [Shot(shot_id="sh_001", available_ms=2000)]
-        # Target 2000ms at 24fps = 48 frames
-        target_ms = 2000
-
-        clips = fit_duration(shots, target_ms, fps=Rational(24, 1))
-
-        total_ms = sum(c.playback_duration_ms() for c in clips)
-        assert total_ms == target_ms
+# Shortest playback of a full-size clip: ceil(800 / 1.15). Shots of 1.2 s or more leave no gaps
+# between "one clip" and "two clips"; shorter ones can (see the next test).
+MIN_TARGET = 696
 
 
 @given(
-    target_ms=st.integers(min_value=MIN_CLIP_MS, max_value=10000),
-    shot_count=st.integers(min_value=1, max_value=5),
+    target_ms=st.integers(min_value=MIN_TARGET, max_value=30_000),
+    availables=st.lists(st.integers(min_value=1200, max_value=20_000), min_size=1, max_size=6),
 )
-def test_fitting_property_total_duration_matches(target_ms: int, shot_count: int) -> None:
-    """Property: fitted clips' total duration always equals target."""
-    shots = [Shot(shot_id=f"sh_{i:03d}", available_ms=5000) for i in range(shot_count)]
-
-    try:
-        clips = fit_duration(shots, target_ms)
-        total_ms = sum(c.playback_duration_ms() for c in clips)
-        assert total_ms == target_ms, f"got {total_ms}, expected {target_ms}"
-    except ValueError:
-        # Some targets may be unfittable (outside speed/duration ranges)
-        pass
-
-
-@given(
-    target_ms=st.integers(min_value=MIN_CLIP_MS, max_value=5000),
-    shot_count=st.integers(min_value=1, max_value=3),
-)
-def test_fitting_property_all_clips_valid(target_ms: int, shot_count: int) -> None:
-    """Property: all fitted clips respect speed and duration constraints."""
-    shots = [Shot(shot_id=f"sh_{i:03d}", available_ms=4000) for i in range(shot_count)]
-
-    try:
-        clips = fit_duration(shots, target_ms)
-        for clip in clips:
-            assert MIN_SPEED <= clip.speed <= MAX_SPEED
-            assert MIN_CLIP_MS <= clip.source_duration_ms <= MAX_CLIP_MS
-    except ValueError:
-        # Some targets may be unfittable
-        pass
-
-
-def test_fitting_wraps_around_shots() -> None:
-    """Fitting uses available shots in order."""
-    shots = [
-        Shot(shot_id="sh_001", available_ms=2000),
-        Shot(shot_id="sh_002", available_ms=2000),
-    ]
-    target_ms = 2000  # can fit from either shot
+def test_total_duration_equals_the_target_and_limits_hold(
+    target_ms: int, availables: list[int]
+) -> None:
+    shots = [Shot(f"sh_{i:03d}", a, start_ms=i * 100_000) for i, a in enumerate(availables)]
 
     clips = fit_duration(shots, target_ms)
 
-    # Should produce clips that sum to target
-    assert len(clips) >= 1
-    total_ms = sum(c.playback_duration_ms() for c in clips)
-    assert total_ms == target_ms
+    assert abs(total_ms(clips) - target_ms) <= FRAME_MS_24  # in fact exact
+    assert total_ms(clips) == target_ms
+    check_limits(clips, shots)
+
+
+@given(
+    target_ms=st.integers(min_value=1, max_value=30_000),
+    availables=st.lists(st.integers(min_value=1, max_value=20_000), min_size=1, max_size=6),
+)
+def test_short_shots_and_odd_targets_either_fit_exactly_or_are_rejected(
+    target_ms: int, availables: list[int]
+) -> None:
+    shots = [Shot(f"sh_{i:03d}", a) for i, a in enumerate(availables)]
+
+    try:
+        clips = fit_duration(shots, target_ms)
+    except ValueError as e:
+        assert "cannot fill" in str(e)
+        return
+    assert total_ms(clips) == target_ms
+    check_limits(clips, shots)

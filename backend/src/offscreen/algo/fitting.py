@@ -1,181 +1,171 @@
-"""Duration fitting: cut and speed clips to match target duration exactly.
+"""Duration fitting: cut and speed shots so the clips play for exactly the target. Pure.
 
-Given a list of candidate shots and a target duration (in milliseconds),
-select and trim clips from the candidates so their total duration matches
-the target exactly, frame-perfect, accounting for playback speed.
+Given shots in preference order and a target playback duration, choose how many shots to use
+and cut one clip from the middle of each, with a playback speed that makes the durations add
+up to `target_ms` to the millisecond. That is within one frame at any frame rate, and the
+compiler (`algo.compile`) rounds from cumulative time, so no frame grid is needed here.
 
-Constraints:
-- Individual clips: 800–4000 ms at 1x speed
-- Speed range: 0.85–1.15x
-- Total duration: precise to frame (no floating-point error)
-"""
+Constraints: a clip's source length is 800-4000 ms (a shot shorter than 800 ms is used whole),
+and its speed is 0.85-1.15x. A clip therefore plays for `source / speed` ms, anywhere in
+`[smin / 1.15, smax / 0.85]` where `smin`/`smax` are the shortest/longest source lengths the
+shot allows. The playback range of n clips is the sum of those intervals, so a target is
+reachable with n shots exactly when it lies in that sum: the fitter takes the fewest shots
+whose sum contains the target, preferring a count that needs no slow-motion (speed >= 1),
+and spreads the target over them in proportion to each shot's slack.
+
+Shots are used in the order given and wrap around when there are too few (the same shot is
+then cut again, identically). A shot too short to cut is skipped."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NamedTuple
 
 TimeMs = int
-FrameCount = int
 
-
-class Rational(NamedTuple):
-    """Frame rate as num/den (e.g., 30/1 for 30 fps)."""
-
-    num: int
-    den: int
-
-    @property
-    def inverse(self) -> Rational:
-        """Returns den/num (used for ms -> frame conversion)."""
-        return Rational(self.den, self.num)
-
-
-class Duration(NamedTuple):
-    """Duration with both millisecond and frame representations."""
-
-    ms: TimeMs  # source time
-    frames: FrameCount  # at given frame rate
+MIN_CLIP_MS = 800
+MAX_CLIP_MS = 4000
+MIN_SPEED = 0.85
+MAX_SPEED = 1.15
+MAX_CLIPS = 200
+"""Safety bound on the clips of one fit (a 12 s segment needs at most about 18)."""
 
 
 @dataclass(frozen=True)
 class Shot:
-    """Candidate shot: its id and available duration."""
+    """Candidate shot: where it starts in the source and how much footage it has."""
 
     shot_id: str
     available_ms: TimeMs
+    start_ms: TimeMs = 0
 
 
 @dataclass(frozen=True)
 class Clip:
-    """Trimmed clip ready for timeline: source range and playback speed."""
+    """Trimmed clip ready for the plan: absolute source range and playback speed."""
 
     shot_id: str
     src_in_ms: TimeMs
     src_out_ms: TimeMs
-    speed: float  # 1.0 = original, 0.85–1.15 range
+    speed: float  # 1.0 = original, 0.85-1.15 range
 
     @property
     def source_duration_ms(self) -> TimeMs:
         return self.src_out_ms - self.src_in_ms
 
     def playback_duration_ms(self) -> TimeMs:
-        """Duration at playback speed (before frame rounding)."""
+        """Duration at playback speed."""
         return round(self.source_duration_ms / self.speed)
 
 
-MIN_CLIP_MS = 800
-MAX_CLIP_MS = 4000
-MIN_SPEED = 0.85
-MAX_SPEED = 1.15
+@dataclass(frozen=True)
+class _Slot:
+    shot: Shot
+    smin: int  # shortest / longest source length that may be cut from the shot
+    smax: int
+    dmin: int  # playback range this shot can cover
+    dmax: int
+
+    @property
+    def dnat(self) -> int:
+        """Longest playback without slow-motion."""
+        return self.smax
 
 
-def fit_duration(shots: list[Shot], target_ms: TimeMs, fps: Rational | None = None) -> list[Clip]:
-    """Fit shots to exact target duration by trimming and speed adjustment.
+def fit_duration(shots: list[Shot], target_ms: TimeMs) -> list[Clip]:
+    """Clips from `shots` whose playback durations add up to `target_ms` exactly.
 
-    Args:
-        shots: candidate shots in preference order (best first)
-        target_ms: exact target duration in milliseconds
-        fps: frame rate (default 30/1); used to verify frame-exact duration
-
-    Returns:
-        List of Clip objects whose playback duration equals target_ms,
-        or raises ValueError if impossible to fit.
-
-    Raises:
-        ValueError: if target cannot be achieved with given shots
-    """
-    if fps is None:
-        fps = Rational(30, 1)
-
+    Shots are used in the order given. A few targets fall in a gap that the first shots cannot
+    cover (one 0.9 s shot plays for at most 1.06 s, two clips for at least 1.39 s); the fitter
+    then tries again with the longest shots first. Raises ValueError when the target is shorter
+    than the shortest possible clip, no shot has footage, or even that does not work."""
     if target_ms <= 0:
         raise ValueError("target_ms must be positive")
-
-    if not shots:
+    usable = [_slot(s) for s in shots if s.available_ms > 0]
+    if not usable:
         raise ValueError("no shots available")
+    try:
+        slots = _choose(usable, target_ms)
+    except ValueError as first:
+        longest_first = sorted(usable, key=lambda s: -s.shot.available_ms)
+        if longest_first == usable:
+            raise
+        try:
+            slots = _choose(longest_first, target_ms)
+        except ValueError:
+            raise first from None
+    lengths = _spread(slots, target_ms)
+    return [_cut(slot, d) for slot, d in zip(slots, lengths, strict=True)]
 
-    clips: list[Clip] = []
-    accumulated_ms = 0
-    shot_idx = 0
 
-    while accumulated_ms < target_ms:
-        if shot_idx >= len(shots):
-            shot_idx = 0  # wrap around
+def _slot(shot: Shot) -> _Slot:
+    smax = min(shot.available_ms, MAX_CLIP_MS)
+    smin = min(MIN_CLIP_MS, smax)
+    return _Slot(
+        shot=shot,
+        smin=smin,
+        smax=smax,
+        dmin=-(-smin * 100 // round(MAX_SPEED * 100)),  # ceil(smin / 1.15)
+        dmax=smax * 100 // round(MIN_SPEED * 100),  # floor(smax / 0.85)
+    )
 
-        shot = shots[shot_idx]
-        shot_idx += 1
 
-        remaining_ms = target_ms - accumulated_ms
-
-        # Try to fill `remaining_ms` from this shot
-        clip = _cut_clip(shot, remaining_ms)
-        if clip is None:
-            raise ValueError(
-                f"cannot fill {remaining_ms}ms from {shot.shot_id} "
-                f"({MIN_CLIP_MS}–{MAX_CLIP_MS}ms, speed {MIN_SPEED}–{MAX_SPEED}x)"
-            )
-
-        clips.append(clip)
-        accumulated_ms += clip.playback_duration_ms()
-
-    # Verify frame-exact duration
-    frames = _total_frames(clips, fps)
-    # frames = target_ms * fps.num / (fps.den * 1000)
-    # so: frames * fps.den * 1000 == target_ms * fps.num
-    if frames * fps.den * 1000 != target_ms * fps.num:
+def _choose(usable: list[_Slot], target_ms: TimeMs) -> list[_Slot]:
+    """The shots to use, in order: the fewest distinct shots that can reach the target without
+    slow-motion, else the fewest clips (repeating shots if need be) that can reach it at all."""
+    lo = nat = hi = 0
+    reachable: int | None = None
+    for n in range(1, MAX_CLIPS + 1):
+        slot = usable[(n - 1) % len(usable)]
+        lo += slot.dmin
+        nat += slot.dnat
+        hi += slot.dmax
+        if lo > target_ms:
+            break
+        if n <= len(usable) and target_ms <= nat:
+            return [usable[i % len(usable)] for i in range(n)]
+        if reachable is None and target_ms <= hi:
+            reachable = n
+    if reachable is None:
         raise ValueError(
-            f"duration {target_ms}ms is not frame-exact at {fps.num}/{fps.den} fps "
-            f"(got {frames} frames = {frames * fps.den * 1000 / fps.num:.3f}ms)"
+            f"cannot fill {target_ms}ms: the shortest clip plays for {usable[0].dmin}ms"
+            if target_ms < usable[0].dmin
+            else f"cannot fill {target_ms}ms with the given shots"
         )
-
-    return clips
-
-
-def _cut_clip(shot: Shot, target_ms: TimeMs) -> Clip | None:
-    """Try to cut a clip from a shot to fill `target_ms` at playback.
-
-    Returns the clip if successful, None if impossible.
-    Searches for a source duration in [MIN_CLIP_MS, min(available, MAX_CLIP_MS)]
-    and adjusts playback speed to reach the target duration.
-    """
-    max_available = min(shot.available_ms, MAX_CLIP_MS)
-    if max_available < MIN_CLIP_MS:
-        return None
-
-    # Try source durations from longest to shortest, with fine granularity
-    step = 1 if max_available - MIN_CLIP_MS < 200 else 50
-    for source_ms in range(max_available, MIN_CLIP_MS - 1, -step):
-        needed_speed = source_ms / target_ms
-        if MIN_SPEED <= needed_speed <= MAX_SPEED:
-            # Found a valid clip
-            start_offset = (shot.available_ms - source_ms) // 2
-            return Clip(
-                shot_id=shot.shot_id,
-                src_in_ms=start_offset,
-                src_out_ms=start_offset + source_ms,
-                speed=needed_speed,
-            )
-
-    # Fine search: try every millisecond if we haven't found one yet
-    for source_ms in range(max_available, MIN_CLIP_MS - 1, -1):
-        needed_speed = source_ms / target_ms
-        if MIN_SPEED <= needed_speed <= MAX_SPEED:
-            start_offset = (shot.available_ms - source_ms) // 2
-            return Clip(
-                shot_id=shot.shot_id,
-                src_in_ms=start_offset,
-                src_out_ms=start_offset + source_ms,
-                speed=needed_speed,
-            )
-
-    return None
+    return [usable[i % len(usable)] for i in range(reachable)]
 
 
-def _total_frames(clips: list[Clip], fps: Rational) -> FrameCount:
-    """Sum playback durations in frames (frame-exact)."""
-    total_ms = sum(c.playback_duration_ms() for c in clips)
-    # frames = ms * (fps.num / fps.den / 1000)
-    #        = ms * fps.num / (fps.den * 1000)
-    # Compute as integer to avoid float precision loss
-    frames = (total_ms * fps.num) // (fps.den * 1000)
-    return frames
+def _spread(slots: list[_Slot], target_ms: TimeMs) -> list[int]:
+    """Playback durations, each within its slot's range, adding up to `target_ms`. The slack
+    above every minimum is shared in proportion to how much each slot can take (largest
+    remainder, so the integers add up exactly)."""
+    upper = [s.dnat if target_ms <= sum(t.dnat for t in slots) else s.dmax for s in slots]
+    lower = [s.dmin for s in slots]
+    room = [u - lo for u, lo in zip(upper, lower, strict=True)]
+    extra = target_ms - sum(lower)
+    total_room = sum(room)
+    shares = [extra * r // total_room if total_room else 0 for r in room]
+    left = extra - sum(shares)
+    by_remainder = sorted(
+        range(len(slots)),
+        key=lambda i: (-((extra * room[i]) % total_room if total_room else 0), i),
+    )
+    for i in by_remainder:
+        if left == 0:
+            break
+        if shares[i] < room[i]:
+            shares[i] += 1
+            left -= 1
+    return [lo + sh for lo, sh in zip(lower, shares, strict=True)]
+
+
+def _cut(slot: _Slot, playback_ms: int) -> Clip:
+    """The middle of the shot, as long as `playback_ms` allows at a speed within limits."""
+    source_ms = min(max(playback_ms, slot.smin), slot.smax)
+    offset = (slot.shot.available_ms - source_ms) // 2
+    start = slot.shot.start_ms + offset
+    return Clip(
+        shot_id=slot.shot.shot_id,
+        src_in_ms=start,
+        src_out_ms=start + source_ms,
+        speed=source_ms / playback_ms,
+    )
