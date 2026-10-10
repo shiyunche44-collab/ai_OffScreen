@@ -8,6 +8,8 @@ import typer
 
 from offscreen.config import ConfigError, load_config
 from offscreen.domain.index import SelectionLabel
+from offscreen.domain.voice import Voice
+from offscreen.providers.ports import TTSError
 from offscreen.server import default_web_dir, run_worker, serve
 from offscreen.services.app import AppServices
 from offscreen.services.config_view import show_config
@@ -370,6 +372,101 @@ def worker_command(config: ConfigOpt = None) -> None:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(1) from e
     run_worker(cfg)
+
+
+voice_app = typer.Typer(
+    help="The voice library: voices and how fast each one speaks", no_args_is_help=True
+)
+app.add_typer(voice_app, name="voice")
+
+
+def _voice_line(v: Voice, default: str) -> str:
+    rate = f"{v.chars_per_s:.2f} 字/秒 (±{v.rate_spread:.1%})" if v.chars_per_s else "未标定"
+    mark = " *" if v.id == default else ""
+    clone = f"  克隆自 {v.reference_audio}" if v.reference_audio else ""
+    return f"{v.id + mark:<22} {v.provider:<10} 语速 {v.default_speed:<4} {rate}{clone}  {v.name}"
+
+
+@voice_app.command("list")
+def voice_list(config: ConfigOpt = None) -> None:
+    """The registered voices (* marks tts.default_voice)."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            voices = services.voices.list()
+    except ConfigError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    if not voices:
+        typer.echo("(no voices registered; `offscreen voice add <id>` or `voice calibrate <id>`)")
+    for v in voices:
+        typer.echo(_voice_line(v, cfg.tts.default_voice))
+
+
+@voice_app.command("add")
+def voice_add(
+    voice_id: Annotated[str, typer.Argument(help="The voice id the TTS engine uses")],
+    name: Annotated[str | None, typer.Option(help="A name to show")] = None,
+    provider: Annotated[str | None, typer.Option(help="TTS engine (default: tts.provider)")] = None,
+    reference: Annotated[
+        str | None, typer.Option(help="Recording to clone, a file in data/library/voices/")
+    ] = None,
+    speed: Annotated[float | None, typer.Option(help="Default speed, 0.5-2")] = None,
+    config: ConfigOpt = None,
+) -> None:
+    """Register a voice, or change the given fields of a registered one."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            v = services.voices.add(
+                voice_id,
+                name=name,
+                provider=provider,
+                reference_audio=reference,
+                default_speed=speed,
+            )
+    except (ConfigError, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(_voice_line(v, cfg.tts.default_voice))
+
+
+@voice_app.command("remove")
+def voice_remove(
+    voice_id: Annotated[str, typer.Argument(help="Voice id")], config: ConfigOpt = None
+) -> None:
+    """Take a voice out of the library (projects that use it keep working)."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            services.voices.remove(voice_id)
+    except (ConfigError, NotFound) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"removed {voice_id}")
+
+
+@voice_app.command("calibrate")
+def voice_calibrate(
+    voice_id: Annotated[str, typer.Argument(help="Voice id; registered if it is not yet")],
+    config: ConfigOpt = None,
+) -> None:
+    """Measure how fast the voice speaks (speaks ~250 characters), so scripts are sized for it."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            v = services.voices.calibrate(voice_id)
+            ok = services.voices.accurate(v)
+    except (ConfigError, InvalidInput, TTSError) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(_voice_line(v, cfg.tts.default_voice))
+    if not ok:
+        typer.echo(
+            f"warning: the sample texts differ by up to {v.rate_spread:.1%} from this rate; "
+            "estimates of a text's length may be off by more than 5%",
+            err=True,
+        )
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from offscreen.algo.calibrate import voice_timing
 from offscreen.config import AppConfig, ConfigError
 from offscreen.engine import Artifact, ArtifactStore, Engine, StageRun
 from offscreen.engine.stage import Stage
@@ -56,6 +57,7 @@ from offscreen.store.db import Database
 from offscreen.store.documents import DocumentStore
 from offscreen.store.outline_edits import OutlineEditStore
 from offscreen.store.repos import AssetRepo, StageRunRepo
+from offscreen.store.voices import VoiceStore
 
 FINAL_STAGE = "output.render"
 DEFAULT_STYLE = "suspense"
@@ -191,9 +193,15 @@ class Pipeline:
     def _stages(self, opts: RunOptions) -> list[Stage]:
         cfg, p = self.cfg, self.providers
         voice = opts.voice or cfg.tts.default_voice
+        # A measured voice sizes the script by how fast it really speaks (M6-01).
+        timing = voice_timing(
+            next((v for v in VoiceStore(cfg.data_dir).read().voices if v.id == voice), None),
+            p.tts.id,
+        )
         script = ScriptSettings(
             target_duration_s=max(1, round(opts.minutes * 60)),
             voice_id=voice,
+            chars_per_s=timing.chars_per_s,
             style=opts.style,
             spoil_ending=opts.spoil_ending,
             outline=OutlineEditStore(cfg.data_dir).read(opts.project_id)
@@ -238,6 +246,7 @@ class Pipeline:
             ReviewStage(p.llm, models),
             PlanStage(
                 p.tts,
+                timing.speed,
                 settings=plan_settings_for(DocumentStore(self.db, cfg.data_dir), opts.project_id)
                 if opts.project_id
                 else None,

@@ -738,7 +738,7 @@ data/
 │   ├── renders/{render_id}/            # 成片 + render_manifest.json
 │   └── exports/
 ├── library/bgm/                        # 背景音乐库
-├── library/voices/                     # 音色参考音频（克隆用）
+├── library/voices/                     # 音色库：voices.json（音色、默认语速、实测语速）+ 参考音频（克隆用）
 ├── llm/                                # LLM 请求/响应原文（按日期分目录）
 └── logs/
 ```

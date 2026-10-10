@@ -27,6 +27,7 @@ from offscreen.domain.plan import EditPlan
 from offscreen.domain.project import Project
 from offscreen.domain.script import Script, ScriptOutline, ScriptReview
 from offscreen.domain.timeline import Timeline
+from offscreen.domain.voice import VoiceLibrary
 
 DOCUMENTS: dict[str, type[BaseModel]] = {
     "asset": MediaAsset,
@@ -52,4 +53,5 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "job": Job,
     "project": Project,
     "manifest": Manifest,
+    "voices": VoiceLibrary,
 }

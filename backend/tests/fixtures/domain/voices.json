@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "voices": [
+    {
+      "calibrated_at": "2026-10-10T09:30:00Z",
+      "calibrated_with": "minimax:speech-2.8-hd@32000",
+      "chars_per_s": 4.62,
+      "default_speed": 1.0,
+      "id": "male-qn-qingse",
+      "name": "青涩青年",
+      "provider": "minimax",
+      "rate_spread": 0.021,
+      "reference_audio": null
+    },
+    {
+      "calibrated_at": null,
+      "calibrated_with": null,
+      "chars_per_s": null,
+      "default_speed": 1.1,
+      "id": "narrator_m1",
+      "name": "我的声音",
+      "provider": "cosyvoice",
+      "rate_spread": null,
+      "reference_audio": "narrator_m1.wav"
+    }
+  ]
+}

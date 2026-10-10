@@ -18,6 +18,7 @@ from offscreen.services.preview import PreviewService
 from offscreen.services.report import ReportService
 from offscreen.services.search import SearchService
 from offscreen.services.selection import SelectionService
+from offscreen.services.voices import VoiceService
 from offscreen.store.db import Database
 
 
@@ -33,6 +34,7 @@ class AppServices:
         self.plan_edits = PlanEditService(cfg, self.db, self.jobs)
         self.preview = PreviewService(cfg, self.db, self.jobs)
         self.selection = SelectionService(cfg, self.db, self.jobs)
+        self.voices = VoiceService(cfg, self.db, self.jobs)
         self.annotations = AnnotationService(cfg, self.db, self.jobs)
         self.characters = CharacterService(cfg, self.db, self.jobs)
         self.index = IndexService(cfg, self.db, self.jobs)
