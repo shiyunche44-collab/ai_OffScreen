@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { mergeJobs } from "./events";
 import type { ScriptContent } from "../lib/script";
-import type { CharacterEdit, CharactersView, CutsView, Job, OutlineBeat, ProjectOptions } from "./types";
+import type { CharacterEdit, CharactersView, CutsView, Job, OutlineBeat, PlanOp, ProjectOptions } from "./types";
 
 export const keys = {
   assets: ["assets"] as const,
@@ -429,5 +429,61 @@ export function useRunStep(project: { id: string; asset_id: string }) {
       }
     },
     onSuccess: (job) => client.setQueryData<Job[]>(keys.jobs, (jobs) => mergeJobs(jobs, [job])),
+  });
+}
+
+const planKey = (projectId: string) => [...keys.project(projectId), "plan"] as const;
+
+/** A version of the edit plan (default: the current one); 404 until it is built. */
+export function usePlan(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...planKey(projectId), "current"] as const,
+    enabled,
+    retry: false,
+    queryFn: async () =>
+      unwrap(await api.GET("/api/projects/{project_id}/plan", { params: { path: { project_id: projectId } } })),
+  });
+}
+
+/** Apply operations to the plan version `baseVersion` (409 if it is no longer the current one).
+ * Every answer that depends on the plan is dropped afterwards. */
+export function useEditPlan(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ops, baseVersion }: { ops: PlanOp[]; baseVersion: number }) =>
+      unwrap(
+        await api.POST("/api/projects/{project_id}/plan:edit", {
+          params: { path: { project_id: projectId } },
+          body: { ops, base_version: baseVersion },
+        }),
+      ),
+    onSettled: () => void client.invalidateQueries({ queryKey: planKey(projectId) }),
+  });
+}
+
+/** The best footage for one narration segment of a plan version. */
+export function useCandidates(projectId: string, segmentId: string | null, version: number, limit: number) {
+  return useQuery({
+    queryKey: [...planKey(projectId), "candidates", segmentId, version, limit] as const,
+    enabled: segmentId !== null,
+    retry: false,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/projects/{project_id}/plan/segments/{segment_id}/candidates", {
+          params: { path: { project_id: projectId, segment_id: segmentId ?? "" }, query: { version, limit } },
+        }),
+      ),
+  });
+}
+
+/** Render one segment's quick preview (a few seconds; the same segment is not rendered twice). */
+export function usePreviewSegment(projectId: string) {
+  return useMutation({
+    mutationFn: async ({ segmentId, version }: { segmentId: string; version: number }) =>
+      unwrap(
+        await api.POST("/api/projects/{project_id}/plan/segments/{segment_id}:preview", {
+          params: { path: { project_id: projectId, segment_id: segmentId }, query: { version } },
+        }),
+      ),
   });
 }

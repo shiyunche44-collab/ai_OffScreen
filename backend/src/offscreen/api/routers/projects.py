@@ -15,6 +15,7 @@ from offscreen.domain.script import OutlineBeat, Script, ScriptContent
 from offscreen.services.library import ProjectDetail
 from offscreen.services.outline import OutlineView
 from offscreen.services.preview import SegmentPreviewView
+from offscreen.services.selection import CandidatesView
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
 
@@ -158,6 +159,19 @@ def preview_segment(
     voice-over and subtitles; the same segment is not rendered twice. Answers when it is done
     (a few seconds); `file` is served at `/api/files/…`."""
     return services.preview.segment(project_id, segment_id, version)
+
+
+@router.get("/{project_id}/plan/segments/{segment_id}/candidates")
+def segment_candidates(
+    project_id: str,
+    segment_id: str,
+    services: Services,
+    version: int | None = None,
+    limit: int = 12,
+) -> CandidatesView:
+    """The best footage for a narration segment, best first, with the factors of each score
+    (what the plan editor's candidate drawer shows). Swap one in with `swap_clip`."""
+    return services.selection.candidates(project_id, segment_id, version, limit)
 
 
 class SaveOutline(BaseModel):

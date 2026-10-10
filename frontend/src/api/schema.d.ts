@@ -585,6 +585,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/plan/segments/{segment_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Segment Candidates
+         * @description The best footage for a narration segment, best first, with the factors of each score
+         *     (what the plan editor's candidate drawer shows). Swap one in with `swap_clip`.
+         */
+        get: operations["segment_candidates_api_projects__project_id__plan_segments__segment_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/plan/segments/{segment_id}:preview": {
         parameters: {
             query?: never;
@@ -923,6 +944,51 @@ export interface components {
              * @default -22
              */
             gain_db: number;
+        };
+        /** CandidateView */
+        CandidateView: {
+            /** Caption */
+            caption: string;
+            /**
+             * Current
+             * @description The segment shows this shot now.
+             */
+            current: boolean;
+            /** End Ms */
+            end_ms: number;
+            factors: components["schemas"]["ScoreView"];
+            /** Scene Id */
+            scene_id: string | null;
+            /**
+             * Score
+             * @description 0-1; the candidates are listed best first.
+             */
+            score: number;
+            /** Shot Id */
+            shot_id: string;
+            /** Start Ms */
+            start_ms: number;
+            /**
+             * Used By
+             * @description Another segment of the plan that shows this shot (it ranks lower for it).
+             */
+            used_by: string | null;
+        };
+        /** CandidatesView */
+        CandidatesView: {
+            /** Candidates */
+            candidates: components["schemas"]["CandidateView"][];
+            /** Plan Version */
+            plan_version: number;
+            /** Segment Id */
+            segment_id: string;
+            /**
+             * Total
+             * @description How many usable candidates there are (the list is cut).
+             */
+            total: number;
+            /** Vector Search */
+            vector_search: boolean;
         };
         /** Character */
         Character: {
@@ -1646,6 +1712,28 @@ export interface components {
              * @default 1
              */
             schema_version: number;
+        };
+        /**
+         * ScoreView
+         * @description The factors of a score, each 0-1 (the total is their weighted sum).
+         */
+        ScoreView: {
+            /** Caption */
+            caption: number;
+            /** Character */
+            character: number;
+            /** Embedding */
+            embedding: number;
+            /** Exclusions */
+            exclusions: number;
+            /** Quality */
+            quality: number;
+            /** Reuse */
+            reuse: number;
+            /** Size */
+            size: number;
+            /** Time Order */
+            time_order: number;
         };
         /** Script */
         Script: {
@@ -3846,6 +3934,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentDiff"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    segment_candidates_api_projects__project_id__plan_segments__segment_id__candidates_get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidatesView"];
                 };
             };
             /** @description Not found */

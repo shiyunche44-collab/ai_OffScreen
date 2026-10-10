@@ -49,6 +49,14 @@ export function ProjectPage() {
               </div>
             ) : null}
 
+            {data.stages.find((s) => s.stage === "creation.plan")?.cached ? (
+              <p className="text-sm">
+                <Link className="text-sky-600 hover:underline dark:text-sky-400" to={`/projects/${projectId}/plan`}>
+                  编辑剪辑计划：换镜、裁剪、锁定、重排、插入原声 →
+                </Link>
+              </p>
+            ) : null}
+
             {data.video ? (
               <div>
                 <h2 className="mb-3 text-lg font-medium">成片</h2>

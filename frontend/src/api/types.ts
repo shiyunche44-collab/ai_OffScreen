@@ -1,6 +1,7 @@
 // Names for the generated schema types (src/api/schema.d.ts, produced by `make api-types`).
 // Nothing here describes backend data by hand (ARCHITECTURE R7): every type is looked up in the
 // generated schema.
+import type { usePlan } from "./queries";
 import type { components, paths } from "./schema";
 
 export type { paths };
@@ -32,3 +33,11 @@ export type OutlineView = Schemas["OutlineView"];
 export type DocumentVersion = Schemas["DocumentVersion"];
 export type DocumentDiff = Schemas["DocumentDiff"];
 export type StylePreset = Schemas["StylePreset"];
+// As the client returns it (openapi-fetch reads the schema's tuples as plain arrays).
+export type Plan = NonNullable<ReturnType<typeof usePlan>["data"]>;
+export type PlanSegment = Plan["segments"][number];
+export type PlanClip = PlanSegment["clips"][number];
+export type PlanOp = Schemas["EditPlanBody"]["ops"][number];
+export type CandidatesView = Schemas["CandidatesView"];
+export type Candidate = CandidatesView["candidates"][number];
+export type SegmentPreview = Schemas["SegmentPreviewView"];

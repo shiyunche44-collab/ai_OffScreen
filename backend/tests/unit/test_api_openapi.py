@@ -53,6 +53,7 @@ def test_the_documented_routes() -> None:
         "/api/projects/{project_id}/plan/diff",
         "/api/projects/{project_id}/plan:edit",
         "/api/projects/{project_id}/plan/segments/{segment_id}:preview",
+        "/api/projects/{project_id}/plan/segments/{segment_id}/candidates",
         "/api/projects/{project_id}/plan:build",
         "/api/projects/{project_id}/render",
         "/api/styles",

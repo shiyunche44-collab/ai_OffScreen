@@ -569,6 +569,48 @@ def test_one_segment_of_the_plan_can_be_previewed_quickly_and_only_once(
     assert preview("seg_03", version=1).json()["cached"] is False  # the old version still plays
 
 
+def test_a_segment_offers_ranked_candidates_that_can_be_swapped_in(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/plan"
+
+    def candidates(segment: str, **params: Any) -> Any:
+        return client.get(f"{url}/segments/{segment}/candidates", params=params)
+
+    err(candidates("seg_01"), 404, "not_found")  # no plan yet
+    for step in ("script:generate", "plan:build"):
+        client.post(f"/api/projects/{pid}/{step}")
+        drain(services)
+    plan = client.get(url).json()
+    err(candidates("seg_99"), 404, "not_found")
+    err(candidates("seg_01", limit=0), 422, "invalid_input")
+
+    r = candidates("seg_01")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert (body["segment_id"], body["plan_version"]) == ("seg_01", 1)
+    got = body["candidates"]
+    assert got and len(got) <= 12 and body["total"] >= len(got)
+    scores = [c["score"] for c in got]
+    assert scores == sorted(scores, reverse=True) and all(0 <= x <= 1 for x in scores)
+    shown = {c["shot_id"] for c in plan["segments"][0]["clips"]}
+    assert {c["shot_id"] for c in got if c["current"]} <= shown
+    assert len(candidates("seg_01", limit=1).json()["candidates"]) == 1
+
+    # a candidate can be swapped in with the edit API
+    pick = next(c for c in got if not c["current"])
+    op = {"op": "swap_clip", "segment_id": "seg_01", "index": 0, "to": {"shot_id": pick["shot_id"]}}
+    ok = client.post(f"{url}:edit", json={"base_version": 1, "ops": [op]})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["segments"][0]["clips"][0]["shot_id"] == pick["shot_id"]
+    again = candidates("seg_02").json()["candidates"]
+    assert all(c["used_by"] != "seg_02" for c in again)  # a segment never counts as its own user
+
+
 def test_edits_and_regeneration_share_one_version_history(
     client: TestClient, services: AppServices, movie: Path
 ) -> None:

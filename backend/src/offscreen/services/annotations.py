@@ -28,16 +28,10 @@ from offscreen.domain.script import ScriptSegment
 from offscreen.services.errors import InvalidInput, NotFound
 from offscreen.services.jobs import JobService
 from offscreen.services.pipeline import Pipeline
-from offscreen.stages.analysis.captions import CAPTIONS_FILE
+from offscreen.services.selection import load_index, load_search
 from offscreen.stages.analysis.proxy import PROXY_FILE
-from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
-from offscreen.stages.creation.selection import (
-    SelectionError,
-    ShotRanker,
-    VectorSearch,
-    load_vector_search,
-)
+from offscreen.stages.creation.selection import SelectionError, ShotRanker, VectorSearch
 from offscreen.store.annotations import AnnotationsStore
 from offscreen.store.db import Database
 from offscreen.store.repos import AssetRepo
@@ -248,33 +242,10 @@ class AnnotationService:
         )
 
     def _index(self, asset_id: str) -> tuple[Shots, Scenes, Captions]:
-        with Pipeline(self.cfg, self.jobs.providers, db=self.db) as p:
-            arts = [
-                p.peek(n, asset_id)
-                for n in ("analysis.shots", "analysis.scenes", "analysis.captions")
-            ]
-        names = ("shots", "scenes", "captions")
-        for name, art in zip(names, arts, strict=True):
-            if art is None:
-                raise NotFound(f"analysis.{name} has not been built yet")
-        a, b, c = arts
-        assert a is not None and b is not None and c is not None
-        return (
-            a.read_model(SHOTS_FILE, Shots),
-            b.read_model(SCENES_FILE, Scenes),
-            c.read_model(CAPTIONS_FILE, Captions),
-        )
+        return load_index(self.cfg, self.jobs.providers, self.db, asset_id)
 
     def _search(self, asset_id: str) -> VectorSearch | None:
-        """The vector search when embedders are configured and their artifact is built."""
-        providers = self.jobs.providers
-        if providers.image_embedder is None and providers.text_embedder is None:
-            return None
-        with Pipeline(self.cfg, providers, db=self.db) as p:
-            art = p.peek("analysis.embeddings", asset_id)
-        if art is None:
-            return None
-        return load_vector_search(art, providers.image_embedder, providers.text_embedder)
+        return load_search(self.cfg, self.jobs.providers, self.db, asset_id)
 
     # ---- internals -------------------------------------------------------------------------
     @staticmethod

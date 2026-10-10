@@ -258,6 +258,112 @@
         "title": "Bgm",
         "type": "object"
       },
+      "CandidateView": {
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "current": {
+            "description": "The segment shows this shot now.",
+            "title": "Current",
+            "type": "boolean"
+          },
+          "end_ms": {
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "factors": {
+            "$ref": "#/components/schemas/ScoreView"
+          },
+          "scene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Id"
+          },
+          "score": {
+            "description": "0-1; the candidates are listed best first.",
+            "title": "Score",
+            "type": "number"
+          },
+          "shot_id": {
+            "title": "Shot Id",
+            "type": "string"
+          },
+          "start_ms": {
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "used_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Another segment of the plan that shows this shot (it ranks lower for it).",
+            "title": "Used By"
+          }
+        },
+        "required": [
+          "shot_id",
+          "scene_id",
+          "start_ms",
+          "end_ms",
+          "score",
+          "factors",
+          "caption",
+          "used_by",
+          "current"
+        ],
+        "title": "CandidateView",
+        "type": "object"
+      },
+      "CandidatesView": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateView"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "plan_version": {
+            "title": "Plan Version",
+            "type": "integer"
+          },
+          "segment_id": {
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "total": {
+            "description": "How many usable candidates there are (the list is cut).",
+            "title": "Total",
+            "type": "integer"
+          },
+          "vector_search": {
+            "title": "Vector Search",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "segment_id",
+          "plan_version",
+          "total",
+          "vector_search",
+          "candidates"
+        ],
+        "title": "CandidatesView",
+        "type": "object"
+      },
       "Character": {
         "additionalProperties": false,
         "properties": {
@@ -2127,6 +2233,55 @@
           "scenes"
         ],
         "title": "Scenes",
+        "type": "object"
+      },
+      "ScoreView": {
+        "description": "The factors of a score, each 0-1 (the total is their weighted sum).",
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "number"
+          },
+          "character": {
+            "title": "Character",
+            "type": "number"
+          },
+          "embedding": {
+            "title": "Embedding",
+            "type": "number"
+          },
+          "exclusions": {
+            "title": "Exclusions",
+            "type": "number"
+          },
+          "quality": {
+            "title": "Quality",
+            "type": "number"
+          },
+          "reuse": {
+            "title": "Reuse",
+            "type": "number"
+          },
+          "size": {
+            "title": "Size",
+            "type": "number"
+          },
+          "time_order": {
+            "title": "Time Order",
+            "type": "number"
+          }
+        },
+        "required": [
+          "embedding",
+          "caption",
+          "character",
+          "quality",
+          "size",
+          "reuse",
+          "time_order",
+          "exclusions"
+        ],
+        "title": "ScoreView",
         "type": "object"
       },
       "Script": {
@@ -5767,6 +5922,104 @@
           }
         },
         "summary": "Plan Diff",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/plan/segments/{segment_id}/candidates": {
+      "get": {
+        "description": "The best footage for a narration segment, best first, with the factors of each score\n(what the plan editor's candidate drawer shows). Swap one in with `swap_clip`.",
+        "operationId": "segment_candidates_api_projects__project_id__plan_segments__segment_id__candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "segment_id",
+            "required": true,
+            "schema": {
+              "title": "Segment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Segment Candidates",
         "tags": [
           "projects"
         ]
