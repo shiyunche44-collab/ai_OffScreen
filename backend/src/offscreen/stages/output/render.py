@@ -14,6 +14,8 @@ does no loudness normalization (M6)."""
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -84,13 +86,22 @@ class RenderStage(Stage):
             raise RenderError(f"layout {out.layout!r} is not supported yet")
         if any(v.asset_id != asset_id for v in tl.video):
             raise RenderError("timeline uses footage from another asset")
-        fps = out.fps
-        total_ms = frames_to_ms(tl.duration_frames, fps)
+        total_ms = frames_to_ms(tl.duration_frames, out.fps)
 
         try:
             with tempfile.TemporaryDirectory(dir=ctx.out_dir, prefix=".work-") as tmp:
                 work = Path(tmp)
-                self._render(ctx, tl, compiled.dir, source, bool(asset.audio), work, total_ms)
+                render_timeline(
+                    tl,
+                    compiled.dir,
+                    ctx.out_dir,
+                    work,
+                    video=source,
+                    audio=source if asset.audio else None,
+                    font=self.font,
+                    progress=ctx.progress,
+                    should_cancel=ctx.is_canceled,
+                )
         except FFmpegCanceled as e:
             raise StageCanceled(self.name) from e
         final = ctx.out_dir / FINAL_FILE
@@ -103,87 +114,111 @@ class RenderStage(Stage):
             }
         )
 
-    def _render(
-        self,
-        ctx: StageContext,
-        tl: Timeline,
-        compiled_dir: Path,
-        source: Path,
-        has_audio: bool,
-        work: Path,
-        total_ms: int,
-    ) -> None:
-        fps, out = tl.output.fps, tl.output
-        cancel = ctx.is_canceled
 
-        # 1. clips
-        clip_files: list[Path] = []
-        for i, v in enumerate(tl.video):
-            dst = work / f"clip_{i:05d}.mp4"
-            media.render_clip(
-                source,
-                dst,
-                src_in_ms=v.src_in_ms,
-                frames=v.f1 - v.f0,
-                fps=fps,
-                width=out.width,
-                height=out.height,
-                speed=v.speed,
-                should_cancel=cancel,
-            )
-            clip_files.append(dst)
-            ctx.progress(0.6 * (i + 1) / len(tl.video), f"clip {i + 1}/{len(tl.video)}")
+@dataclass(frozen=True)
+class Quality:
+    """Encoder settings: the final video's, or a preview's (fast and small)."""
 
-        # 2. concat
-        silent = work / "silent.mp4"
-        media.concat_videos(clip_files, silent, list_file=work / "clips.txt", should_cancel=cancel)
-        for f in clip_files:
-            f.unlink()
-        ctx.progress(0.65, "joined")
+    preset: str = media.PRESET
+    clip_crf: int = media.CLIP_CRF
+    final_crf: int = media.FINAL_CRF
 
-        # 3. mixdown
-        parts = [
-            media.AudioPart(
-                path=compiled_dir / n.file, start_ms=frames_to_ms(n.f0, fps), gain_db=n.gain_db
-            )
-            for n in tl.narration
-        ]
-        if has_audio:
-            parts += [
-                media.AudioPart(
-                    path=source,
-                    start_ms=frames_to_ms(s.f0, fps),
-                    gain_db=s.gain_db,
-                    seek_ms=s.src_in_ms,
-                    duration_ms=frames_to_ms(s.f1 - s.f0, fps),
-                    fade=True,
-                )
-                for s in tl.source_audio
-            ]
-        if not parts:
-            raise RenderError("timeline has no sound at all")
-        for p in parts:
-            if not p.path.is_file():
-                raise RenderError(f"audio file missing: {p.path}")
-        mix = work / "mix.wav"
-        media.mix_audio(
-            parts, mix, total_ms=total_ms, script_file=work / "mix.filter", should_cancel=cancel
-        )
-        ctx.progress(0.8, "mixed")
 
-        # 4. final encode with subtitles
-        subs: Path | None = None
-        if tl.subtitles:
-            subs = ctx.out_dir / SUBTITLES_FILE
-            subs.write_text(
-                build_ass(tl.subtitles, fps, out.width, out.height, self.font), encoding="utf-8"
-            )
-        media.encode_final(
-            silent,
-            mix,
-            ctx.out_dir / FINAL_FILE,
-            subtitles=subs,
-            duration_ms=total_ms,
-            on_progress=lambda f: ctx.progress(0.8 + 0.2 * f, "encoding"),
+DEFAULT_QUALITY = Quality()
+
+
+def render_timeline(
+    tl: Timeline,
+    narration_dir: Path,
+    out_dir: Path,
+    work: Path,
+    *,
+    video: Path,
+    audio: Path | None,
+    font: str,
+    quality: Quality = DEFAULT_QUALITY,
+    progress: Callable[[float, str], None] = lambda _f, _m: None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> None:
+    """Timeline -> `out_dir/final.mp4` (and the subtitle file), working in `work`.
+
+    `video` supplies the picture, `audio` the film's own sound (None: the film has none); the
+    narration files are found next to `narration_dir`. Used for the final render (the source
+    film) and for single-segment previews (the proxy)."""
+    fps, out = tl.output.fps, tl.output
+    total_ms = frames_to_ms(tl.duration_frames, fps)
+    cancel = should_cancel
+
+    # 1. clips
+    clip_files: list[Path] = []
+    for i, v in enumerate(tl.video):
+        dst = work / f"clip_{i:05d}.mp4"
+        media.render_clip(
+            video,
+            dst,
+            src_in_ms=v.src_in_ms,
+            frames=v.f1 - v.f0,
+            fps=fps,
+            width=out.width,
+            height=out.height,
+            speed=v.speed,
+            preset=quality.preset,
+            crf=quality.clip_crf,
             should_cancel=cancel,
         )
+        clip_files.append(dst)
+        progress(0.6 * (i + 1) / len(tl.video), f"clip {i + 1}/{len(tl.video)}")
+
+    # 2. concat
+    silent = work / "silent.mp4"
+    media.concat_videos(clip_files, silent, list_file=work / "clips.txt", should_cancel=cancel)
+    for f in clip_files:
+        f.unlink()
+    progress(0.65, "joined")
+
+    # 3. mixdown
+    parts = [
+        media.AudioPart(
+            path=narration_dir / n.file, start_ms=frames_to_ms(n.f0, fps), gain_db=n.gain_db
+        )
+        for n in tl.narration
+    ]
+    if audio is not None:
+        parts += [
+            media.AudioPart(
+                path=audio,
+                start_ms=frames_to_ms(s.f0, fps),
+                gain_db=s.gain_db,
+                seek_ms=s.src_in_ms,
+                duration_ms=frames_to_ms(s.f1 - s.f0, fps),
+                fade=True,
+            )
+            for s in tl.source_audio
+        ]
+    if not parts:
+        raise RenderError("timeline has no sound at all")
+    for p in parts:
+        if not p.path.is_file():
+            raise RenderError(f"audio file missing: {p.path}")
+    mix = work / "mix.wav"
+    media.mix_audio(
+        parts, mix, total_ms=total_ms, script_file=work / "mix.filter", should_cancel=cancel
+    )
+    progress(0.8, "mixed")
+
+    # 4. final encode with subtitles
+    subs: Path | None = None
+    if tl.subtitles:
+        subs = out_dir / SUBTITLES_FILE
+        subs.write_text(build_ass(tl.subtitles, fps, out.width, out.height, font), encoding="utf-8")
+    media.encode_final(
+        silent,
+        mix,
+        out_dir / FINAL_FILE,
+        subtitles=subs,
+        duration_ms=total_ms,
+        preset=quality.preset,
+        crf=quality.final_crf,
+        on_progress=lambda f: progress(0.8 + 0.2 * f, "encoding"),
+        should_cancel=cancel,
+    )

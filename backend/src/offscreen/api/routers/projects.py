@@ -14,6 +14,7 @@ from offscreen.domain.project import Project, ProjectOptions
 from offscreen.domain.script import OutlineBeat, Script, ScriptContent
 from offscreen.services.library import ProjectDetail
 from offscreen.services.outline import OutlineView
+from offscreen.services.preview import SegmentPreviewView
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
 
@@ -147,6 +148,16 @@ def edit_plan(project_id: str, body: EditPlanBody, services: Services) -> EditPl
     """Swap, trim, lock, add or remove footage; move, delete or insert segments; change a
     voice. Stored as the next version (author human). A new voice is spoken by the next build."""
     return services.plan_edits.edit(project_id, body.ops, body.base_version)
+
+
+@router.post("/{project_id}/plan/segments/{segment_id}:preview")
+def preview_segment(
+    project_id: str, segment_id: str, services: Services, version: int | None = None
+) -> SegmentPreviewView:
+    """A small, fast render (360p from the proxy film) of one segment of the plan, with its
+    voice-over and subtitles; the same segment is not rendered twice. Answers when it is done
+    (a few seconds); `file` is served at `/api/files/…`."""
+    return services.preview.segment(project_id, segment_id, version)
 
 
 class SaveOutline(BaseModel):

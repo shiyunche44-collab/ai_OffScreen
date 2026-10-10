@@ -14,6 +14,7 @@ from offscreen.services.library import LibraryService
 from offscreen.services.outline import OutlineService
 from offscreen.services.pipeline import Providers
 from offscreen.services.plan_edit import PlanEditService
+from offscreen.services.preview import PreviewService
 from offscreen.services.report import ReportService
 from offscreen.services.search import SearchService
 from offscreen.store.db import Database
@@ -29,6 +30,7 @@ class AppServices:
         self.outline = OutlineService(cfg, self.db, self.jobs)
         self.documents = DocumentService(cfg, self.db)
         self.plan_edits = PlanEditService(cfg, self.db, self.jobs)
+        self.preview = PreviewService(cfg, self.db, self.jobs)
         self.annotations = AnnotationService(cfg, self.db, self.jobs)
         self.characters = CharacterService(cfg, self.db, self.jobs)
         self.index = IndexService(cfg, self.db, self.jobs)

@@ -2407,6 +2407,41 @@
         "title": "SegmentChange",
         "type": "object"
       },
+      "SegmentPreviewView": {
+        "properties": {
+          "cached": {
+            "description": "True when an earlier preview of the same segment was used.",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "file": {
+            "description": "Relative to the data directory; served at /api/files/….",
+            "title": "File",
+            "type": "string"
+          },
+          "plan_version": {
+            "title": "Plan Version",
+            "type": "integer"
+          },
+          "segment_hash": {
+            "title": "Segment Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "cached",
+          "segment_hash",
+          "duration_ms",
+          "plan_version"
+        ],
+        "title": "SegmentPreviewView",
+        "type": "object"
+      },
       "SetLocked": {
         "additionalProperties": false,
         "properties": {
@@ -5732,6 +5767,94 @@
           }
         },
         "summary": "Plan Diff",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/plan/segments/{segment_id}:preview": {
+      "post": {
+        "description": "A small, fast render (360p from the proxy film) of one segment of the plan, with its\nvoice-over and subtitles; the same segment is not rendered twice. Answers when it is done\n(a few seconds); `file` is served at `/api/files/…`.",
+        "operationId": "preview_segment_api_projects__project_id__plan_segments__segment_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "segment_id",
+            "required": true,
+            "schema": {
+              "title": "Segment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPreviewView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Preview Segment",
         "tags": [
           "projects"
         ]

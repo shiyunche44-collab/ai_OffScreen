@@ -3,6 +3,9 @@ A Worker runs the queued jobs, as the server process will."""
 
 from __future__ import annotations
 
+import json
+import subprocess
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -486,6 +489,84 @@ def test_the_plan_can_be_edited_and_a_rebuild_keeps_the_edits(
 
 
 _DELETE = {"op": "delete_segment", "segment_id": "seg_01"}
+
+
+def test_one_segment_of_the_plan_can_be_previewed_quickly_and_only_once(
+    client: TestClient, services: AppServices, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/plan"
+
+    def preview(segment: str, **params: Any) -> Any:
+        return client.post(f"{url}/segments/{segment}:preview", params=params)
+
+    err(preview("seg_01"), 404, "not_found")  # no plan yet
+    for step in ("script:generate", "plan:build"):
+        client.post(f"/api/projects/{pid}/{step}")
+        drain(services)
+    plan = client.get(url).json()
+    err(preview("seg_99"), 404, "not_found")
+
+    started = time.monotonic()
+    first = preview("seg_01")
+    elapsed = time.monotonic() - started
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["cached"] is False and body["plan_version"] == 1
+    voice_ms = plan["segments"][0]["audio"]["duration_ms"]
+    assert abs(body["duration_ms"] - voice_ms) <= 42
+    assert elapsed < 5, f"a preview took {elapsed:.1f} s"
+
+    served = client.get(f"/api/files/{body['file']}")
+    assert served.status_code == 200 and served.headers["content-type"] == "video/mp4"
+    info = json.loads(
+        subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_type,height:format=duration",
+                "-of",
+                "json",
+                str(services.cfg.data_dir / body["file"]),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    kinds = {s["codec_type"]: s for s in info["streams"]}
+    assert kinds["video"]["height"] == 180 and "audio" in kinds  # the test film is 320x180
+    assert abs(float(info["format"]["duration"]) * 1000 - body["duration_ms"]) < 100
+
+    again = preview("seg_01").json()
+    assert again["cached"] is True and again["file"] == body["file"]
+
+    # editing seg_02 leaves seg_01's preview as it was; the edited segment is rendered anew
+    second = preview("seg_02").json()
+    assert second["cached"] is False and second["segment_hash"] != body["segment_hash"]
+    edit = {"op": "set_locked", "segment_id": "seg_02", "index": 0, "locked": True}
+    bad = {
+        "op": "trim_clip",
+        "segment_id": "seg_02",
+        "index": 0,
+        "src_in_ms": 100,
+        "src_out_ms": 9000,
+    }
+    ok = client.post(f"{url}:edit", json={"base_version": 1, "ops": [edit, bad]})
+    assert ok.status_code == 200, ok.text
+    assert preview("seg_01").json()["cached"] is True
+    assert preview("seg_02").json()["cached"] is False
+
+    # a voice change leaves the segment stale: there is nothing true to show until it is built
+    voice = {"op": "set_voice", "segment_id": "seg_03", "speed": 1.2}
+    client.post(f"{url}:edit", json={"base_version": 2, "ops": [voice]})
+    err(preview("seg_03"), 422, "invalid_input")
+    assert preview("seg_03", version=1).json()["cached"] is False  # the old version still plays
 
 
 def test_edits_and_regeneration_share_one_version_history(

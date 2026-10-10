@@ -585,6 +585,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/plan/segments/{segment_id}:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Segment
+         * @description A small, fast render (360p from the proxy film) of one segment of the plan, with its
+         *     voice-over and subtitles; the same segment is not rendered twice. Answers when it is done
+         *     (a few seconds); `file` is served at `/api/files/…`.
+         */
+        post: operations["preview_segment_api_projects__project_id__plan_segments__segment_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/plan/versions": {
         parameters: {
             query?: never;
@@ -1752,6 +1774,25 @@ export interface components {
              * @enum {string}
              */
             status: "added" | "removed" | "changed" | "unchanged";
+        };
+        /** SegmentPreviewView */
+        SegmentPreviewView: {
+            /**
+             * Cached
+             * @description True when an earlier preview of the same segment was used.
+             */
+            cached: boolean;
+            /** Duration Ms */
+            duration_ms: number;
+            /**
+             * File
+             * @description Relative to the data directory; served at /api/files/….
+             */
+            file: string;
+            /** Plan Version */
+            plan_version: number;
+            /** Segment Hash */
+            segment_hash: string;
         };
         /** SetLocked */
         SetLocked: {
@@ -3805,6 +3846,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentDiff"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_segment_api_projects__project_id__plan_segments__segment_id__preview_post: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentPreviewView"];
                 };
             };
             /** @description Not found */

@@ -55,6 +55,8 @@ def render_clip(
     width: int,
     height: int,
     speed: float = 1.0,
+    preset: str = PRESET,
+    crf: int = CLIP_CRF,
     should_cancel: Cancel = None,
 ) -> None:
     """Exactly `frames` silent frames of `src` from `src_in_ms`, in the common encoding."""
@@ -65,7 +67,7 @@ def render_clip(
         "-map", "0:v:0", "-an",
         "-vf", clip_filter(fps, width, height, speed, frames),
         "-frames:v", str(frames), "-r", f"{fps.num}/{fps.den}",
-        "-c:v", "libx264", "-preset", PRESET, "-crf", str(CLIP_CRF),
+        "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
         "-g", "48", "-sc_threshold", "0", "-pix_fmt", "yuv420p",
         str(dst),
     ]  # fmt: skip
@@ -172,6 +174,8 @@ def encode_final(
     *,
     subtitles: Path | None,
     duration_ms: int,
+    preset: str = PRESET,
+    crf: int = FINAL_CRF,
     on_progress: ProgressFn | None = None,
     should_cancel: Cancel = None,
 ) -> None:
@@ -181,7 +185,7 @@ def encode_final(
     if subtitles is not None:
         args += [
             "-vf", f"ass=filename={escape_filter_value(str(subtitles))}",
-            "-c:v", "libx264", "-preset", PRESET, "-crf", str(FINAL_CRF), "-pix_fmt", "yuv420p",
+            "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
         ]  # fmt: skip
     else:
         args += ["-c:v", "copy"]
