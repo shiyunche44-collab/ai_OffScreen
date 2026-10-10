@@ -48,6 +48,11 @@ class DocumentStore:
     def _path(self, project_id: str, kind: DocKind, version: int) -> str:
         return f"projects/{project_id}/docs/{kind}/v{version}.json"
 
+    def dir_for(self, project_id: str, kind: DocKind) -> Path:
+        """The directory holding every version of the document (and, for a plan, the audio
+        files its versions refer to, which `AudioRef.file` gives relative to it)."""
+        return self.data_dir / f"projects/{project_id}/docs/{kind}"
+
     def head(self, project_id: str, kind: DocKind) -> int | None:
         """The current version number; None if there is none yet. KeyError: unknown project."""
         with self.db.session() as s:
@@ -88,7 +93,7 @@ class DocumentStore:
             write_model(self.data_dir / path, doc)
             s.add(
                 DocumentRow(
-                    id=doc_id,
+                    id=doc.id,  # type: ignore[attr-defined]  # the document's own id
                     project_id=project_id,
                     kind=kind,
                     version=version,

@@ -31,6 +31,7 @@ from offscreen.providers.ports import (
     ShotDetector,
     TTSError,
 )
+from offscreen.services.documents import plan_settings_for
 from offscreen.services.llm import build_llm, task_models
 from offscreen.services.tts import build_tts
 from offscreen.stages.analysis.captions import DEFAULT_BATCH, CaptionsError, CaptionsStage
@@ -52,6 +53,7 @@ from offscreen.stages.creation.script import ScriptError, ScriptSettings, Script
 from offscreen.stages.output.compile import CompileStage, CompileStageError
 from offscreen.stages.output.render import FINAL_FILE, RenderError, RenderStage
 from offscreen.store.db import Database
+from offscreen.store.documents import DocumentStore
 from offscreen.store.outline_edits import OutlineEditStore
 from offscreen.store.repos import AssetRepo, StageRunRepo
 
@@ -94,7 +96,8 @@ class RunOptions:
     """A style preset id (`offscreen style list`)."""
     spoil_ending: bool = True
     project_id: str | None = None
-    """The project the run is for; its edited outline, if any, is what the script follows."""
+    """The project the run is for. Its edited outline is what the script follows; its current
+    script (as edited) and plan are what the plan is built from, and on."""
 
 
 @dataclass
@@ -233,7 +236,14 @@ class Pipeline:
             ),
             ScriptStage(p.llm, script, models),
             ReviewStage(p.llm, models),
-            PlanStage(p.tts),
+            PlanStage(
+                p.tts,
+                settings=plan_settings_for(DocumentStore(self.db, cfg.data_dir), opts.project_id)
+                if opts.project_id
+                else None,
+                image_embedder=p.image_embedder,
+                text_embedder=p.text_embedder,
+            ),
             CompileStage(self.assets),
             RenderStage(self.assets),
         ]

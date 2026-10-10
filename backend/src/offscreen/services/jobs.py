@@ -18,14 +18,16 @@ import threading
 from dataclasses import asdict, replace
 from typing import Any, Protocol
 
+from offscreen.algo.plan_build import PlanReport
 from offscreen.config import AppConfig
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.job import Job, JobCanceled, JobStatus, Lane
+from offscreen.domain.plan import EditPlan
 from offscreen.domain.script import Script, ScriptReview
 from offscreen.engine.stage import StageCanceled
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.providers.ports import AsrCanceled, DetectionCanceled
-from offscreen.services.documents import adopt_generated_script
+from offscreen.services.documents import adopt_generated_plan, adopt_generated_script
 from offscreen.services.errors import Conflict, InvalidInput, NotFound
 from offscreen.services.pipeline import (
     DEFAULT_STYLE,
@@ -38,7 +40,7 @@ from offscreen.services.rewrite import run_rewrite
 from offscreen.stages.analysis.naming import NamingStage
 from offscreen.stages.analysis.story import StoryStage
 from offscreen.stages.creation.outline import OutlineStage
-from offscreen.stages.creation.plan import PlanStage
+from offscreen.stages.creation.plan import PLAN_FILE, PlanStage
 from offscreen.stages.creation.review import REVIEW_FILE, REVIEW_TASK, ReviewStage
 from offscreen.stages.creation.script import SCRIPT_FILE, ScriptStage
 from offscreen.stages.output.render import RenderStage
@@ -55,6 +57,10 @@ with its own scope: project, segment, instruction, base version."""
 GENERATE_SCRIPT = ScriptStage.name
 BUILD_PLAN = PlanStage.name
 RENDER = RenderStage.name
+
+PLAN_JOBS = (BUILD_PLAN, RENDER)
+_REPORT_KEYS = ("rebuilt", "reused", "removed", "warnings")
+"""Jobs that build the plan and so, for a project, store it as a new version of its plan."""
 
 LOG_TAIL_BYTES = 256 * 1024
 
@@ -77,6 +83,8 @@ class JobRun(Protocol):
     def progress(self, frac: float, msg: str = "") -> None: ...
 
     def is_canceled(self) -> bool: ...
+
+    def log(self, msg: str) -> None: ...
 
 
 def options_to_scope(opts: RunOptions) -> dict[str, Any]:
@@ -224,9 +232,12 @@ class JobService:
         def progress(_stage: str, frac: float, msg: str) -> None:
             ctx.progress((done + frac) / total, f"{_stage} {msg}".strip())
 
+        plan_built = False
+
         def resolved(stage: str, hit: bool) -> None:
-            nonlocal done
+            nonlocal done, plan_built
             done += 1
+            plan_built = plan_built or (stage == PlanStage.name and not hit)
             ctx.progress(done / total, f"{stage} {'cached' if hit else 'done'}")
 
         with Pipeline(
@@ -258,6 +269,26 @@ class JobService:
                 adopt_generated_script(
                     self.docs, opts.project_id, draft, job.scope.get("base_version")
                 )
+            if (
+                job.stage in PLAN_JOBS
+                and opts.project_id
+                and self.docs.head(opts.project_id, "script")
+            ):
+                # A plan is stored only where it follows a stored script (a document refers to
+                # documents); a build before the script exists leaves just the artifact.
+                built = pipeline.peek(PlanStage.name, asset_id, opts)
+                if built is not None:  # always: the run just built it or found it cached
+                    if plan_built:  # what was redone, and why, for whoever reads the job log
+                        for line in PlanReport(**{k: built.meta[k] for k in _REPORT_KEYS}).lines():
+                            ctx.log(line)
+                    adopt_generated_plan(
+                        self.docs, opts.project_id, built.read_model(PLAN_FILE, EditPlan), built.dir
+                    )
+                    if pipeline.peek(PlanStage.name, asset_id, opts) is None:
+                        # The stored plan is now where the next build starts, which is a cache
+                        # key of its own. That build only carries everything over and gives the
+                        # same plan back, so have it done: the project then reads as up to date.
+                        pipeline.run_stage(PlanStage.name, asset_id, opts)
 
     # ---- internals --------------------------------------------------------------------------
     def _asset(self, asset_id: str) -> MediaAsset:

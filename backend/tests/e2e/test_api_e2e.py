@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 
 from offscreen.api.app import create_app
 from offscreen.config import AppConfig
+from offscreen.domain.plan import EditPlan
+from offscreen.providers.adapters.fake import FakeTTS
 from offscreen.services.app import AppServices
 from offscreen.services.pipeline import Providers
 from offscreen.worker import Worker, WorkerSettings
@@ -299,11 +301,12 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
 
     jobs = []
     for step in ("script:generate", "plan:build", "render"):
+        # one after the other, as the page does: the plan follows the script that was stored
         r = client.post(f"/api/projects/{pid}/{step}")
         assert r.status_code == 202, r.text
         jobs.append(r.json())
+        drain(services)
     assert [j["stage"] for j in jobs] == ["creation.script", "creation.plan", "output.render"]
-    drain(services)
     assert all(client.get(f"/api/jobs/{j['id']}").json()["status"] == "succeeded" for j in jobs)
 
     script = client.get(f"/api/projects/{pid}/script").json()
@@ -319,7 +322,7 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
     ]
 
     after = client.get(f"/api/projects/{pid}").json()
-    assert all(s["cached"] for s in after["stages"])
+    assert [s["stage"] for s in after["stages"] if not s["cached"]] == []
     assert after["video"].endswith("/final.mp4")
     assert (services.cfg.data_dir / after["video"]).is_file()
 
@@ -341,6 +344,67 @@ def test_a_project_goes_from_nothing_to_a_playable_video(
         "analysis.story",
     }
     assert client.get(f"/api/projects/{other['id']}").json()["video"] is None
+
+
+def test_the_plan_follows_the_edited_script_and_redoes_only_what_changed(
+    client: TestClient, services: AppServices, fakes: Providers, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    script_url = f"/api/projects/{pid}/script"
+
+    def run(step: str) -> dict[str, Any]:
+        job = client.post(f"/api/projects/{pid}/{step}").json()
+        drain(services)
+        done = client.get(f"/api/jobs/{job['id']}").json()
+        assert done["status"] == "succeeded", done
+        return done  # type: ignore[no-any-return]
+
+    def head() -> EditPlan:
+        plan = services.jobs.docs.read(pid, "plan", EditPlan)
+        assert plan is not None
+        return plan
+
+    assert isinstance(fakes.tts, FakeTTS)
+    tts = fakes.tts
+    run("script:generate")
+    run("plan:build")
+    v1 = head()
+    spoken = len(tts.calls)
+    assert (v1.version, v1.parent_version, v1.author) == (1, None, "ai")
+    assert v1.id == f"pln_{pid.split('_', 1)[1]}" and v1.project_id == pid
+    assert [s.id for s in v1.segments] == ["seg_01", "seg_02", "seg_03"] and spoken == 3
+
+    # building again changes nothing: no new version, nobody is asked to speak again
+    run("plan:build")
+    assert head() == v1 and len(tts.calls) == spoken
+
+    # a person rewrites the first segment; the plan redoes that segment alone
+    script = client.get(script_url).json()
+    edit = {k: script[k] for k in ("params", "outline", "segments", "annotations")}
+    edit["segments"][0]["text"] = "我改过的开场白，比原来长一些。"
+    client.put(script_url, json={**edit, "base_version": script["version"]})
+    job = run("plan:build")
+    v2 = head()
+    assert (v2.version, v2.parent_version, v2.id) == (2, 1, v1.id)
+    assert v2.script_ref.version == script["version"] + 1
+    assert [c[0] for c in tts.calls[spoken:]] == ["我改过的开场白，比原来长一些。"]
+    assert v2.segments[0].text == "我改过的开场白，比原来长一些。"
+    assert v2.segments[1:] == v1.segments[1:]
+    assert "plan: rebuilt seg_01 (text)" in services.jobs.log(job["id"])
+    assert "plan: reused seg_02" in services.jobs.log(job["id"])
+    # every version's audio is on disk next to the versions
+    audio_dir = services.jobs.docs.dir_for(pid, "plan")
+    for plan in (v1, v2):
+        assert all((audio_dir / s.audio.file).is_file() for s in plan.segments if s.audio)
+
+    # and the video is rendered from it; after that everything is cached
+    run("render")
+    assert head() == v2
+    after = client.get(f"/api/projects/{pid}").json()
+    assert all(s["cached"] for s in after["stages"]) and after["video"]
 
 
 def test_edits_and_regeneration_share_one_version_history(

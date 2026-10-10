@@ -1,16 +1,24 @@
 """Versioned documents: save with `base_version`, read any version, compare, restore.
 
-Only the script has an editor so far (M4); the plan joins in M5 through the same store."""
+Only the script has an editor so far (M4); the plan joins in M5 through the same store: the
+build reads the current script and plan from it and stores what it makes as the next plan
+version (`adopt_generated_plan`)."""
 
 from __future__ import annotations
+
+import shutil
+from pathlib import Path
 
 from pydantic import ValidationError
 
 from offscreen.algo.docdiff import diff_documents
+from offscreen.algo.plan_build import same_content
 from offscreen.config import AppConfig
 from offscreen.domain.document import DocumentDiff, DocumentVersion
+from offscreen.domain.plan import EditPlan
 from offscreen.domain.script import Author, Script, ScriptContent
 from offscreen.services.errors import Conflict, InvalidInput, NotFound
+from offscreen.stages.creation.plan import PlanSettings, PreviousPlan
 from offscreen.store.db import Database
 from offscreen.store.documents import DocumentStore, StaleBase
 from offscreen.store.repos import ProjectRepo
@@ -121,4 +129,48 @@ def adopt_generated_script(
         raise Conflict(
             f"the script changed while it was being generated (it was version {base_version}, "
             f"now {e.current}); generate again to build on the current one"
+        ) from e
+
+
+def plan_settings_for(store: DocumentStore, project_id: str) -> PlanSettings:
+    """What the plan build starts from: the project's current script (a person may have edited
+    it) and its current plan, if there is one (the build then redoes only what changed)."""
+    plan = store.read(project_id, "plan", EditPlan)
+    return PlanSettings(
+        script=store.read(project_id, "script", Script),
+        previous=PreviousPlan(plan, store.dir_for(project_id, "plan")) if plan else None,
+    )
+
+
+def adopt_generated_plan(
+    store: DocumentStore, project_id: str, built: EditPlan, artifact_dir: Path
+) -> EditPlan:
+    """Store a built plan as the project's next version. It builds on `built.parent_version`;
+    if a person saved another version meanwhile, nothing is stored and the job fails (the build
+    stays cached). A build identical to the current version is not stored twice. The audio files
+    are copied next to the versions (names are content hashes, so versions share them)."""
+    head = store.read(project_id, "plan", EditPlan)
+    if head is not None and same_content(head, built):
+        return head
+    audio_dir = store.dir_for(project_id, "plan")
+    for seg in built.segments:
+        if seg.audio is not None:
+            dst = audio_dir / seg.audio.file
+            if not dst.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(artifact_dir / seg.audio.file, dst)
+
+    def build(_doc_id: str, version: int, parent: int | None) -> EditPlan:
+        # The id is the one the build gave (derived from the project), not a fresh one: stored
+        # and built plan are then the same bytes.
+        return built.model_copy(
+            update={"project_id": project_id, "version": version, "parent_version": parent}
+        )
+
+    try:
+        return store.append(project_id, "plan", built.parent_version, build, author="ai")
+    except StaleBase as e:
+        raise Conflict(
+            f"the plan changed while it was being built (it was version {built.parent_version}, "
+            f"now {e.current}); build again to build on the current one"
         ) from e
