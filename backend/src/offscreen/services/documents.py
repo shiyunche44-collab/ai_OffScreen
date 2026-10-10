@@ -92,6 +92,32 @@ class DocumentService:
         old, new = self.script(project_id, a), self.script(project_id, b)
         return diff_documents("script", a, b, _dump(old), _dump(new))
 
+    def plan_head(self, project_id: str) -> int | None:
+        self._project(project_id)
+        return self.store.head(project_id, "plan")
+
+    def plan(self, project_id: str, version: int | None = None) -> EditPlan:
+        """A version of the edit plan (default: the current one)."""
+        self._project(project_id)
+        doc = self.store.read(project_id, "plan", EditPlan, version)
+        if doc is None:
+            raise NotFound(
+                "the project has no plan yet"
+                if version is None
+                else f"the plan has no version {version}"
+            )
+        return doc
+
+    def plan_versions(self, project_id: str) -> list[DocumentVersion]:
+        self._project(project_id)
+        return self.store.versions(project_id, "plan")
+
+    def diff_plan(self, project_id: str, a: int, b: int) -> DocumentDiff:
+        old, new = self.plan(project_id, a), self.plan(project_id, b)
+        return diff_documents(
+            "plan", a, b, old.model_dump(mode="json"), new.model_dump(mode="json")
+        )
+
     def _project(self, project_id: str) -> None:
         if self.projects.get(project_id) is None:
             raise NotFound(f"project {project_id} not found")
@@ -134,11 +160,15 @@ def adopt_generated_script(
 
 def plan_settings_for(store: DocumentStore, project_id: str) -> PlanSettings:
     """What the plan build starts from: the project's current script (a person may have edited
-    it) and its current plan, if there is one (the build then redoes only what changed)."""
+    it) and its current plan, if there is one (the build then redoes only what changed). The
+    script the plan was built from tells which structural differences are the person's edits of
+    the plan and which are changes of the script."""
     plan = store.read(project_id, "plan", EditPlan)
+    built_from = store.read(project_id, "script", Script, plan.script_ref.version) if plan else None
     return PlanSettings(
         script=store.read(project_id, "script", Script),
         previous=PreviousPlan(plan, store.dir_for(project_id, "plan")) if plan else None,
+        previous_script_ids=tuple(s.id for s in built_from.segments) if built_from else None,
     )
 
 

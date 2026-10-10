@@ -545,6 +545,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Plan
+         * @description A version of the edit plan (default: the current one); 404 until it is built.
+         */
+        get: operations["get_plan_api_projects__project_id__plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/plan/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Diff
+         * @description Segment-by-segment difference between versions `a` and `b`.
+         */
+        get: operations["plan_diff_api_projects__project_id__plan_diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/plan/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Versions
+         * @description The history, newest first.
+         */
+        get: operations["plan_versions_api_projects__project_id__plan_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/plan:build": {
         parameters: {
             query?: never;
@@ -556,6 +616,27 @@ export interface paths {
         put?: never;
         /** Build Plan */
         post: operations["build_plan_api_projects__project_id__plan_build_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/plan:edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit Plan
+         * @description Swap, trim, lock, add or remove footage; move, delete or insert segments; change a
+         *     voice. Stored as the next version (author human). A new voice is spoken by the next build.
+         */
+        post: operations["edit_plan_api_projects__project_id__plan_edit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -734,6 +815,22 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /** AddClip */
+        AddClip: {
+            /**
+             * Index
+             * @description Where to put it; null: the end.
+             */
+            index?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_clip";
+            /** Segment Id */
+            segment_id: string;
+            to: components["schemas"]["ClipSource"];
+        };
         /** AnalysisReport */
         AnalysisReport: {
             asset: components["schemas"]["MediaAsset"];
@@ -764,6 +861,21 @@ export interface components {
             /** Stages */
             stages: components["schemas"]["StageStatus"][];
         };
+        /** AudioRef */
+        AudioRef: {
+            /**
+             * Char Timings
+             * @default []
+             */
+            char_timings: [
+                number,
+                number
+            ][];
+            /** Duration Ms */
+            duration_ms: number;
+            /** File */
+            file: string;
+        };
         /** AudioStream */
         AudioStream: {
             /** Channels */
@@ -774,6 +886,21 @@ export interface components {
             language?: string | null;
             /** Sample Rate */
             sample_rate: number;
+        };
+        /** Bgm */
+        Bgm: {
+            /**
+             * Duck Under Narration Db
+             * @default -8
+             */
+            duck_under_narration_db: number;
+            /** File */
+            file: string;
+            /**
+             * Gain Db
+             * @default -22
+             */
+            gain_db: number;
         };
         /** Character */
         Character: {
@@ -830,6 +957,47 @@ export interface components {
             /** Unmatched Edits */
             unmatched_edits: number;
         };
+        /** Clip */
+        Clip: {
+            /** Asset Id */
+            asset_id: string;
+            /**
+             * Locked
+             * @default false
+             */
+            locked: boolean;
+            /** Score */
+            score?: number | null;
+            /** Shot Id */
+            shot_id?: string | null;
+            /**
+             * Speed
+             * @default 1
+             */
+            speed: number;
+            /** Src In Ms */
+            src_in_ms: number;
+            /** Src Out Ms */
+            src_out_ms: number;
+        };
+        /**
+         * ClipSource
+         * @description Where footage comes from: a whole shot (the editor cuts the middle of it to the length
+         *     of the clip it replaces), or any interval of the film.
+         */
+        ClipSource: {
+            /** Shot Id */
+            shot_id?: string | null;
+            /**
+             * Speed
+             * @default 1
+             */
+            speed: number;
+            /** Src In Ms */
+            src_in_ms?: number | null;
+            /** Src Out Ms */
+            src_out_ms?: number | null;
+        };
         /** CreateProject */
         CreateProject: {
             /** Asset Id */
@@ -878,6 +1046,16 @@ export interface components {
             fps_num: number;
             /** Marked */
             marked: boolean;
+        };
+        /** DeleteSegment */
+        DeleteSegment: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "delete_segment";
+            /** Segment Id */
+            segment_id: string;
         };
         /**
          * DerivedFiles
@@ -937,6 +1115,49 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** EditPlan */
+        EditPlan: {
+            /**
+             * Author
+             * @enum {string}
+             */
+            author: "ai" | "human";
+            bgm?: components["schemas"]["Bgm"] | null;
+            /** Id */
+            id: string;
+            /**
+             * Output Profile
+             * @default source
+             */
+            output_profile: string;
+            /** Parent Version */
+            parent_version?: number | null;
+            /** Project Id */
+            project_id: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            script_ref: components["schemas"]["ScriptRef"];
+            /** Segments */
+            segments: components["schemas"]["PlanSegment"][];
+            /** Version */
+            version: number;
+        };
+        /** EditPlanBody */
+        EditPlanBody: {
+            /**
+             * Base Version
+             * @description The plan version being edited (409 if stale).
+             */
+            base_version: number;
+            /**
+             * Ops
+             * @description Applied in order, all or nothing; clips are addressed by position in their segment. Picked or trimmed footage is locked.
+             */
+            ops: (components["schemas"]["SwapClip"] | components["schemas"]["AddClip"] | components["schemas"]["RemoveClip"] | components["schemas"]["TrimClip"] | components["schemas"]["SetLocked"] | components["schemas"]["MoveSegment"] | components["schemas"]["DeleteSegment"] | components["schemas"]["InsertOriginal"] | components["schemas"]["SetVoice"])[];
+        };
         /** ErrorBody */
         ErrorBody: {
             /** Code */
@@ -973,6 +1194,21 @@ export interface components {
             path: string;
             /** Title */
             title?: string | null;
+        };
+        /** InsertOriginal */
+        InsertOriginal: {
+            /**
+             * After
+             * @description null: at the start.
+             */
+            after?: string | null;
+            /** Line Refs */
+            line_refs: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "insert_original";
         };
         /** Job */
         Job: {
@@ -1125,6 +1361,18 @@ export interface components {
              */
             truncated: boolean;
         };
+        /** MoveSegment */
+        MoveSegment: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "move_segment";
+            /** Segment Id */
+            segment_id: string;
+            /** To Index */
+            to_index: number;
+        };
         /** OutlineBeat */
         OutlineBeat: {
             /** Beat */
@@ -1146,6 +1394,50 @@ export interface components {
             outline: components["schemas"]["ScriptOutline"];
             /** Total S */
             total_s: number;
+        };
+        /** PlanSegment */
+        PlanSegment: {
+            audio?: components["schemas"]["AudioRef"] | null;
+            /**
+             * Clips
+             * @default []
+             */
+            clips: components["schemas"]["Clip"][];
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "narration" | "original";
+            /**
+             * Line Refs
+             * @default []
+             */
+            line_refs: string[];
+            /**
+             * @default {
+             *       "gain_db": 0,
+             *       "mode": "duck",
+             *       "stem": "mix"
+             *     }
+             */
+            source_audio: components["schemas"]["SourceAudio"];
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /** Text */
+            text?: string | null;
+            /** Text Hash */
+            text_hash?: string | null;
+            voice?: components["schemas"]["VoiceSpec"] | null;
+            /**
+             * Voice Pinned
+             * @default false
+             */
+            voice_pinned: boolean;
         };
         /** Project */
         Project: {
@@ -1212,6 +1504,18 @@ export interface components {
             b: string;
             /** Relation */
             relation: string;
+        };
+        /** RemoveClip */
+        RemoveClip: {
+            /** Index */
+            index: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_clip";
+            /** Segment Id */
+            segment_id: string;
         };
         /**
          * ReportCounts
@@ -1400,6 +1704,13 @@ export interface components {
             /** Voice Id */
             voice_id: string;
         };
+        /** ScriptRef */
+        ScriptRef: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: number;
+        };
         /** ScriptSegment */
         ScriptSegment: {
             /** Beat */
@@ -1441,6 +1752,38 @@ export interface components {
              * @enum {string}
              */
             status: "added" | "removed" | "changed" | "unchanged";
+        };
+        /** SetLocked */
+        SetLocked: {
+            /** Index */
+            index: number;
+            /** Locked */
+            locked: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_locked";
+            /** Segment Id */
+            segment_id: string;
+        };
+        /**
+         * SetVoice
+         * @description A new voice and / or speed for a narration segment. It is spoken again by the next plan
+         *     build (the segment is marked stale until then) and keeps this voice through rebuilds.
+         */
+        SetVoice: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_voice";
+            /** Segment Id */
+            segment_id: string;
+            /** Speed */
+            speed?: number | null;
+            /** Voice Id */
+            voice_id?: string | null;
         };
         /** ShotCaption */
         ShotCaption: {
@@ -1544,6 +1887,26 @@ export interface components {
             tile_width: number;
             /** Video */
             video: string;
+        };
+        /** SourceAudio */
+        SourceAudio: {
+            /**
+             * Gain Db
+             * @default 0
+             */
+            gain_db: number;
+            /**
+             * Mode
+             * @default duck
+             * @enum {string}
+             */
+            mode: "mute" | "duck" | "full";
+            /**
+             * Stem
+             * @default mix
+             * @enum {string}
+             */
+            stem: "mix" | "no_vocals" | "vocals";
         };
         /** SpriteSlot */
         SpriteSlot: {
@@ -1661,6 +2024,19 @@ export interface components {
             /** Tone */
             tone: string;
         };
+        /** SwapClip */
+        SwapClip: {
+            /** Index */
+            index: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "swap_clip";
+            /** Segment Id */
+            segment_id: string;
+            to: components["schemas"]["ClipSource"];
+        };
         /** Transcript */
         Transcript: {
             /** Asset Id */
@@ -1695,6 +2071,27 @@ export interface components {
              */
             words: components["schemas"]["Word"][];
         };
+        /** TrimClip */
+        TrimClip: {
+            /** Index */
+            index: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "trim_clip";
+            /** Segment Id */
+            segment_id: string;
+            /**
+             * Speed
+             * @description null: keep the speed.
+             */
+            speed?: number | null;
+            /** Src In Ms */
+            src_in_ms: number;
+            /** Src Out Ms */
+            src_out_ms: number;
+        };
         /** TurningPoint */
         TurningPoint: {
             /** Scene Id */
@@ -1721,6 +2118,16 @@ export interface components {
             height: number;
             /** Width */
             width: number;
+        };
+        /** VoiceSpec */
+        VoiceSpec: {
+            /**
+             * Speed
+             * @default 1
+             */
+            speed: number;
+            /** Voice Id */
+            voice_id: string;
         };
         /** Word */
         Word: {
@@ -3326,6 +3733,158 @@ export interface operations {
             };
         };
     };
+    get_plan_api_projects__project_id__plan_get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditPlan"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    plan_diff_api_projects__project_id__plan_diff_get: {
+        parameters: {
+            query: {
+                a: number;
+                b: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDiff"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    plan_versions_api_projects__project_id__plan_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentVersion"][];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     build_plan_api_projects__project_id__plan_build_post: {
         parameters: {
             query?: never;
@@ -3344,6 +3903,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    edit_plan_api_projects__project_id__plan_edit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPlanBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditPlan"];
                 };
             };
             /** @description Not found */

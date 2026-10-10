@@ -8,6 +8,8 @@ from offscreen.api.errors import ERROR_RESPONSES
 from offscreen.domain.common import AssetId
 from offscreen.domain.document import DocumentDiff, DocumentVersion
 from offscreen.domain.job import Job
+from offscreen.domain.plan import EditPlan
+from offscreen.domain.plan_edit import PlanOp
 from offscreen.domain.project import Project, ProjectOptions
 from offscreen.domain.script import OutlineBeat, Script, ScriptContent
 from offscreen.services.library import ProjectDetail
@@ -111,6 +113,40 @@ def rewrite_segment(
 def restore_script(project_id: str, body: RestoreScript, services: Services) -> Script:
     """Bring an old version back as a new one (the history only grows)."""
     return services.documents.restore_script(project_id, body.version, body.base_version)
+
+
+class EditPlanBody(BaseModel):
+    base_version: int = Field(ge=1, description="The plan version being edited (409 if stale).")
+    ops: list[PlanOp] = Field(
+        min_length=1,
+        description="Applied in order, all or nothing; clips are addressed by position in "
+        "their segment. Picked or trimmed footage is locked.",
+    )
+
+
+@router.get("/{project_id}/plan")
+def get_plan(project_id: str, services: Services, version: int | None = None) -> EditPlan:
+    """A version of the edit plan (default: the current one); 404 until it is built."""
+    return services.documents.plan(project_id, version)
+
+
+@router.get("/{project_id}/plan/versions")
+def plan_versions(project_id: str, services: Services) -> list[DocumentVersion]:
+    """The history, newest first."""
+    return services.documents.plan_versions(project_id)
+
+
+@router.get("/{project_id}/plan/diff")
+def plan_diff(project_id: str, a: int, b: int, services: Services) -> DocumentDiff:
+    """Segment-by-segment difference between versions `a` and `b`."""
+    return services.documents.diff_plan(project_id, a, b)
+
+
+@router.post("/{project_id}/plan:edit")
+def edit_plan(project_id: str, body: EditPlanBody, services: Services) -> EditPlan:
+    """Swap, trim, lock, add or remove footage; move, delete or insert segments; change a
+    voice. Stored as the next version (author human). A new voice is spoken by the next build."""
+    return services.plan_edits.edit(project_id, body.ops, body.base_version)
 
 
 class SaveOutline(BaseModel):

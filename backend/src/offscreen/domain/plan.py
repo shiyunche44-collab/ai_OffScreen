@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from offscreen.domain.common import (
     AssetId,
+    LineId,
     PlanId,
     ProjectId,
     ScriptId,
@@ -68,6 +69,8 @@ class PlanSegment(Strict):
     text_hash: Sha256 | None = None  # hash of the script text this was built from
     stale: bool = False
     voice: VoiceSpec | None = None
+    voice_pinned: bool = False  # a person chose the voice / speed: a rebuild keeps it
+    line_refs: list[LineId] = []  # original: the transcript lines played (a rebuild compares)
     audio: AudioRef | None = None
     clips: list[Clip] = []
     source_audio: SourceAudio = SourceAudio()

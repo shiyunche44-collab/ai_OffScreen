@@ -43,6 +43,7 @@
       ],
       "id": "seg_01",
       "kind": "narration",
+      "line_refs": [],
       "source_audio": {
         "gain_db": -14,
         "mode": "duck",
@@ -54,7 +55,8 @@
       "voice": {
         "speed": 1.1,
         "voice_id": "male-qn-qingse"
-      }
+      },
+      "voice_pinned": false
     },
     {
       "audio": null,
@@ -71,6 +73,10 @@
       ],
       "id": "seg_02",
       "kind": "original",
+      "line_refs": [
+        "ln_0211",
+        "ln_0212"
+      ],
       "source_audio": {
         "gain_db": 0,
         "mode": "full",
@@ -78,7 +84,8 @@
       },
       "stale": false,
       "text_hash": null,
-      "voice": null
+      "voice": null,
+      "voice_pinned": false
     }
   ],
   "version": 7

@@ -30,6 +30,44 @@
         "title": "Act",
         "type": "object"
       },
+      "AddClip": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where to put it; null: the end.",
+            "title": "Index"
+          },
+          "op": {
+            "const": "add_clip",
+            "default": "add_clip",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "to": {
+            "$ref": "#/components/schemas/ClipSource"
+          }
+        },
+        "required": [
+          "segment_id",
+          "to"
+        ],
+        "title": "AddClip",
+        "type": "object"
+      },
       "AnalysisReport": {
         "properties": {
           "asset": {
@@ -118,6 +156,46 @@
         "title": "AssetDetail",
         "type": "object"
       },
+      "AudioRef": {
+        "additionalProperties": false,
+        "properties": {
+          "char_timings": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Char Timings",
+            "type": "array"
+          },
+          "duration_ms": {
+            "exclusiveMinimum": 0.0,
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "duration_ms"
+        ],
+        "title": "AudioRef",
+        "type": "object"
+      },
       "AudioStream": {
         "additionalProperties": false,
         "properties": {
@@ -154,6 +232,30 @@
           "sample_rate"
         ],
         "title": "AudioStream",
+        "type": "object"
+      },
+      "Bgm": {
+        "additionalProperties": false,
+        "properties": {
+          "duck_under_narration_db": {
+            "default": -8.0,
+            "title": "Duck Under Narration Db",
+            "type": "number"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "gain_db": {
+            "default": -22.0,
+            "title": "Gain Db",
+            "type": "number"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Bgm",
         "type": "object"
       },
       "Character": {
@@ -344,6 +446,117 @@
         "title": "CharactersView",
         "type": "object"
       },
+      "Clip": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "pattern": "^ast_[0-9A-Za-z]+$",
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "locked": {
+            "default": false,
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "shot_id": {
+            "anyOf": [
+              {
+                "pattern": "^sh_[0-9A-Za-z]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Id"
+          },
+          "speed": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "src_in_ms": {
+            "minimum": 0.0,
+            "title": "Src In Ms",
+            "type": "integer"
+          },
+          "src_out_ms": {
+            "minimum": 0.0,
+            "title": "Src Out Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "src_in_ms",
+          "src_out_ms"
+        ],
+        "title": "Clip",
+        "type": "object"
+      },
+      "ClipSource": {
+        "additionalProperties": false,
+        "description": "Where footage comes from: a whole shot (the editor cuts the middle of it to the length\nof the clip it replaces), or any interval of the film.",
+        "properties": {
+          "shot_id": {
+            "anyOf": [
+              {
+                "pattern": "^sh_[0-9A-Za-z]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Id"
+          },
+          "speed": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "src_in_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Src In Ms"
+          },
+          "src_out_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Src Out Ms"
+          }
+        },
+        "title": "ClipSource",
+        "type": "object"
+      },
       "CreateProject": {
         "properties": {
           "asset_id": {
@@ -476,6 +689,27 @@
           "marked"
         ],
         "title": "CutsView",
+        "type": "object"
+      },
+      "DeleteSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "delete_segment",
+            "default": "delete_segment",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id"
+        ],
+        "title": "DeleteSegment",
         "type": "object"
       },
       "DerivedFiles": {
@@ -619,6 +853,152 @@
         "title": "DocumentVersion",
         "type": "object"
       },
+      "EditPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "enum": [
+              "ai",
+              "human"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "bgm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bgm"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "pattern": "^pln_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "output_profile": {
+            "default": "source",
+            "title": "Output Profile",
+            "type": "string"
+          },
+          "parent_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version"
+          },
+          "project_id": {
+            "pattern": "^prj_[0-9A-Za-z]+$",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "script_ref": {
+            "$ref": "#/components/schemas/ScriptRef"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSegment"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "version",
+          "author",
+          "script_ref",
+          "segments"
+        ],
+        "title": "EditPlan",
+        "type": "object"
+      },
+      "EditPlanBody": {
+        "properties": {
+          "base_version": {
+            "description": "The plan version being edited (409 if stale).",
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "ops": {
+            "description": "Applied in order, all or nothing; clips are addressed by position in their segment. Picked or trimmed footage is locked.",
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "add_clip": "#/components/schemas/AddClip",
+                  "delete_segment": "#/components/schemas/DeleteSegment",
+                  "insert_original": "#/components/schemas/InsertOriginal",
+                  "move_segment": "#/components/schemas/MoveSegment",
+                  "remove_clip": "#/components/schemas/RemoveClip",
+                  "set_locked": "#/components/schemas/SetLocked",
+                  "set_voice": "#/components/schemas/SetVoice",
+                  "swap_clip": "#/components/schemas/SwapClip",
+                  "trim_clip": "#/components/schemas/TrimClip"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SwapClip"
+                },
+                {
+                  "$ref": "#/components/schemas/AddClip"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveClip"
+                },
+                {
+                  "$ref": "#/components/schemas/TrimClip"
+                },
+                {
+                  "$ref": "#/components/schemas/SetLocked"
+                },
+                {
+                  "$ref": "#/components/schemas/MoveSegment"
+                },
+                {
+                  "$ref": "#/components/schemas/DeleteSegment"
+                },
+                {
+                  "$ref": "#/components/schemas/InsertOriginal"
+                },
+                {
+                  "$ref": "#/components/schemas/SetVoice"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Ops",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_version",
+          "ops"
+        ],
+        "title": "EditPlanBody",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -722,6 +1102,44 @@
           "path"
         ],
         "title": "ImportAsset",
+        "type": "object"
+      },
+      "InsertOriginal": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "pattern": "^seg_[0-9A-Za-z]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null: at the start.",
+            "title": "After"
+          },
+          "line_refs": {
+            "items": {
+              "pattern": "^ln_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Line Refs",
+            "type": "array"
+          },
+          "op": {
+            "const": "insert_original",
+            "default": "insert_original",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_refs"
+        ],
+        "title": "InsertOriginal",
         "type": "object"
       },
       "Job": {
@@ -1069,6 +1487,33 @@
         "title": "MediaListing",
         "type": "object"
       },
+      "MoveSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "move_segment",
+            "default": "move_segment",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "to_index": {
+            "minimum": 0.0,
+            "title": "To Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "segment_id",
+          "to_index"
+        ],
+        "title": "MoveSegment",
+        "type": "object"
+      },
       "OutlineBeat": {
         "additionalProperties": false,
         "properties": {
@@ -1124,6 +1569,108 @@
           "total_s"
         ],
         "title": "OutlineView",
+        "type": "object"
+      },
+      "PlanSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clips": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Clip"
+            },
+            "title": "Clips",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "narration",
+              "original"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "line_refs": {
+            "default": [],
+            "items": {
+              "pattern": "^ln_[0-9A-Za-z]+$",
+              "type": "string"
+            },
+            "title": "Line Refs",
+            "type": "array"
+          },
+          "source_audio": {
+            "$ref": "#/components/schemas/SourceAudio",
+            "default": {
+              "gain_db": 0.0,
+              "mode": "duck",
+              "stem": "mix"
+            }
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "text_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[0-9a-f]{8,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Hash"
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voice_pinned": {
+            "default": false,
+            "title": "Voice Pinned",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "PlanSegment",
         "type": "object"
       },
       "Project": {
@@ -1278,6 +1825,33 @@
           "relation"
         ],
         "title": "Relation",
+        "type": "object"
+      },
+      "RemoveClip": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "op": {
+            "const": "remove_clip",
+            "default": "remove_clip",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "index"
+        ],
+        "title": "RemoveClip",
         "type": "object"
       },
       "ReportCounts": {
@@ -1720,6 +2294,27 @@
         "title": "ScriptParams",
         "type": "object"
       },
+      "ScriptRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^scr_[0-9A-Za-z]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "ScriptRef",
+        "type": "object"
+      },
       "ScriptSegment": {
         "additionalProperties": false,
         "properties": {
@@ -1810,6 +2405,85 @@
           "status"
         ],
         "title": "SegmentChange",
+        "type": "object"
+      },
+      "SetLocked": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "op": {
+            "const": "set_locked",
+            "default": "set_locked",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "index",
+          "locked"
+        ],
+        "title": "SetLocked",
+        "type": "object"
+      },
+      "SetVoice": {
+        "additionalProperties": false,
+        "description": "A new voice and / or speed for a narration segment. It is spoken again by the next plan\nbuild (the segment is marked stale until then) and keeps this voice through rebuilds.",
+        "properties": {
+          "op": {
+            "const": "set_voice",
+            "default": "set_voice",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed"
+          },
+          "voice_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Id"
+          }
+        },
+        "required": [
+          "segment_id"
+        ],
+        "title": "SetVoice",
         "type": "object"
       },
       "ShotCaption": {
@@ -2108,6 +2782,38 @@
         "title": "ShotsView",
         "type": "object"
       },
+      "SourceAudio": {
+        "additionalProperties": false,
+        "properties": {
+          "gain_db": {
+            "default": 0.0,
+            "title": "Gain Db",
+            "type": "number"
+          },
+          "mode": {
+            "default": "duck",
+            "enum": [
+              "mute",
+              "duck",
+              "full"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "stem": {
+            "default": "mix",
+            "enum": [
+              "mix",
+              "no_vocals",
+              "vocals"
+            ],
+            "title": "Stem",
+            "type": "string"
+          }
+        },
+        "title": "SourceAudio",
+        "type": "object"
+      },
       "SpriteSlot": {
         "properties": {
           "col": {
@@ -2386,6 +3092,37 @@
         "title": "StylePreset",
         "type": "object"
       },
+      "SwapClip": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "op": {
+            "const": "swap_clip",
+            "default": "swap_clip",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "to": {
+            "$ref": "#/components/schemas/ClipSource"
+          }
+        },
+        "required": [
+          "segment_id",
+          "index",
+          "to"
+        ],
+        "title": "SwapClip",
+        "type": "object"
+      },
       "Transcript": {
         "additionalProperties": false,
         "properties": {
@@ -2475,6 +3212,58 @@
         "title": "TranscriptLine",
         "type": "object"
       },
+      "TrimClip": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "op": {
+            "const": "trim_clip",
+            "default": "trim_clip",
+            "title": "Op",
+            "type": "string"
+          },
+          "segment_id": {
+            "pattern": "^seg_[0-9A-Za-z]+$",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null: keep the speed.",
+            "title": "Speed"
+          },
+          "src_in_ms": {
+            "minimum": 0.0,
+            "title": "Src In Ms",
+            "type": "integer"
+          },
+          "src_out_ms": {
+            "minimum": 0.0,
+            "title": "Src Out Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "segment_id",
+          "index",
+          "src_in_ms",
+          "src_out_ms"
+        ],
+        "title": "TrimClip",
+        "type": "object"
+      },
       "TurningPoint": {
         "additionalProperties": false,
         "properties": {
@@ -2552,6 +3341,26 @@
           "codec"
         ],
         "title": "VideoInfo",
+        "type": "object"
+      },
+      "VoiceSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "speed": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "voice_id": {
+            "title": "Voice Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "voice_id"
+        ],
+        "title": "VoiceSpec",
         "type": "object"
       },
       "Word": {
@@ -4768,6 +5577,233 @@
         ]
       }
     },
+    "/api/projects/{project_id}/plan": {
+      "get": {
+        "description": "A version of the edit plan (default: the current one); 404 until it is built.",
+        "operationId": "get_plan_api_projects__project_id__plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Get Plan",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/plan/diff": {
+      "get": {
+        "description": "Segment-by-segment difference between versions `a` and `b`.",
+        "operationId": "plan_diff_api_projects__project_id__plan_diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "a",
+            "required": true,
+            "schema": {
+              "title": "A",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "b",
+            "required": true,
+            "schema": {
+              "title": "B",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDiff"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Plan Diff",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/plan/versions": {
+      "get": {
+        "description": "The history, newest first.",
+        "operationId": "plan_versions_api_projects__project_id__plan_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentVersion"
+                  },
+                  "title": "Response Plan Versions Api Projects  Project Id  Plan Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Plan Versions",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/projects/{project_id}/plan:build": {
       "post": {
         "operationId": "build_plan_api_projects__project_id__plan_build_post",
@@ -4825,6 +5861,79 @@
           }
         },
         "summary": "Build Plan",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/plan:edit": {
+      "post": {
+        "description": "Swap, trim, lock, add or remove footage; move, delete or insert segments; change a\nvoice. Stored as the next version (author human). A new voice is spoken by the next build.",
+        "operationId": "edit_plan_api_projects__project_id__plan_edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditPlanBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "summary": "Edit Plan",
         "tags": [
           "projects"
         ]

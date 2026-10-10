@@ -162,6 +162,15 @@
           "title": "Kind",
           "type": "string"
         },
+        "line_refs": {
+          "default": [],
+          "items": {
+            "pattern": "^ln_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "title": "Line Refs",
+          "type": "array"
+        },
         "source_audio": {
           "$ref": "#/$defs/SourceAudio",
           "default": {
@@ -210,6 +219,11 @@
             }
           ],
           "default": null
+        },
+        "voice_pinned": {
+          "default": false,
+          "title": "Voice Pinned",
+          "type": "boolean"
         }
       },
       "required": [

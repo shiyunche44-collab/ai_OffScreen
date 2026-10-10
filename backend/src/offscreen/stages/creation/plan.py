@@ -41,8 +41,10 @@ from offscreen.algo.plan_build import (
     PlanReport,
     decide_narration,
     keep_locked,
+    plan_order,
     same_content,
     text_digest,
+    voice_for,
     with_fresh_footage,
 )
 from offscreen.algo.scoring import ScoringWeights, score_candidates
@@ -119,6 +121,9 @@ class PlanSettings:
     """The script to follow; None: the generated one (`creation.script`)."""
     previous: PreviousPlan | None = None
     """The plan to build on; None: build everything."""
+    previous_script_ids: tuple[str, ...] | None = None
+    """Segment ids of the script `previous` was built from; with them, a person's structural
+    edits of the plan (order, deleted segments, inserted original sound) are kept."""
     weights: ScoringWeights = field(default_factory=ScoringWeights)
 
 
@@ -170,6 +175,9 @@ class PlanStage(Stage):
             "weights": s.weights.__dict__,
             "script": _digest(s.script.model_dump_json()) if s.script else None,
             "previous": _digest(s.previous.plan.model_dump_json()) if s.previous else None,
+            "previous_script": list(s.previous_script_ids)
+            if s.previous_script_ids is not None
+            else None,
         }
 
     def provider_info(self, scope: Scope) -> dict[str, Any]:
@@ -205,26 +213,45 @@ class PlanStage(Stage):
             weights=self.settings.weights,
             search=self._search(ctx),
         )
-        report = PlanReport(removed=[sid for sid in before if sid not in _ids(script)])
+        by_id = {seg.id: seg for seg in script.segments}
+        order = plan_order(
+            [seg.id for seg in script.segments],
+            previous.plan if previous else None,
+            self.settings.previous_script_ids,
+        )
+        report = PlanReport(removed=[sid for sid in before if sid not in order])
 
-        # Original-sound segments first: narration must stay off their footage.
+        # Original-sound segments first: narration must stay off their footage. A person's
+        # trimming of one is kept while it still plays the same lines.
         done: dict[str, PlanSegment] = {}
-        for seg in script.segments:
-            if seg.kind == "original":
-                done[seg.id] = _original(seg, transcript, shots)
+        for sid in order:
+            seg = by_id.get(sid)
+            old = before.get(sid)
+            if seg is None:  # inserted by a person
+                assert old is not None
+                done[sid] = old
+            elif seg.kind == "original":
+                keep = (
+                    old is not None
+                    and old.kind == "original"
+                    and bool(old.line_refs)
+                    and old.line_refs == seg.line_refs
+                )
+                done[sid] = old if keep and old is not None else _original(seg, transcript, shots)
         taken = [c for p in done.values() for c in p.clips]
 
         # Then decide which narration segments stay, so a rebuild avoids their shots.
         used: set[str] = set()
         rebuild: dict[str, ScriptSegment] = {}
-        for seg in script.segments:
-            if seg.kind != "narration":
+        for sid in order:
+            seg = by_id.get(sid)
+            if seg is None or seg.kind != "narration":
                 continue
             old = before.get(seg.id)
             decision = decide_narration(
                 seg.id,
                 seg.text,
-                voice,
+                voice_for(old, voice),
                 old,
                 audio_exists=bool(
                     old
@@ -250,11 +277,11 @@ class PlanStage(Stage):
                 raise StageCanceled(self.name)
             old = before.get(seg.id)
             done[seg.id] = self._build_narration(
-                ctx, seg, voice, old, picker, used, taken, asset_id
+                ctx, seg, voice_for(old, voice), old, picker, used, taken, asset_id
             )
             ctx.progress((i + 1) / n, seg.id)
 
-        segments = [done[seg.id] for seg in script.segments]
+        segments = [done[sid] for sid in order]
         for o in find_overlaps(segments):
             report.warnings.append(
                 f"{o.original_id} (original sound) and {o.narration_id} show the same footage "
@@ -329,6 +356,7 @@ class PlanStage(Stage):
             text=seg.text,
             text_hash=text_digest(seg.text),
             voice=voice,
+            voice_pinned=bool(old and old.kind == "narration" and old.voice_pinned),
             audio=AudioRef(
                 file=rel, duration_ms=audio.duration_ms, char_timings=audio.char_timings
             ),
@@ -488,10 +516,6 @@ def _segment_ms(seg: PlanSegment) -> int:
     if seg.audio is not None:
         return seg.audio.duration_ms
     return round(sum((c.src_out_ms - c.src_in_ms) / c.speed for c in seg.clips))
-
-
-def _ids(script: Script) -> set[str]:
-    return {s.id for s in script.segments}
 
 
 def _digest(text: str) -> str:

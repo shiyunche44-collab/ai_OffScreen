@@ -52,6 +52,7 @@ def original_segment(
     return PlanSegment(
         id=segment_id,
         kind="original",
+        line_refs=list(line_refs),
         clips=[original_clip(line_refs, transcript, asset_duration_ms)],
         source_audio=SourceAudio(mode="full", stem="mix", gain_db=0.0),
     )

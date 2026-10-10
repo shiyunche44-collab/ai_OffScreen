@@ -407,6 +407,87 @@ def test_the_plan_follows_the_edited_script_and_redoes_only_what_changed(
     assert all(s["cached"] for s in after["stages"]) and after["video"]
 
 
+def test_the_plan_can_be_edited_and_a_rebuild_keeps_the_edits(
+    client: TestClient, services: AppServices, fakes: Providers, movie: Path
+) -> None:
+    asset = import_movie(client, movie)
+    pid = client.post(
+        "/api/projects", json={"asset_id": asset["id"], "options": {"minutes": 0.25}}
+    ).json()["id"]
+    url = f"/api/projects/{pid}/plan"
+
+    def run(step: str) -> None:
+        job = client.post(f"/api/projects/{pid}/{step}").json()
+        drain(services)
+        assert client.get(f"/api/jobs/{job['id']}").json()["status"] == "succeeded"
+
+    err(client.get(url), 404, "not_found")
+    err(client.post(f"{url}:edit", json={"base_version": 1, "ops": [_DELETE]}), 404, "not_found")
+    run("script:generate")
+    run("plan:build")
+    v1 = client.get(url).json()
+    assert [s["id"] for s in v1["segments"]] == ["seg_01", "seg_02", "seg_03"]
+
+    ops = [
+        {"op": "set_locked", "segment_id": "seg_01", "index": 0, "locked": True},
+        {"op": "move_segment", "segment_id": "seg_03", "to_index": 0},
+        {"op": "set_voice", "segment_id": "seg_02", "voice_id": "mine", "speed": 1.25},
+    ]
+    r = client.post(f"{url}:edit", json={"base_version": 1, "ops": ops})
+    assert r.status_code == 200, r.text
+    v2 = r.json()
+    assert (v2["version"], v2["parent_version"], v2["author"], v2["id"]) == (
+        2,
+        1,
+        "human",
+        v1["id"],
+    )
+    assert [s["id"] for s in v2["segments"]] == ["seg_03", "seg_01", "seg_02"]
+    assert v2["segments"][1]["clips"][0]["locked"] is True
+    assert (v2["segments"][2]["stale"], v2["segments"][2]["voice_pinned"]) == (True, True)
+    assert [v["version"] for v in client.get(f"{url}/versions").json()] == [2, 1]
+    diff = client.get(f"{url}/diff", params={"a": 1, "b": 2}).json()
+    assert diff["reordered"] is True
+    assert {c["segment_id"]: c["status"] for c in diff["changes"]}["seg_02"] == "changed"
+
+    # an edit made from an old version, a bad operation and an empty request are all refused
+    err(client.post(f"{url}:edit", json={"base_version": 1, "ops": [_DELETE]}), 409, "conflict")
+    bad = {"op": "swap_clip", "segment_id": "seg_01", "index": 9, "to": {"shot_id": "sh_0001"}}
+    refused = err(
+        client.post(f"{url}:edit", json={"base_version": 2, "ops": [bad]}), 422, "invalid_input"
+    )
+    assert "edit 1 (swap_clip)" in refused["message"]
+    err(client.post(f"{url}:edit", json={"base_version": 2, "ops": []}), 422, "validation_error")
+    assert client.get(url).json()["version"] == 2  # nothing half-saved
+
+    # the next build speaks the changed voice (only that segment) and keeps everything else
+    assert isinstance(fakes.tts, FakeTTS)
+    spoken = len(fakes.tts.calls)
+    run("plan:build")
+    v3 = client.get(url).json()
+    assert [c[1:] for c in fakes.tts.calls[spoken:]] == [("mine", 1.25)]
+    assert (v3["version"], v3["parent_version"], v3["author"]) == (3, 2, "ai")
+    assert [s["id"] for s in v3["segments"]] == ["seg_03", "seg_01", "seg_02"]
+    assert v3["segments"][1] == v2["segments"][1]  # untouched, lock included
+    assert v3["segments"][0] == v2["segments"][0]
+    redone = v3["segments"][2]
+    assert (redone["stale"], redone["voice"]["voice_id"], redone["voice_pinned"]) == (
+        False,
+        "mine",
+        True,
+    )
+
+    # it renders in the order the person chose, and building again changes nothing
+    run("render")
+    run("plan:build")
+    assert client.get(url).json() == v3
+    after = client.get(f"/api/projects/{pid}").json()
+    assert all(s["cached"] for s in after["stages"]) and after["video"]
+
+
+_DELETE = {"op": "delete_segment", "segment_id": "seg_01"}
+
+
 def test_edits_and_regeneration_share_one_version_history(
     client: TestClient, services: AppServices, movie: Path
 ) -> None:

@@ -10,7 +10,7 @@ script leaves the others reusable."""
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -45,7 +45,8 @@ def decide_narration(
     audio_exists: bool,
 ) -> Decision:
     """Whether the segment of the previous plan can stay, and if not, why. The first reason
-    that applies is given."""
+    that applies is given. `voice` is the one the segment should have (its own when a person
+    pinned it, else the script's)."""
     if previous is None or previous.kind != "narration":
         return Decision(segment_id, "new")
     if previous.stale:
@@ -59,6 +60,46 @@ def decide_narration(
     if previous.audio is None or not audio_exists:
         return Decision(segment_id, "audio_missing")
     return Decision(segment_id, None)
+
+
+def voice_for(previous: PlanSegment | None, default: VoiceSpec) -> VoiceSpec:
+    """A person's choice of voice for a segment outlives rebuilds; otherwise the script's."""
+    if previous is not None and previous.kind == "narration" and previous.voice_pinned:
+        return previous.voice or default
+    return default
+
+
+def plan_order(
+    script_ids: Sequence[str],
+    previous: EditPlan | None,
+    previous_script_ids: Collection[str] | None,
+) -> list[str]:
+    """The segment ids of the new plan, in order.
+
+    Without a previous plan, or without the script it was built from, the plan is the script.
+    Otherwise a person's structural edits of the plan stand: the plan's own order is kept,
+    a segment the person deleted (it was in the previous script, and is not in the plan) stays
+    deleted, and an original-sound segment the person inserted (it is in neither script) stays.
+    Segments the script gained since are put after the script segment before them."""
+    if previous is None or previous_script_ids is None:
+        return list(script_ids)
+    current, known = set(script_ids), set(previous_script_ids)
+    order = [
+        s.id
+        for s in previous.segments
+        if s.id in current or (s.id not in known and s.kind == "original")
+    ]
+    present = set(order)
+    for i, sid in enumerate(script_ids):
+        if sid in present or sid in known:
+            continue
+        at = next(
+            (order.index(p) + 1 for p in reversed(script_ids[:i]) if p in present),
+            0,
+        )
+        order.insert(at, sid)
+        present.add(sid)
+    return order
 
 
 def playback_ms(clip: Clip) -> int:

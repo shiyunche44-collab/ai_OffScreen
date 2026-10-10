@@ -558,3 +558,111 @@ def test_the_vector_search_brings_in_footage_beyond_the_cited_scenes(tmp_path: P
 
     assert "sh_0007" not in {c.shot_id for c in without.segments[0].clips}
     assert "sh_0007" in {c.shot_id for c in with_search.segments[0].clips}
+
+
+# ---- what a person's edits of the plan mean to a rebuild ----------------------------------
+def with_segments(prev: EditPlan, segments: list[PlanSegment]) -> EditPlan:
+    return prev.model_copy(update={"segments": segments})
+
+
+def test_a_voice_a_person_chose_is_spoken_by_the_next_build_and_kept_after_that(
+    tmp_path: Path,
+) -> None:
+    first = build(tmp_path, SEGS, FakeTTS()).ensure("creation.plan", SCOPE)
+    before = plan_of(first)
+    mine = before.segments[1].voice.model_copy(update={"voice_id": "mine", "speed": 1.25})  # type: ignore[union-attr]
+    edited = with_segments(
+        before,
+        [
+            before.segments[0],
+            before.segments[1].model_copy(
+                update={"voice": mine, "voice_pinned": True, "stale": True}
+            ),
+            before.segments[2],
+        ],
+    )
+
+    tts = FakeTTS()
+    art = rebuild_on(tmp_path, first, SEGS, tts, plan=edited)
+
+    assert tts.calls == [("字" * 27, "mine", 1.25)]
+    seg = plan_of(art).segments[1]
+    assert (seg.voice, seg.voice_pinned, seg.stale) == (mine, True, False)
+    assert art.meta["rebuilt"] == {"seg_02": "stale"}
+    # a later build does not take it back to the script's voice
+    tts2 = FakeTTS()
+    again = rebuild_on(tmp_path, art, SEGS, tts2, version=2)
+    assert tts2.calls == [] and plan_of(again).segments[1].voice == mine
+
+
+def test_a_trimmed_original_sound_segment_is_kept_until_the_script_cites_other_lines(
+    tmp_path: Path,
+) -> None:
+    orig = ScriptSegment(id="seg_02", kind="original", text="（原声）", line_refs=["ln_0001"])
+    segs = [narration(1, "字" * 9, ["sc_001"]), orig]
+    first = build(tmp_path, segs, FakeTTS()).ensure("creation.plan", SCOPE)
+    before = plan_of(first)
+    assert before.segments[1].line_refs == ["ln_0001"]
+    trimmed = (
+        before.segments[1].clips[0].model_copy(update={"src_in_ms": 20_500, "src_out_ms": 21_500})
+    )
+    edited = with_segments(
+        before, [before.segments[0], before.segments[1].model_copy(update={"clips": [trimmed]})]
+    )
+
+    kept = rebuild_on(tmp_path, first, segs, FakeTTS(), plan=edited)
+    assert plan_of(kept).segments[1].clips == [trimmed]
+
+    other = ScriptSegment(id="seg_02", kind="original", text="（原声）", line_refs=["ln_0002"])
+    redone = rebuild_on(tmp_path, first, [segs[0], other], FakeTTS(), plan=edited)
+    (c,) = plan_of(redone).segments[1].clips
+    assert (c.src_in_ms, c.src_out_ms) == (24_800, 26_200)
+
+
+def test_the_order_and_deletions_a_person_made_in_the_plan_survive_a_rebuild(
+    tmp_path: Path,
+) -> None:
+    first = build(tmp_path, SEGS, FakeTTS()).ensure("creation.plan", SCOPE)
+    before = plan_of(first)
+    s1, _s2, s3 = before.segments
+    edited = with_segments(before, [s3, s1])  # moved seg_03 to the front, deleted seg_02
+    new = narration(4, "丙" * 18, ["sc_002"])
+    script = [*SEGS, new]  # the script gains seg_04 at the end
+    settings = PlanSettings(
+        script=script_of(script, version=2),
+        previous=PreviousPlan(edited, first.dir),
+        previous_script_ids=tuple(s.id for s in SEGS),
+    )
+
+    tts = FakeTTS()
+    art = build(tmp_path, script, tts, settings=settings).ensure("creation.plan", SCOPE)
+
+    plan = plan_of(art)
+    # seg_04 follows seg_03 in the script, so it goes after seg_03 wherever the person put it
+    assert [s.id for s in plan.segments] == ["seg_03", "seg_04", "seg_01"]
+    assert art.meta["rebuilt"] == {"seg_04": "new"} and art.meta["removed"] == []
+    assert [t for t, _, _ in tts.calls] == ["丙" * 18]
+    assert plan.segments[0] == s3 and plan.segments[2] == s1
+
+
+def test_original_sound_inserted_by_a_person_stays(tmp_path: Path) -> None:
+    first = build(tmp_path, SEGS, FakeTTS()).ensure("creation.plan", SCOPE)
+    before = plan_of(first)
+    inserted = PlanSegment(
+        id="seg_o01",
+        kind="original",
+        line_refs=["ln_0001"],
+        clips=[before.segments[0].clips[0].model_copy(update={"locked": True})],
+    )
+    edited = with_segments(before, [before.segments[0], inserted, *before.segments[1:]])
+    settings = PlanSettings(
+        script=script_of(SEGS, version=1),
+        previous=PreviousPlan(edited, first.dir),
+        previous_script_ids=tuple(s.id for s in SEGS),
+    )
+
+    art = build(tmp_path, SEGS, FakeTTS(), settings=settings).ensure("creation.plan", SCOPE)
+
+    assert [s.id for s in plan_of(art).segments] == ["seg_01", "seg_o01", "seg_02", "seg_03"]
+    assert plan_of(art).segments[1] == inserted
+    assert art.meta["rebuilt"] == {}

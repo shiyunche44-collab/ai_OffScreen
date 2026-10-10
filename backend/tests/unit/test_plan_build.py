@@ -10,13 +10,15 @@ from offscreen.algo.plan_build import (
     PlanReport,
     decide_narration,
     keep_locked,
+    plan_order,
     playback_ms,
     text_digest,
+    voice_for,
     with_fresh_footage,
 )
 from offscreen.algo.textsim import bigram_similarity, bigrams, coverage
 from offscreen.algo.vectors import rank_by_similarity, search_signal
-from offscreen.domain.plan import AudioRef, Clip, PlanSegment, VoiceSpec
+from offscreen.domain.plan import AudioRef, Clip, EditPlan, PlanSegment, ScriptRef, VoiceSpec
 
 VOICE = VoiceSpec(voice_id="v", speed=1.0)
 
@@ -179,3 +181,72 @@ class TestVectors:
 
     def test_no_columns_no_signal(self) -> None:
         assert search_signal({}) == ([], {})
+
+
+class TestVoiceAndOrder:
+    def seg(self, sid: str, kind: str = "narration") -> PlanSegment:
+        if kind == "original":
+            return PlanSegment(id=sid, kind="original", clips=[clip(0, 500, locked=True)])
+        return narration("你好").model_copy(update={"id": sid})
+
+    def plan(self, *segs: PlanSegment) -> EditPlan:
+        return EditPlan(
+            id="pln_t",
+            project_id="prj_t",
+            version=3,
+            author="human",
+            script_ref=ScriptRef(id="scr_t", version=2),
+            segments=list(segs),
+        )
+
+    def test_a_pinned_voice_outlives_the_scripts(self) -> None:
+        mine = VoiceSpec(voice_id="mine", speed=1.3)
+        pinned = narration("你好", voice=mine).model_copy(update={"voice_pinned": True})
+
+        assert voice_for(pinned, VOICE) == mine
+        assert voice_for(narration("你好", voice=mine), VOICE) == VOICE  # not pinned
+        assert voice_for(None, VOICE) == VOICE
+        assert decide_narration(
+            "seg_01", "你好", voice_for(pinned, VOICE), pinned, audio_exists=True
+        ).reuse
+
+    def test_without_history_the_plan_is_the_script(self) -> None:
+        assert plan_order(["a", "b"], None, None) == ["a", "b"]
+        assert plan_order(["a", "b"], self.plan(self.seg("seg_02")), None) == ["a", "b"]
+
+    def test_a_person_s_order_stands(self) -> None:
+        prev = self.plan(self.seg("seg_03"), self.seg("seg_01"), self.seg("seg_02"))
+
+        order = plan_order(["seg_01", "seg_02", "seg_03"], prev, {"seg_01", "seg_02", "seg_03"})
+
+        assert order == ["seg_03", "seg_01", "seg_02"]
+
+    def test_a_segment_the_person_deleted_stays_deleted(self) -> None:
+        prev = self.plan(self.seg("seg_01"), self.seg("seg_03"))
+
+        order = plan_order(["seg_01", "seg_02", "seg_03"], prev, {"seg_01", "seg_02", "seg_03"})
+
+        assert order == ["seg_01", "seg_03"]
+
+    def test_a_segment_the_script_dropped_goes_and_a_new_one_follows_its_predecessor(self) -> None:
+        prev = self.plan(self.seg("seg_03"), self.seg("seg_01"), self.seg("seg_02"))
+
+        order = plan_order(
+            ["seg_01", "seg_04", "seg_03"],  # seg_02 dropped, seg_04 new after seg_01
+            prev,
+            {"seg_01", "seg_02", "seg_03"},
+        )
+
+        assert order == ["seg_03", "seg_01", "seg_04"]
+
+    def test_a_new_first_segment_goes_first_and_inserted_original_sound_stays(self) -> None:
+        prev = self.plan(self.seg("seg_01"), self.seg("seg_o01", "original"), self.seg("seg_02"))
+
+        order = plan_order(["seg_00", "seg_01", "seg_02"], prev, {"seg_01", "seg_02"})
+
+        assert order == ["seg_00", "seg_01", "seg_o01", "seg_02"]
+
+    def test_an_original_segment_the_script_dropped_is_not_mistaken_for_an_insert(self) -> None:
+        prev = self.plan(self.seg("seg_01"), self.seg("seg_02", "original"))
+
+        assert plan_order(["seg_01"], prev, {"seg_01", "seg_02"}) == ["seg_01"]
