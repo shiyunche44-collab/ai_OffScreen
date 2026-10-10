@@ -65,4 +65,5 @@ offscreen prompt list / render <name> [--vars v.json]   # 看提示词模板及�
 offscreen style list / show <id>             # 风格预设：语气、结构、开头钩子、常用句式、禁用词
 offscreen report <asset>                         # 分析的耗时、模型用量、数量
 offscreen cuts evaluate <asset> [--raw]          # 镜头检测对人工标注切点的 P / R / F1
+offscreen select evaluate <asset> [-k 5]         # 选镜排序对人工标注的首选可接受率 / top-k 召回（docs/M5_EVALUATION.md）
 ```

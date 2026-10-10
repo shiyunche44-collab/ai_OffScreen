@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from offscreen.domain.index import CutAnnotations
+from offscreen.domain.index import CutAnnotations, SelectionAnnotations
 from offscreen.store.files import read_model, write_model
 
 CUTS_FILE = "cuts.json"
+SELECTION_FILE = "selection.json"
 
 
 class AnnotationsStore:
@@ -27,3 +28,11 @@ class AnnotationsStore:
 
     def write_cuts(self, doc: CutAnnotations) -> None:
         write_model(self._path(doc.asset_id, CUTS_FILE), doc)
+
+    def read_selection(self, asset_id: str) -> SelectionAnnotations | None:
+        """The labelled footage choices, or None if nobody has labelled this movie."""
+        path = self._path(asset_id, SELECTION_FILE)
+        return read_model(path, SelectionAnnotations) if path.is_file() else None
+
+    def write_selection(self, doc: SelectionAnnotations) -> None:
+        write_model(self._path(doc.asset_id, SELECTION_FILE), doc)

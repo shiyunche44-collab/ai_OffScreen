@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "SelectionLabel": {
+      "additionalProperties": false,
+      "description": "One piece of narration with the shots a person says would be fine to show under it.",
+      "properties": {
+        "acceptable": {
+          "items": {
+            "pattern": "^sh_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Acceptable",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[0-9A-Za-z_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "scene_refs": {
+          "items": {
+            "pattern": "^sc_[0-9A-Za-z]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Scene Refs",
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "scene_refs",
+        "acceptable"
+      ],
+      "title": "SelectionLabel",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Ground truth for footage selection: what the ranking of shots is measured against. Human\nwork, kept apart from every analysis output.",
+  "properties": {
+    "asset_id": {
+      "pattern": "^ast_[0-9A-Za-z]+$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "labels": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SelectionLabel"
+      },
+      "title": "Labels",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "asset_id"
+  ],
+  "title": "SelectionAnnotations",
+  "type": "object"
+}

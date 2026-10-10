@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from offscreen.config import ConfigError, load_config
+from offscreen.domain.index import SelectionLabel
 from offscreen.server import default_web_dir, run_worker, serve
 from offscreen.services.app import AppServices
 from offscreen.services.config_view import show_config
@@ -242,6 +243,89 @@ def cuts_export(
     typer.echo(
         json.dumps(
             {"asset_id": view.asset_id, "fps": [view.fps_num, view.fps_den], "cuts": view.cuts}
+        )
+    )
+
+
+select_app = typer.Typer(
+    help="Hand-labelled footage choices and how well the ranking of shots finds them",
+    no_args_is_help=True,
+)
+app.add_typer(select_app, name="select")
+
+
+@select_app.command("evaluate")
+def select_evaluate(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    k: Annotated[int, typer.Option("-k", help="How many top shots count as found")] = 5,
+    config: ConfigOpt = None,
+) -> None:
+    """First-choice rate and top-k recall of the shot ranking against the labelled choices."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            r = services.annotations.evaluate_selection(asset, k=k)
+    except (ConfigError, NotFound, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    search = "with" if r.vector_search else "without"
+    typer.echo(f"{r.asset_id}  {r.labels} labels, ranked {search} the vector search")
+    typer.echo(f"first choice acceptable  {r.first_choice_rate:.3f}")
+    typer.echo(f"acceptable shot in top {r.k}  {r.top_k_hit_rate:.3f}")
+    typer.echo(f"top-{r.k} recall           {r.top_k_recall:.3f}")
+    typer.echo(f"mean reciprocal rank     {r.mean_reciprocal_rank:.3f}")
+    missed = [x for x in r.results if not x.top_k_hit]
+    typer.echo(f"not in the top {r.k}: {', '.join(x.label_id for x in missed) or '-'}")
+    wrong = [x for x in r.results if x.first_rank != 1 and x.top_k_hit]
+    late = ", ".join(f"{x.label_id}(#{x.first_rank})" for x in wrong) or "-"
+    typer.echo(f"found, but not first:  {late}")
+
+
+@select_app.command("import")
+def select_import(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    file: Annotated[
+        Path,
+        typer.Argument(
+            help='JSON: a list of labels, or {"labels": [...]}; a label is '
+            '{"id", "text", "scene_refs": [...], "acceptable": [shot ids], "note"?}'
+        ),
+    ],
+    config: ConfigOpt = None,
+) -> None:
+    """Save labelled footage choices from a JSON file (replaces the earlier ones)."""
+    try:
+        raw = json.loads(file.read_text(encoding="utf-8"))
+        items = raw["labels"] if isinstance(raw, dict) else raw
+        if not isinstance(items, list):
+            raise ValueError("expected a list of labels")
+        labels = [SelectionLabel.model_validate(x) for x in items]
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            saved = services.annotations.save_selection(asset, labels)
+    except (OSError, ValueError, KeyError, ConfigError, NotFound, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"saved {len(saved)} labels for {asset}")
+
+
+@select_app.command("export")
+def select_export(
+    asset: Annotated[str, typer.Argument(help="Asset id (ast_…)")],
+    config: ConfigOpt = None,
+) -> None:
+    """Print the labelled footage choices as JSON."""
+    try:
+        cfg = load_config(config)
+        with AppServices(cfg) as services:
+            labels = services.annotations.selection(asset)
+    except (ConfigError, NotFound) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(
+        json.dumps(
+            {"asset_id": asset, "labels": [x.model_dump(mode="json") for x in labels]},
+            ensure_ascii=False,
         )
     )
 

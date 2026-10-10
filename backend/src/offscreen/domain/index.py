@@ -337,3 +337,34 @@ class CutAnnotations(Versioned):
         if self.cuts != sorted(set(self.cuts)):
             raise ValueError("cuts must be ascending without duplicates")
         return self
+
+
+class SelectionLabel(Strict):
+    """One piece of narration with the shots a person says would be fine to show under it."""
+
+    id: str = Field(pattern=r"^[0-9A-Za-z_-]+$")
+    text: str = Field(min_length=1)
+    """The narration, as it would be spoken."""
+    scene_refs: list[SceneId] = Field(min_length=1)
+    """The scenes the text is about (a narration segment always cites some)."""
+    acceptable: list[ShotId] = Field(min_length=1)
+    """Every shot that would be an acceptable picture for the text, not just the best one."""
+    note: str | None = None
+
+
+class SelectionAnnotations(Versioned):
+    """Ground truth for footage selection: what the ranking of shots is measured against. Human
+    work, kept apart from every analysis output."""
+
+    asset_id: AssetId
+    labels: list[SelectionLabel] = []
+
+    @model_validator(mode="after")
+    def _unique(self) -> Self:
+        ids = [x.id for x in self.labels]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate label ids")
+        for label in self.labels:
+            if len(label.acceptable) != len(set(label.acceptable)):
+                raise ValueError(f"{label.id}: duplicate acceptable shots")
+        return self

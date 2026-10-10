@@ -32,9 +32,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
-from offscreen.algo.candidates import candidates_for_segment
 from offscreen.algo.fitting import MAX_CLIP_MS, MIN_CLIP_MS, MIN_SPEED, Shot, fit_duration
 from offscreen.algo.original import find_overlaps, original_segment
 from offscreen.algo.plan_build import (
@@ -47,20 +44,12 @@ from offscreen.algo.plan_build import (
     voice_for,
     with_fresh_footage,
 )
-from offscreen.algo.scoring import ScoringWeights, score_candidates
-from offscreen.algo.search import search_text
-from offscreen.algo.textsim import coverage
+from offscreen.algo.scoring import ScoringWeights
 from offscreen.algo.tts import tts_cache_key
-from offscreen.algo.vectors import TOP_K, rank_by_similarity, search_signal
+from offscreen.algo.vectors import TOP_K
 from offscreen.domain.index import (
     Captions,
-    Cast,
-    Characters,
-    Scene,
     Scenes,
-    ShotCaption,
-    ShotIndex,
-    ShotIndexEntry,
     Shots,
     Transcript,
 )
@@ -78,15 +67,16 @@ from offscreen.domain.script import Script, ScriptSegment
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.providers.ports import TTS, Embedder
 from offscreen.stages.analysis.captions import CAPTIONS_FILE
-from offscreen.stages.analysis.embeddings import (
-    IMAGE_VECTORS_FILE,
-    SHOT_INDEX_FILE,
-    TEXT_VECTORS_FILE,
-)
 from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
 from offscreen.stages.analysis.transcript import TRANSCRIPT_FILE
 from offscreen.stages.creation.script import SCRIPT_FILE
+from offscreen.stages.creation.selection import (
+    SelectionError,
+    ShotRanker,
+    VectorSearch,
+    load_vector_search,
+)
 from offscreen.store.files import write_model
 
 PLAN_FILE = "plan.json"
@@ -98,8 +88,6 @@ POOL = 12
 about six)."""
 MIN_FILL_MS = round(MIN_CLIP_MS / 1.15) + 1
 """Shortest footage worth adding around locked clips (the shortest clip plays this long)."""
-NEUTRAL_QUALITY = 0.5
-"""Sharpness / brightness assumed for a shot without a measurement."""
 
 log = logging.getLogger(__name__)
 
@@ -207,11 +195,13 @@ class PlanStage(Stage):
         (ctx.out_dir / AUDIO_DIR).mkdir()
 
         picker = _Picker(
-            shots=shots,
-            scenes=scenes,
-            captions=captions,
-            weights=self.settings.weights,
-            search=self._search(ctx),
+            ShotRanker(
+                shots=shots,
+                scenes=scenes,
+                captions=captions,
+                weights=self.settings.weights,
+                search=self._search(ctx),
+            )
         )
         by_id = {seg.id: seg for seg in script.segments}
         order = plan_order(
@@ -364,71 +354,23 @@ class PlanStage(Stage):
             source_audio=SourceAudio(mode="duck", stem="mix", gain_db=NARRATION_SOURCE_GAIN_DB),
         )
 
-    def _search(self, ctx: StageContext) -> _Search | None:
+    def _search(self, ctx: StageContext) -> VectorSearch | None:
         if self.image_embedder is None and self.text_embedder is None:
             return None
-        art = ctx.input("analysis.embeddings")
-        index = art.read_model(SHOT_INDEX_FILE, ShotIndex)
-        ids = [e.shot_id for e in index.shots]
-        columns: list[tuple[str, Embedder, Any]] = []
-        if self.image_embedder is not None and index.image_model is not None:
-            columns.append(("image", self.image_embedder, np.load(art.path(IMAGE_VECTORS_FILE))))
-        if self.text_embedder is not None and index.text_model is not None:
-            columns.append(("text", self.text_embedder, np.load(art.path(TEXT_VECTORS_FILE))))
-        return _Search(ids, columns)
-
-
-class _Search:
-    """A segment's text compared with every shot, by picture and by description."""
-
-    def __init__(self, ids: list[str], columns: list[tuple[str, Embedder, Any]]) -> None:
-        self.ids = ids
-        self.columns = columns
-
-    def __call__(self, text: str) -> tuple[list[str], dict[str, float]]:
-        ranked: dict[str, list[tuple[str, float]]] = {}
-        for name, embedder, matrix in self.columns:
-            (vector,) = embedder.embed_texts([text])
-            try:
-                ranked[name] = rank_by_similarity(self.ids, matrix, vector)
-            except ValueError as e:
-                raise PlanError(f"{name} vectors do not match the query embedder: {e}") from e
-        return search_signal(ranked)
+        try:
+            return load_vector_search(
+                ctx.input("analysis.embeddings"), self.image_embedder, self.text_embedder
+            )
+        except SelectionError as e:
+            raise PlanError(str(e)) from e
 
 
 class _Picker:
     """Chooses and cuts the footage for one narration segment."""
 
-    def __init__(
-        self,
-        *,
-        shots: Shots,
-        scenes: dict[str, Scene],
-        captions: dict[str, ShotCaption],
-        weights: ScoringWeights,
-        search: _Search | None,
-    ) -> None:
-        self.shots = {s.id: s for s in shots.shots}
-        self.shot_list = shots
-        self.scenes = scenes
-        self.scene_shots = {sid: list(sc.shot_ids) for sid, sc in scenes.items()}
-        self.captions = captions
-        self.weights = weights
-        self.search = search
-        scene_of = {sh: sc.id for sc in scenes.values() for sh in sc.shot_ids}
-        self.entries = {
-            s.id: ShotIndexEntry(
-                shot_id=s.id,
-                scene_id=scene_of.get(s.id),
-                start_ms=s.start_ms,
-                end_ms=s.end_ms,
-                sharpness=s.quality.sharpness if s.quality else NEUTRAL_QUALITY,
-                brightness=s.quality.brightness if s.quality else NEUTRAL_QUALITY,
-                is_credits=bool(captions[s.id].is_credits) if s.id in captions else False,
-                caption=search_text(captions[s.id]) if s.id in captions else "",
-            )
-            for s in shots.shots
-        }
+    def __init__(self, ranker: ShotRanker) -> None:
+        self.ranker = ranker
+        self.shots = {s.id: s for s in ranker.shot_list.shots}
 
     def pick(
         self,
@@ -438,36 +380,10 @@ class _Picker:
         taken: list[Clip],
         asset_id: str,
     ) -> list[Clip]:
-        for ref in seg.scene_refs:
-            if ref not in self.scenes:
-                raise PlanError(f"{seg.id} cites unknown scene {ref}")
-        top, similarity = self.search(seg.text) if self.search else ([], {})
-        cand = candidates_for_segment(
-            seg,
-            self.shot_list,
-            self.scene_shots,
-            self.captions,
-            Cast(asset_id=asset_id, shots=[]),
-            Characters(asset_id=asset_id, characters=[]),
-            {"embedding": top} if top else None,
-        )
-        ids = [sid for sid in cand.shot_ids if self._usable(sid, taken)]
-        if not ids:
-            raise PlanError(f"{seg.id}: no usable footage among {len(cand.shot_ids)} candidates")
-        starts = [self.scenes[ref].start_ms for ref in seg.scene_refs]
-        scored = score_candidates(
-            ids,
-            self.entries,
-            {},
-            self.captions,
-            seg.text,
-            similarity,
-            set(),
-            used,
-            min(starts),
-            self.weights,
-            caption_similarity=coverage,
-        )[:POOL]
+        try:
+            scored = self.ranker.rank(seg, used=used, taken=taken)[:POOL]
+        except SelectionError as e:
+            raise PlanError(str(e)) from e
         total = {s.shot_id: s.total for s in scored}
         try:
             cuts = fit_duration(
@@ -495,12 +411,6 @@ class _Picker:
             )
             for c in cuts
         ]
-
-    def _usable(self, shot_id: str, taken: list[Clip]) -> bool:
-        entry = self.entries.get(shot_id)
-        if entry is None or entry.is_credits:
-            return False
-        return not any(t.src_in_ms < entry.end_ms and entry.start_ms < t.src_out_ms for t in taken)
 
 
 def _original(seg: ScriptSegment, transcript: Transcript, shots: Shots) -> PlanSegment:

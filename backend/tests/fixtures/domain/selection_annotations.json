@@ -1,0 +1,30 @@
+{
+  "asset_id": "ast_sintel01",
+  "labels": [
+    {
+      "acceptable": [
+        "sh_0031",
+        "sh_0032"
+      ],
+      "id": "q01",
+      "note": null,
+      "scene_refs": [
+        "sc_003"
+      ],
+      "text": "女孩在雪山里发现了一条受伤的龙。"
+    },
+    {
+      "acceptable": [
+        "sh_0071"
+      ],
+      "id": "q02",
+      "note": "只有远景合适",
+      "scene_refs": [
+        "sc_007",
+        "sc_008"
+      ],
+      "text": "她决定带着龙离开。"
+    }
+  ],
+  "schema_version": 1
+}
