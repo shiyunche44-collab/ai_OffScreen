@@ -321,6 +321,18 @@ def test_cache_key_covers_speed_and_engine(tmp_path: Path) -> None:
     )
 
 
+def test_the_voice_reads_normalized_text_and_timings_follow_the_script(tmp_path: Path) -> None:
+    tts = FakeTTS()
+    text = "2024年，他花了50%的钱"
+    plan = plan_of(
+        build(tmp_path, [narration(1, text, ["sc_001"])], tts).ensure("creation.plan", SCOPE)
+    )
+    assert tts.calls[0][0] == "二零二四年，他花了百分之五十的钱"
+    (seg,) = plan.segments
+    assert seg.text == text
+    assert seg.audio is not None and len(seg.audio.char_timings) == len(text)
+
+
 def test_voice_speed_is_validated() -> None:
     with pytest.raises(ValueError):
         PlanStage(FakeTTS(), 3.0)
