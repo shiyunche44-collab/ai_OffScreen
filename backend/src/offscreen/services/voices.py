@@ -14,6 +14,7 @@ from offscreen.algo.calibrate import (
     fit_rate,
     sample_of,
 )
+from offscreen.algo.normalize import spoken_text
 from offscreen.config import AppConfig
 from offscreen.domain.voice import Voice, VoiceLibrary
 from offscreen.providers.ports import TTSError
@@ -109,7 +110,8 @@ class VoiceService:
         samples = []
         try:
             for text in STANDARD_TEXTS:
-                audio = tts.synthesize(text, voice_id=voice_id, speed=1.0)
+                # Spoken as the plan stage speaks it; the rate stays in written characters.
+                audio = tts.synthesize(spoken_text(text).text, voice_id=voice_id, speed=1.0)
                 samples.append(sample_of(text, audio.duration_ms))
         except TTSError as e:
             raise InvalidInput(f"could not speak the standard texts: {e}") from e

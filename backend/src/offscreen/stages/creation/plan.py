@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from offscreen.algo.fitting import MAX_CLIP_MS, MIN_CLIP_MS, MIN_SPEED, Shot, fit_duration
+from offscreen.algo.normalize import spoken_text
 from offscreen.algo.original import find_overlaps, original_segment
 from offscreen.algo.plan_build import (
     PlanReport,
@@ -117,7 +118,8 @@ class PlanSettings:
 
 class PlanStage(Stage):
     name = "creation.plan"
-    version = 3  # 3: scored footage, speed fitting, incremental build, original segments
+    version = 4  # 3: scored footage, speed fitting, incremental build, original segments
+    # 4: narration is normalized before synthesis (algo/normalize.py)
     lane: Lane = "api"
 
     def __init__(
@@ -329,8 +331,9 @@ class PlanStage(Stage):
         taken: list[Clip],
         asset_id: str,
     ) -> PlanSegment:
-        audio = self.tts.synthesize(seg.text, voice_id=voice.voice_id, speed=voice.speed)
-        key = tts_cache_key(seg.text, voice.voice_id, voice.speed, self.tts.id)
+        spoken = spoken_text(seg.text)
+        audio = self.tts.synthesize(spoken.text, voice_id=voice.voice_id, speed=voice.speed)
+        key = tts_cache_key(spoken.text, voice.voice_id, voice.speed, self.tts.id)
         rel = f"{AUDIO_DIR}/{key.removeprefix('sha256:')[:16]}.{audio.format}"
         (ctx.out_dir / rel).write_bytes(audio.data)
 
@@ -348,7 +351,9 @@ class PlanStage(Stage):
             voice=voice,
             voice_pinned=bool(old and old.kind == "narration" and old.voice_pinned),
             audio=AudioRef(
-                file=rel, duration_ms=audio.duration_ms, char_timings=audio.char_timings
+                file=rel,
+                duration_ms=audio.duration_ms,
+                char_timings=spoken.source_timings(audio.char_timings, audio.duration_ms),
             ),
             clips=clips,
             source_audio=SourceAudio(mode="duck", stem="mix", gain_db=NARRATION_SOURCE_GAIN_DB),

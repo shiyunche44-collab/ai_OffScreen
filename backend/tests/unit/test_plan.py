@@ -327,6 +327,23 @@ def test_voice_speed_is_validated() -> None:
 
 
 # ---- incremental build ------------------------------------------------------------------
+def test_narration_is_normalized_and_timed_against_the_written_text(tmp_path: Path) -> None:
+    tts = FakeTTS(chars_per_s=4.5)
+    written = "他在2023年赚了50%"
+    art = build(tmp_path, [narration(1, written, ["sc_001"])], tts).ensure("creation.plan", SCOPE)
+    seg = plan_of(art).segments[0]
+
+    assert tts.calls[0][0] == "他在二零二三年赚了百分之五十"
+    assert seg.text == written  # captions show what was written
+    assert seg.audio is not None and seg.audio.duration_ms == 3_111  # 14 spoken chars at 4.5/s
+    timings = seg.audio.char_timings
+    assert len(timings) == len(written)
+    spoken = FakeTTS(chars_per_s=4.5).synthesize(tts.calls[0][0], voice_id="v").char_timings
+    assert timings[2:6] == spoken[2:6]  # "2023" read digit by digit: 二零二三
+    assert timings[-3][0] == spoken[-5][0]  # "50%" shares 百分之五十
+    assert timings[-1][1] == seg.audio.duration_ms
+
+
 SEGS = [
     narration(1, "字" * 18, ["sc_001"]),
     narration(2, "字" * 27, ["sc_002"]),
