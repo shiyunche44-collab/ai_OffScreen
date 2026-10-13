@@ -385,7 +385,7 @@ def test_input_validation_and_config(tmp_path: Path) -> None:
 
 def test_build_tts_wires_cache_dir(tmp_path: Path) -> None:
     tts = build_tts(make_cfg(tmp_path))
-    assert tts.dir == tmp_path / "tts_cache" and tts.id == "p:speech-x:mp3@32000"
+    assert tts.inner.dir == tmp_path / "tts_cache" and tts.id == "p:speech-x:mp3@32000"
 
 
 # ---- cache + fake ------------------------------------------------------------------------
