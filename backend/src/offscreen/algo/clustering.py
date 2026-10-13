@@ -122,7 +122,7 @@ def cluster_faces(
 
 def centroids(vectors: Vectors, labels: NDArray[np.int64]) -> Vectors:
     """The unit-length mean of each labelled group, one row per label 0..max."""
-    count = int(labels.max()) + 1 if len(labels) and labels.max() >= 0 else 0
+    count = max(int(max(labels.tolist(), default=-1)) + 1, 0)
     if count == 0:
         return np.zeros((0, vectors.shape[1] if vectors.ndim == 2 else 0))
     return _unit_rows(np.stack([vectors[labels == c].sum(axis=0) for c in range(count)]))

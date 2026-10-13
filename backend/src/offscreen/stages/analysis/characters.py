@@ -110,7 +110,7 @@ class CharactersStage(Stage):
                 )
             named.append(ShotFaces(shot_id=s.shot_id, faces=boxes))
 
-        count = int(labels.max()) + 1 if len(labels) and labels.max() >= 0 else 0
+        count = max(int(max(labels.tolist(), default=-1)) + 1, 0)
         centres = centroids(np.asarray(vectors, dtype=np.float64), labels)
         np.save(ctx.out_dir / CENTROIDS_FILE, centres.astype(np.float32))
         (ctx.out_dir / "faces").mkdir()
