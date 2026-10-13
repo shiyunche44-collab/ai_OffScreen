@@ -68,3 +68,5 @@
 | 参考录音原话自动转写 | T3 编排 / 声音 | 2026-10-13 | 搁置 | CosyVoice 有录音原话（`reference_text`）时克隆效果更好，现在要手填。可在 `voice add` 时用 ASR 端口自动转写，人再改 |
 | 豆包与 MiniMax 盲听结果 | T3 编排 / 声音 | 2026-10-13 | 待人工 | M6-04 生成了 6 对盲听样本（`scripts/tts_ab.py`，MiniMax `male-qn-qingse` 对 豆包 `zh_male_jieshuoxiaoming_uranus_bigtts`），主观结论要人听后填 `answers.txt` 再 `--score`；结果补进 PROVIDERS.md §5.5，再决定默认 TTS 是否换。样本没有做响度对齐（豆包各段响度差到 ~3 dB），偏好可能受音量影响 |
 | 豆包音色列表与声音复刻 | providers / 声音 | 2026-10-13 | 搁置 | V3 接口没有列音色的端点，可用音色只能从控制台抄（PROVIDERS.md §5.2 列了实测可用的 12 个）；当前 Key 未开通 `seed-icl-*`（声音复刻）和 `seed-tts-1.0`。开通复刻后可作为 CosyVoice 之外的云端克隆方案 |
+| ASR 对齐在真实识别上的效果 | T3 编排 / plan | 2026-10-13 | 搁置 | M6-05 的对齐（`algo/align.py`）只用编排好的识别结果测过：云环境拦截 Hugging Face，faster-whisper 模型下不来。要在本机用 CosyVoice 配音实测：匹配率、繁体输出（Whisper 中文常出繁体字，现在只靠前后插值兜底，可加繁简映射）、与豆包自带时间戳的偏差 |
+| 对齐转写占用的通道 | worker / 计划 | 2026-10-13 | 搁置 | 对齐在计划阶段里跑（api 通道），faster-whisper 默认 `device: cuda`；若同时 gpu 通道在转写整部电影，显存可能吃紧。真实使用中出现问题再考虑把对齐拆成 gpu 通道的单独阶段，或对齐固定用 CPU 小模型 |

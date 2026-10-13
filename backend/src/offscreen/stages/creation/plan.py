@@ -20,6 +20,10 @@ follow when a person has edited it (the document store's version); without it th
 the generated one. Both are part of the cache key. What was rebuilt, and why, goes to the job
 log and the artifact's manifest.
 
+Engines that give no timestamps (CosyVoice) leave the subtitles nothing to follow; with an
+`aligner` (the ASR port) the voice-over is transcribed and the recognized words are matched back
+onto the text (`algo.align`). A poor match keeps no timings rather than wrong ones.
+
 Audio files are written under `tts/` in this artifact and `AudioRef.file` is relative to the
 directory of the plan document, as for every plan version."""
 
@@ -28,10 +32,12 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from offscreen.algo.align import align_chars
 from offscreen.algo.fitting import MAX_CLIP_MS, MIN_CLIP_MS, MIN_SPEED, Shot, fit_duration
 from offscreen.algo.original import find_overlaps, original_segment
 from offscreen.algo.plan_build import (
@@ -67,7 +73,9 @@ from offscreen.domain.plan import (
 )
 from offscreen.domain.script import Script, ScriptSegment
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
-from offscreen.providers.ports import TTS, Embedder
+from offscreen.media.ffmpeg import FFmpegCanceled, FFmpegError
+from offscreen.media.transcode import extract_audio
+from offscreen.providers.ports import ASR, TTS, AsrCanceled, Embedder
 from offscreen.stages.analysis.captions import CAPTIONS_FILE
 from offscreen.stages.analysis.scenes import SCENES_FILE
 from offscreen.stages.analysis.shots import SHOTS_FILE
@@ -92,6 +100,9 @@ MIN_FILL_MS = round(MIN_CLIP_MS / 1.15) + 1
 """Shortest footage worth adding around locked clips (the shortest clip plays this long)."""
 
 log = logging.getLogger(__name__)
+
+ASR_SAMPLE_RATE = 16000
+"""What the ASR port takes."""
 
 
 class PlanError(RuntimeError):
@@ -119,7 +130,7 @@ class PlanSettings:
 
 class PlanStage(Stage):
     name = "creation.plan"
-    version = 4  # 3: scored footage, fitting, incremental build; 4: text normalized for speech
+    version = 5  # 4: text normalized for speech; 5: timings by ASR when the engine has none
     lane: Lane = "api"
 
     def __init__(
@@ -129,7 +140,9 @@ class PlanStage(Stage):
         settings: PlanSettings | None = None,
         image_embedder: Embedder | None = None,
         text_embedder: Embedder | None = None,
+        aligner: ASR | None = None,
     ) -> None:
+        """`aligner`: transcribes voice-over the TTS engine gave no timestamps for."""
         if not 0.5 <= voice_speed <= 2.0:
             raise ValueError("voice_speed must be within 0.5-2.0")
         self.tts = tts
@@ -137,6 +150,7 @@ class PlanStage(Stage):
         self.settings = settings or PlanSettings()
         self.image_embedder = image_embedder
         self.text_embedder = text_embedder
+        self.aligner = aligner
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
         refs = [
@@ -176,6 +190,7 @@ class PlanStage(Stage):
             "tts": self.tts.id,
             "image_embedder": self.image_embedder.id if self.image_embedder else "none",
             "text_embedder": self.text_embedder.id if self.text_embedder else "none",
+            "aligner": self.aligner.id if self.aligner else "none",
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
@@ -270,7 +285,16 @@ class PlanStage(Stage):
                 raise StageCanceled(self.name)
             old = before.get(seg.id)
             done[seg.id] = self._build_narration(
-                ctx, seg, voice_for(old, voice), old, picker, used, taken, asset_id
+                ctx,
+                seg,
+                voice_for(old, voice),
+                old,
+                picker,
+                used,
+                taken,
+                asset_id,
+                script.params.language,
+                report,
             )
             ctx.progress((i + 1) / n, seg.id)
 
@@ -331,12 +355,19 @@ class PlanStage(Stage):
         used: set[str],
         taken: list[Clip],
         asset_id: str,
+        language: str,
+        report: PlanReport,
     ) -> PlanSegment:
         speech = normalize_for_speech(seg.text)
         audio = self.tts.synthesize(speech.text, voice_id=voice.voice_id, speed=voice.speed)
         key = tts_cache_key(speech.text, voice.voice_id, voice.speed, self.tts.id)
         rel = f"{AUDIO_DIR}/{key.removeprefix('sha256:')[:16]}.{audio.format}"
         (ctx.out_dir / rel).write_bytes(audio.data)
+        spoken_timings = audio.char_timings
+        if not spoken_timings and self.aligner is not None:
+            spoken_timings = self._align(
+                ctx, rel, speech.text, audio.duration_ms, seg, language, report
+            )
 
         kept = keep_locked(old.clips if old and old.kind == "narration" else [], audio.duration_ms)
         fresh: list[Clip] = []
@@ -354,11 +385,56 @@ class PlanStage(Stage):
             audio=AudioRef(
                 file=rel,
                 duration_ms=audio.duration_ms,
-                char_timings=speech.source_timings(audio.char_timings, audio.duration_ms),
+                char_timings=speech.source_timings(spoken_timings, audio.duration_ms),
             ),
             clips=clips,
             source_audio=SourceAudio(mode="duck", stem="mix", gain_db=NARRATION_SOURCE_GAIN_DB),
         )
+
+    def _align(
+        self,
+        ctx: StageContext,
+        rel: str,
+        text: str,
+        duration_ms: int,
+        seg: ScriptSegment,
+        language: str,
+        report: PlanReport,
+    ) -> list[tuple[int, int]]:
+        """Timings for `text` from a transcription of the voice-over; [] when they would not
+        be trusted (or transcription is impossible), with a warning: subtitles then spread
+        evenly."""
+        assert self.aligner is not None
+        try:
+            with tempfile.TemporaryDirectory(dir=ctx.out_dir) as tmp:
+                wav = Path(tmp) / "speech.wav"
+                extract_audio(
+                    ctx.out_dir / rel,
+                    wav,
+                    stream_index=0,
+                    sample_rate=ASR_SAMPLE_RATE,
+                    channels=1,
+                    duration_ms=duration_ms,
+                )
+                result = self.aligner.transcribe(
+                    wav, language=language, should_cancel=ctx.is_canceled
+                )
+        except (AsrCanceled, FFmpegCanceled):
+            raise StageCanceled(self.name) from None
+        except (FFmpegError, RuntimeError, OSError) as e:  # e.g. the ASR is not installed
+            report.warnings.append(f"{seg.id}: no subtitle timings, transcription failed ({e})")
+            return []
+        words = [(w.w, w.start_ms, w.end_ms) for part in result.segments for w in part.words] or [
+            (part.text, part.start_ms, part.end_ms) for part in result.segments
+        ]
+        aligned = align_chars(text, words, duration_ms)
+        if not aligned.trusted:
+            report.warnings.append(
+                f"{seg.id}: no subtitle timings, only {aligned.coverage:.0%} of the voice-over "
+                "was recognized"
+            )
+            return []
+        return aligned.char_timings
 
     def _search(self, ctx: StageContext) -> VectorSearch | None:
         if self.image_embedder is None and self.text_embedder is None:

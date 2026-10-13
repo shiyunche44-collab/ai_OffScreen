@@ -77,7 +77,7 @@ offscreen voice calibrate narrator_m1      # 实测语速，用于文案时长�
 | `prompt_audio` | 参考录音（base64，WAV），克隆用 |
 | `prompt_text` | 参考录音里说的话，可选，只能和 `prompt_audio` 一起给 |
 
-成功：`200`，`audio/wav`（16 位单声道，采样率同 `/health`）。没有字级时间戳，字幕对齐由 M6-05 补。
+成功：`200`，`audio/wav`（16 位单声道，采样率同 `/health`）。没有字级时间戳：平台在计划阶段用 ASR 转写配音后对回原文（M6-05）。
 失败：`400`（请求不对，如未知音色）、`500`（推理失败；进程继续服务），正文 `{"error": "..."}`。
 
 `--engine fake`：不加载模型，每 5 个字 1 秒的静音，用于协议测试。

@@ -24,12 +24,28 @@ from offscreen.domain.index import (
     Shots,
     Transcript,
     TranscriptLine,
+    Word,
 )
 from offscreen.domain.plan import Bgm, EditPlan, PlanSegment
 from offscreen.domain.script import Script, ScriptParams, ScriptSegment
-from offscreen.engine import Artifact, ArtifactStore, Engine, Stage, StageContext, StageOutput
+from offscreen.engine import (
+    Artifact,
+    ArtifactStore,
+    Engine,
+    Stage,
+    StageCanceled,
+    StageContext,
+    StageOutput,
+)
 from offscreen.providers.adapters.fake import FakeEmbedder, FakeTTS
-from offscreen.providers.ports import TTSError
+from offscreen.providers.ports import (
+    ASR,
+    AsrCanceled,
+    AsrResult,
+    AsrSegment,
+    SynthesizedAudio,
+    TTSError,
+)
 from offscreen.stages.analysis.captions import CAPTIONS_FILE
 from offscreen.stages.analysis.embeddings import (
     SHOT_INDEX_FILE,
@@ -148,6 +164,7 @@ def build(
     settings: PlanSettings | None = None,
     embed: bool = False,
     voice: str = "voice-a",
+    aligner: ASR | None = None,
 ) -> Engine:
     script = settings.script if settings and settings.script else script_of(segments, voice)
     names = ["creation.script", "analysis.scenes", "analysis.shots", "analysis.captions"]
@@ -161,6 +178,7 @@ def build(
                 speed,
                 settings,
                 text_embedder=FakeEmbedder() if embed else None,
+                aligner=aligner,
             ),
         ],
     )
@@ -686,3 +704,117 @@ def test_original_sound_inserted_by_a_person_stays(tmp_path: Path) -> None:
     assert [s.id for s in plan_of(art).segments] == ["seg_01", "seg_o01", "seg_02", "seg_03"]
     assert plan_of(art).segments[1] == inserted
     assert art.meta["rebuilt"] == {}
+
+
+# ---- timings by ASR for engines that give none (M6-05) -----------------------------------------
+class SilentTimingsTTS(FakeTTS):
+    """An engine that gives no timestamps (as CosyVoice)."""
+
+    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> SynthesizedAudio:
+        audio = super().synthesize(text, voice_id=voice_id, speed=speed)
+        return SynthesizedAudio(
+            audio.data, audio.format, audio.sample_rate, audio.duration_ms, char_timings=[]
+        )
+
+
+class ScriptedAsr:
+    """Hears `heard` (word, start, end) in whatever it is given; records the wavs."""
+
+    id = "scripted-asr"
+
+    def __init__(self, heard: list[tuple[str, int, int]], fail: Exception | None = None) -> None:
+        self.heard = heard
+        self.fail = fail
+        self.calls: list[tuple[int, str | None]] = []
+
+    def transcribe(
+        self,
+        wav: Path,
+        *,
+        language: str | None = None,
+        on_progress: Any = None,
+        should_cancel: Any = None,
+    ) -> AsrResult:
+        import wave
+
+        with wave.open(str(wav)) as w:
+            assert (w.getframerate(), w.getnchannels()) == (16000, 1)
+        self.calls.append((wav.stat().st_size, language))
+        if self.fail is not None:
+            raise self.fail
+        words = [Word(w=w, start_ms=s, end_ms=e) for w, s, e in self.heard]
+        text = "".join(w for w, _, _ in self.heard)
+        return AsrResult("zh", [AsrSegment(0, self.heard[-1][2], text, words)])
+
+
+ALIGN_TEXT = "他在1990年出生，后来回到小镇。"  # spoken: 他在一九九零年出生，后来回到小镇。
+
+
+def test_voice_over_without_timestamps_is_transcribed_for_subtitles(tmp_path: Path) -> None:
+    heard = [
+        ("他在", 0, 400),
+        ("1990年", 400, 1400),
+        ("出声", 1400, 1800),
+        ("后来回到小镇", 1800, 3000),
+    ]
+    asr = ScriptedAsr(heard)
+    art = build(
+        tmp_path, [narration(1, ALIGN_TEXT, ["sc_001"])], SilentTimingsTTS(), aligner=asr
+    ).ensure("creation.plan", SCOPE)
+    (seg,) = plan_of(art).segments
+    assert seg.audio is not None and asr.calls and asr.calls[0][1] == "zh"
+    t = seg.audio.char_timings
+    assert len(t) == len(ALIGN_TEXT)
+    assert t[0] == (0, 200) and t[1] == (200, 400)
+    assert t[2][0] == 400 and t[5][1] == 1200  # "1990" was heard as 一九九零
+    assert t[-2] == (2800, 3000)
+    assert art.meta["warnings"] == []
+    assert not list(art.dir.glob("**/speech.wav"))  # the 16 kHz copy is not kept
+
+
+def test_engine_timestamps_are_used_as_they_are(tmp_path: Path) -> None:
+    asr = ScriptedAsr([("字", 0, 100)])
+    build(tmp_path, [narration(1, ALIGN_TEXT, ["sc_001"])], FakeTTS(), aligner=asr).ensure(
+        "creation.plan", SCOPE
+    )
+    assert asr.calls == []
+
+
+@pytest.mark.parametrize(
+    ("asr", "why"),
+    [
+        (ScriptedAsr([("完全不同的话", 0, 2000)]), "recognized"),
+        (
+            ScriptedAsr([("x", 0, 1)], fail=RuntimeError("faster-whisper is not installed")),
+            "failed",
+        ),
+    ],
+)
+def test_a_poor_or_failed_transcription_leaves_no_timings_and_says_so(
+    tmp_path: Path, asr: ScriptedAsr, why: str
+) -> None:
+    art = build(
+        tmp_path, [narration(1, ALIGN_TEXT, ["sc_001"])], SilentTimingsTTS(), aligner=asr
+    ).ensure("creation.plan", SCOPE)
+    (seg,) = plan_of(art).segments
+    assert seg.audio is not None and seg.audio.char_timings == []
+    (warning,) = art.meta["warnings"]
+    assert warning.startswith("seg_01: no subtitle timings") and why in warning
+
+
+def test_canceling_during_transcription_cancels_the_stage(tmp_path: Path) -> None:
+    asr = ScriptedAsr([("x", 0, 1)], fail=AsrCanceled("stop"))
+    with pytest.raises(StageCanceled):
+        build(
+            tmp_path, [narration(1, ALIGN_TEXT, ["sc_001"])], SilentTimingsTTS(), aligner=asr
+        ).ensure("creation.plan", SCOPE)
+
+
+def test_the_aligner_is_part_of_the_cache_key(tmp_path: Path) -> None:
+    segs = [narration(1, ALIGN_TEXT, ["sc_001"])]
+    tts = SilentTimingsTTS()
+    plain = build(tmp_path, segs, tts).ensure("creation.plan", SCOPE)
+    aligned = build(tmp_path, segs, tts, aligner=ScriptedAsr([("他", 0, 100)])).ensure(
+        "creation.plan", SCOPE
+    )
+    assert plain.cache_key != aligned.cache_key

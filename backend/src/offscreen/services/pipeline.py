@@ -252,6 +252,7 @@ class Pipeline:
                 else None,
                 image_embedder=p.image_embedder,
                 text_embedder=p.text_embedder,
+                aligner=p.asr,
             ),
             CompileStage(self.assets),
             RenderStage(self.assets),
