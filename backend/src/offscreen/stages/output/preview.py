@@ -8,6 +8,7 @@ plan version, or after an edit elsewhere in the plan, is not rendered again."""
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -18,17 +19,24 @@ from pathlib import Path
 
 from offscreen.algo.ass import FONT
 from offscreen.algo.compile import CompileError, compile_timeline
+from offscreen.algo.mixing import MixSettings
 from offscreen.domain.asset import MediaAsset
 from offscreen.domain.plan import EditPlan
 from offscreen.domain.timeline import OutputSpec
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.media.render import even
 from offscreen.stages.output.compile import SUBTITLE_CHARS_LANDSCAPE, SUBTITLE_CHARS_PORTRAIT
-from offscreen.stages.output.render import FINAL_FILE, Quality, RenderError, render_timeline
+from offscreen.stages.output.render import (
+    DEFAULT_MIX,
+    FINAL_FILE,
+    Quality,
+    RenderError,
+    render_timeline,
+)
 
 PREVIEW_HEIGHT = 360
 PREVIEW_QUALITY = Quality(preset="ultrafast", clip_crf=30, final_crf=30)
-PREVIEW_VERSION = 1
+PREVIEW_VERSION = 2  # 2: numpy mixdown
 """Bump when a preview of the same segment would look different."""
 
 
@@ -53,7 +61,12 @@ def preview_spec(asset: MediaAsset) -> OutputSpec:
 
 
 def segment_hash(
-    plan: EditPlan, segment_id: str, asset: MediaAsset, proxy_hash: str, font: str = FONT
+    plan: EditPlan,
+    segment_id: str,
+    asset: MediaAsset,
+    proxy_hash: str,
+    font: str = FONT,
+    mix: MixSettings = DEFAULT_MIX,
 ) -> str:
     seg = next((s for s in plan.segments if s.id == segment_id), None)
     if seg is None:
@@ -66,6 +79,7 @@ def segment_hash(
         "output": preview_spec(asset).model_dump(mode="json"),
         "quality": [PREVIEW_QUALITY.preset, PREVIEW_QUALITY.clip_crf, PREVIEW_QUALITY.final_crf],
         "font": font,
+        "mix": dataclasses.asdict(mix),
         "subtitle_chars": [SUBTITLE_CHARS_LANDSCAPE, SUBTITLE_CHARS_PORTRAIT],
     }
     text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -83,12 +97,13 @@ def render_segment_preview(
     audio: Path | None,
     previews_dir: Path,
     font: str = FONT,
+    mix: MixSettings = DEFAULT_MIX,
     should_cancel: Callable[[], bool] | None = None,
 ) -> SegmentPreview:
     """The preview file of `segment_id` of `plan`, rendered unless one with the same hash is
     there. `plan_dir` is where the plan's narration files are, `proxy` / `audio` the proxy film
     and the film's sound (None: it has none)."""
-    key = segment_hash(plan, segment_id, asset, proxy_hash, font)
+    key = segment_hash(plan, segment_id, asset, proxy_hash, font, mix)
     spec = preview_spec(asset)
     seg = next(s for s in plan.segments if s.id == segment_id)
     if seg.stale:
@@ -123,6 +138,7 @@ def render_segment_preview(
                 audio=audio,
                 font=font,
                 quality=PREVIEW_QUALITY,
+                mix=mix,
                 should_cancel=should_cancel,
             )
         except FFmpegCanceled as e:

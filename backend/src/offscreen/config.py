@@ -101,6 +101,17 @@ class TtsCfg(_Cfg):
     sample_rate: int = 32000
 
 
+class MixCfg(_Cfg):
+    """The renderer's mixdown (`algo/mixing.py`)."""
+
+    edge_fade_ms: int = Field(default=15, ge=10, le=20)
+    """Fade at both ends of every piece of sound, so cuts do not click."""
+    duck_attack_ms: int = Field(default=150, ge=0, le=2000)
+    """Music starts going down this long before the narration."""
+    duck_release_ms: int = Field(default=400, ge=0, le=5000)
+    """Music takes this long to come back after the narration."""
+
+
 class BudgetCfg(_Cfg):
     confirm_above_tokens: int = Field(default=2_000_000, ge=0)
 
@@ -124,6 +135,7 @@ class AppConfig(_Cfg):
     faces: FacesCfg = FacesCfg()
     embeddings: EmbeddingsCfg = EmbeddingsCfg()
     tts: TtsCfg = TtsCfg()
+    mix: MixCfg = MixCfg()
     budget: BudgetCfg = BudgetCfg()
     worker: WorkerCfg = WorkerCfg()
 

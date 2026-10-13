@@ -157,3 +157,47 @@ def read_raw_video(
             stderr="".join(tail),
         )
     return b"".join(chunks)
+
+
+def read_ffmpeg_output(
+    args: Sequence[str],
+    *,
+    should_cancel: Callable[[], bool] | None = None,
+    binary: str = "ffmpeg",
+    chunk_bytes: int = 1 << 20,
+) -> bytes:
+    """Run ffmpeg writing to `pipe:1` (the caller puts it at the end of `args`) and return what
+    it wrote. Raises FFmpegError or FFmpegCanceled."""
+    cmd = [binary, "-hide_banner", "-nostdin", "-nostats", "-loglevel", "error", *args]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None and proc.stderr is not None
+    tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
+    drain = threading.Thread(
+        target=lambda: tail.extend(line.decode("utf-8", "replace") for line in proc.stderr or ()),
+        daemon=True,
+    )
+    drain.start()
+    chunks: list[bytes] = []
+    try:
+        while True:
+            if should_cancel is not None and should_cancel():
+                proc.kill()
+                raise FFmpegCanceled("ffmpeg canceled")
+            chunk = proc.stdout.read(chunk_bytes)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        proc.wait()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        drain.join(timeout=2)
+    if proc.returncode != 0:
+        raise FFmpegError(
+            f"ffmpeg failed (exit {proc.returncode})",
+            returncode=proc.returncode,
+            cmd=cmd,
+            stderr="".join(tail),
+        )
+    return b"".join(chunks)

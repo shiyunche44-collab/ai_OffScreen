@@ -4,19 +4,15 @@ import json
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from offscreen.domain.common import Rational
+from offscreen.media.audio import decode_audio, write_wav
 from offscreen.media.render import (
-    AudioPart,
     _concat_quote,
     clip_filter,
     concat_videos,
     encode_final,
     escape_filter_value,
     even,
-    mix_audio,
-    mix_graph,
     render_clip,
 )
 
@@ -48,26 +44,6 @@ def test_clip_filter() -> None:
         "tpad=stop_mode=clone:stop=36"
     )
     assert clip_filter(FPS, 640, 360, 1.25, 10).startswith("setpts=PTS/1.250000,fps=")
-
-
-def test_mix_graph_places_gains_and_fades() -> None:
-    parts = [
-        AudioPart(Path("n.wav"), start_ms=1500, gain_db=0.0),
-        AudioPart(
-            Path("f.mkv"), start_ms=0, gain_db=-20.0, seek_ms=5000, duration_ms=1000, fade=True
-        ),
-    ]
-    g = mix_graph(parts, 4000)
-    assert (
-        "[0:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=0.00dB,adelay=1500:all=1[a0]"
-        in g
-    )
-    assert "volume=-20.00dB,afade=t=in:d=0.01,afade=t=out:st=0.990:d=0.01,adelay=0:all=1[a1]" in g
-    assert g.endswith(
-        "[a0][a1]amix=inputs=2:normalize=0:duration=longest,apad=whole_dur=4.000,atrim=end=4.000[out]"
-    )
-    with pytest.raises(ValueError):
-        mix_graph([], 1000)
 
 
 def test_filter_and_concat_quoting() -> None:
@@ -117,7 +93,7 @@ def test_clip_resizes_and_retimes(clip: Path, tmp_path: Path) -> None:
     )
 
 
-def test_concat_mix_and_final_encode(clip: Path, tmp_path: Path) -> None:
+def test_concat_and_final_encode(clip: Path, tmp_path: Path) -> None:
     a, b = tmp_path / "a.mp4", tmp_path / "b.mp4"
     render_clip(clip, a, src_in_ms=0, frames=12, fps=FPS, width=320, height=180)
     render_clip(clip, b, src_in_ms=1000, frames=12, fps=FPS, width=320, height=180)
@@ -127,13 +103,7 @@ def test_concat_mix_and_final_encode(clip: Path, tmp_path: Path) -> None:
 
     total_ms = round(24 * 1001 / 24)  # 24 frames at 23.976 fps
     mix = tmp_path / "mix.wav"
-    mix_audio(
-        [
-            AudioPart(clip, start_ms=0, gain_db=-20.0, seek_ms=500, duration_ms=400, fade=True),
-            AudioPart(clip, start_ms=500, gain_db=0.0, seek_ms=0, duration_ms=300),
-        ],
-        mix, total_ms=total_ms, script_file=tmp_path / "mix.filter",
-    )  # fmt: skip
+    write_wav(mix, decode_audio(clip, sample_rate=48_000, channels=2, duration_ms=total_ms), 48_000)
     a_info = probe(mix)["streams"][0]
     assert (a_info["sample_rate"], a_info["channels"]) == ("48000", 2)
     assert abs(float(probe(mix)["format"]["duration"]) * 1000 - total_ms) < 2

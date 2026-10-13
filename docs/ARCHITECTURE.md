@@ -838,7 +838,7 @@ REST 资源风格；所有耗时操作返回 `job_id`。**所有路径都挂在 
 | 向量 | LanceDB（嵌入式） | 无服务进程，支持过滤 |
 | LLM / VLM | OpenAI 兼容适配器（MiniMax 默认，DeepSeek / 火山方舟按量 / 本地模型同一适配器） | 一个适配器覆盖国内主流供应商；结构化输出由 JSON 降级模式兜底 |
 | TTS | MiniMax speech-2.8（默认）→ 火山豆包语音 / Edge-TTS / CosyVoice 侧车 | 现有 Key 可直接用且自带字级时间戳；音色克隆走侧车 |
-| 音频处理 | numpy + soundfile；ffmpeg loudnorm | 混音逻辑可测、可控 |
+| 音频处理 | numpy（解码走 ffmpeg，写 wav 用标准库 wave，不另加 soundfile）；ffmpeg loudnorm | 混音逻辑可测、可控 |
 | 时间线交换 | OpenTimelineIO；pyJianYingDraft | 对接专业剪辑软件 |
 | 前端 | React + TypeScript + Vite + TanStack Query + Tailwind | 主流、生态全 |
 | 音频波形 | wavesurfer.js | 配音试听与裁剪 |

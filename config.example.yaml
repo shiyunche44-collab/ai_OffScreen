@@ -76,6 +76,11 @@ tts:
   sample_rate: 32000
   # 备选：edge_tts（免费）、volc_speech、cosyvoice（侧车，音色克隆）
 
+mix:                    # 渲染混音（algo/mixing.py）
+  edge_fade_ms: 15        # 每段声音两端的淡入淡出（10–20），防止接缝爆音
+  duck_attack_ms: 150     # 配乐在解说开始前多久开始压低
+  duck_release_ms: 400    # 解说结束后配乐多久回到原音量
+
 budget:
   confirm_above_tokens: 2000000   # 单个作业预估 token 超过此值需确认
 
