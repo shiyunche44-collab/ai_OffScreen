@@ -1,0 +1,5 @@
+# The sidecar's own additions; CosyVoice itself (and torch) come from its repository's
+# requirements.txt — see README.md. Never installed into the backend's environment.
+fastapi>=0.110
+uvicorn>=0.29
+numpy

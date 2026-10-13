@@ -194,6 +194,26 @@ def test_adding_changing_and_removing_voices(services: AppServices) -> None:
         services.voices.get("me")
 
 
+def test_the_transcript_of_a_recording(services: AppServices) -> None:
+    store = VoiceStore(services.cfg.data_dir)
+    store.dir.mkdir(parents=True)
+    for name in ("me.wav", "me2.wav"):
+        (store.dir / name).write_bytes(b"RIFF")
+    with pytest.raises(InvalidInput, match="reference_audio"):
+        services.voices.add("me", reference_text="没有录音")
+    v = services.voices.add("me", reference_audio="me.wav", reference_text="你好")
+    assert v.reference_text == "你好"
+
+    services.voices.calibrate("me")
+    retold = services.voices.add("me", reference_text="你好呀")  # clones differently
+    assert retold.reference_text == "你好呀" and retold.chars_per_s is None
+
+    services.voices.calibrate("me")
+    rerecorded = services.voices.add("me", reference_audio="me2.wav")
+    assert rerecorded.reference_text is None  # it described the old recording
+    assert rerecorded.chars_per_s is None
+
+
 def test_the_script_is_sized_for_the_voice_that_reads_it(services: AppServices) -> None:
     def settings(voice: str | None = None) -> ScriptSettings:
         with Pipeline(services.cfg, services.jobs.providers, db=services.db) as p:

@@ -1,7 +1,11 @@
 """Disk cache around any TTS engine, keyed by text + voice + speed + engine id.
 
 Layout: `{dir}/{hex}.{format}` (audio) next to `{hex}.json` (duration, timings…). A hit
-costs nothing, so it reports `billed_chars=0`."""
+costs nothing, so it reports `billed_chars=0`.
+
+An engine whose voices can change under the same id (a cloned voice gets a new reference
+recording) has a `voice_fingerprint(voice_id) -> str` method; the fingerprint is then part of
+the key, so the old audio is not served for the new voice."""
 
 from __future__ import annotations
 
@@ -25,7 +29,9 @@ class CachedTTS:
         return self.inner.id
 
     def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> SynthesizedAudio:
-        key = tts_cache_key(text, voice_id, speed, self.inner.id).removeprefix("sha256:")
+        key = tts_cache_key(text, self._voice_key(voice_id), speed, self.inner.id).removeprefix(
+            "sha256:"
+        )
         meta_path = self.dir / f"{key}.json"
         hit = self._load(key, meta_path)
         if hit is not None:
@@ -44,6 +50,10 @@ class CachedTTS:
         }
         atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False).encode("utf-8"))
         return result
+
+    def _voice_key(self, voice_id: str) -> str:
+        fingerprint = getattr(self.inner, "voice_fingerprint", None)
+        return voice_id if fingerprint is None else f"{voice_id}#{fingerprint(voice_id)}"
 
     def _load(self, key: str, meta_path: Path) -> SynthesizedAudio | None:
         try:

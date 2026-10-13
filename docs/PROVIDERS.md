@@ -226,7 +226,17 @@ M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l
   - 淡入淡出 + 叠化（各 0.75 秒）+ 1 个硬切：TransNetV2 找到 3 个边界（两个渐变各落在转场区间内，硬切在 ±2 帧内）；PySceneDetect 漏掉淡入淡出，只在叠化结束处出了 1 个、再加硬切。
 - **未做**：任务卡要求的「在人工标注的真实切点上与 PySceneDetect 的对比评估报告」需要真实测试片和标注（M3-01 的工具已就绪：`offscreen cuts evaluate <asset> --raw` 分别在两种检测器下跑）；所以默认检测器仍是 PySceneDetect，没有切换。
 
-## 9. 云环境网络备注
+## 9. CosyVoice 侧车（TTS + 音色克隆，本地；M6-03，未实测）
+
+- 独立环境（`sidecars/cosyvoice/`，Python 3.10 + CosyVoice 仓库的依赖），HTTP 服务，启动与接口见 `sidecars/cosyvoice/README.md`；配置 `tts: {provider: cosyvoice}` + `sidecars.cosyvoice.url / model`
+- 按 CosyVoice2 的接口编写：`CosyVoice2(model_dir)`，`inference_zero_shot(text, prompt_text, prompt_speech_16k, stream=False, speed=…)`（有参考原文）/ `inference_cross_lingual`（只有录音）/ `inference_sft`（模型自带说话人）；`prompt_speech_16k` 来自 `cosyvoice.utils.file_utils.load_wav(path, 16000)`。新版仓库（CosyVoice3、`AutoModel`）接口有变，上线前对照所装版本
+- 采样率由模型决定（CosyVoice2 为 24000），侧车在 `/health` 里报告；适配器以 WAV 头为准计算时长
+- **不返回字级时间戳**：`char_timings` 为空（字幕对齐等 M6-05）
+- 适配器启动后第一次合成前比对 `/health` 的 `model` 与配置，不一致直接失败，避免把另一个模型的音频缓存在这个名字下；参考音频与原文的摘要进入 TTS 缓存键（换了录音就是换了音色）
+- 侧车在本地：不可达、超时、推理失败都不重试，直接让作业失败并提示
+- **未实测**：云环境没有 GPU，也没有下载约 2 GB 的模型；HTTP 契约由后端测试用假引擎覆盖。首次在本地 GPU 上跑通后补充实测记录（速度、显存、克隆效果）
+
+## 10. 云环境网络备注
 
 - 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
 - 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）

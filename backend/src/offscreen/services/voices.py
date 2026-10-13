@@ -46,10 +46,12 @@ class VoiceService:
         name: str | None = None,
         provider: str | None = None,
         reference_audio: str | None = None,
+        reference_text: str | None = None,
         default_speed: float | None = None,
     ) -> Voice:
         """Register a voice, or change the fields given of a registered one. A changed
-        provider or reference recording drops the measured rate (it described another voice)."""
+        provider, reference recording or transcript of it drops the measured rate (it described
+        another voice). A new recording without a transcript drops the old transcript."""
         library = self.store.read()
         old = next((v for v in library.voices if v.id == voice_id), None)
         if reference_audio is not None and not (self.store.dir / reference_audio).is_file():
@@ -61,6 +63,7 @@ class VoiceService:
                     name=name or voice_id,
                     provider=provider or self.cfg.tts.provider,
                     reference_audio=reference_audio,
+                    reference_text=reference_text,
                     default_speed=default_speed if default_speed is not None else 1.0,
                 )
             else:
@@ -70,13 +73,20 @@ class VoiceService:
                         ("name", name),
                         ("provider", provider),
                         ("reference_audio", reference_audio),
+                        ("reference_text", reference_text),
                         ("default_speed", default_speed),
                     )
                     if v is not None
                 }
+                new_recording = (
+                    changes.get("reference_audio", old.reference_audio) != old.reference_audio
+                )
+                if new_recording and reference_text is None:
+                    changes["reference_text"] = None
                 if (
                     changes.get("provider", old.provider) != old.provider
-                    or changes.get("reference_audio", old.reference_audio) != old.reference_audio
+                    or new_recording
+                    or changes.get("reference_text", old.reference_text) != old.reference_text
                 ):
                     changes |= {
                         "chars_per_s": None,

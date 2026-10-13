@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from offscreen.domain.voice import VoiceLibrary
+from offscreen.domain.voice import Voice, VoiceLibrary
 from offscreen.store.files import read_model, write_model
 
 VOICES_FILE = "voices.json"
@@ -25,3 +25,9 @@ class VoiceStore:
 
     def write(self, library: VoiceLibrary) -> None:
         write_model(self.path, library)
+
+    def get(self, voice_id: str) -> Voice | None:
+        return next((v for v in self.read().voices if v.id == voice_id), None)
+
+    def reference_path(self, voice: Voice) -> Path | None:
+        return self.dir / voice.reference_audio if voice.reference_audio else None

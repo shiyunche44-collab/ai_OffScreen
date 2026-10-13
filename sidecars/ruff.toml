@@ -1,0 +1,4 @@
+# Sidecars follow the backend's style (`make lint` checks them too), but run on the Python
+# their model needs: CosyVoice wants 3.10.
+extend = "../backend/pyproject.toml"
+target-version = "py310"

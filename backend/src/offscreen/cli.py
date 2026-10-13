@@ -411,6 +411,9 @@ def voice_add(
     reference: Annotated[
         str | None, typer.Option(help="Recording to clone, a file in data/library/voices/")
     ] = None,
+    reference_text: Annotated[
+        str | None, typer.Option(help="What is said in the recording (clones more closely)")
+    ] = None,
     speed: Annotated[float | None, typer.Option(help="Default speed, 0.5-2")] = None,
     config: ConfigOpt = None,
 ) -> None:
@@ -423,6 +426,7 @@ def voice_add(
                 name=name,
                 provider=provider,
                 reference_audio=reference,
+                reference_text=reference_text,
                 default_speed=speed,
             )
     except (ConfigError, InvalidInput) as e:

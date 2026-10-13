@@ -5,10 +5,10 @@ sync:
 	$(BE) uv sync --group dev
 
 fmt:
-	$(BE) uv run ruff format src tests && uv run ruff check --fix src tests
+	$(BE) uv run ruff format src tests ../sidecars && uv run ruff check --fix src tests ../sidecars
 
 lint:
-	$(BE) uv run ruff format --check src tests && uv run ruff check src tests
+	$(BE) uv run ruff format --check src tests ../sidecars && uv run ruff check src tests ../sidecars
 
 type:
 	$(BE) uv run mypy

@@ -101,6 +101,22 @@ class TtsCfg(_Cfg):
     sample_rate: int = 32000
 
 
+class CosyVoiceCfg(_Cfg):
+    """The CosyVoice sidecar (`sidecars/cosyvoice/`, started separately): voice cloning from a
+    reference recording, on the local GPU."""
+
+    url: str = "http://127.0.0.1:50021"
+    model: str = "CosyVoice2-0.5B"
+    """The model the sidecar must have loaded (it says which in `GET /health`); part of the
+    cache key of what it speaks."""
+    timeout_s: float = Field(default=300.0, gt=0)
+    """One synthesis, which on a slow GPU can take a while for a long segment."""
+
+
+class SidecarsCfg(_Cfg):
+    cosyvoice: CosyVoiceCfg = CosyVoiceCfg()
+
+
 class BudgetCfg(_Cfg):
     confirm_above_tokens: int = Field(default=2_000_000, ge=0)
 
@@ -124,6 +140,7 @@ class AppConfig(_Cfg):
     faces: FacesCfg = FacesCfg()
     embeddings: EmbeddingsCfg = EmbeddingsCfg()
     tts: TtsCfg = TtsCfg()
+    sidecars: SidecarsCfg = SidecarsCfg()
     budget: BudgetCfg = BudgetCfg()
     worker: WorkerCfg = WorkerCfg()
 

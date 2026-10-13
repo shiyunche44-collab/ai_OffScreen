@@ -10,7 +10,8 @@
       "name": "青涩青年",
       "provider": "minimax",
       "rate_spread": 0.021,
-      "reference_audio": null
+      "reference_audio": null,
+      "reference_text": null
     },
     {
       "calibrated_at": null,
@@ -21,7 +22,8 @@
       "name": "我的声音",
       "provider": "cosyvoice",
       "rate_spread": null,
-      "reference_audio": "narrator_m1.wav"
+      "reference_audio": "narrator_m1.wav",
+      "reference_text": "这是我的声音，用来给电影解说配音。"
     }
   ]
 }

@@ -18,6 +18,9 @@ class Voice(Strict):
     """The TTS engine the voice belongs to (`tts.provider`)."""
     reference_audio: str | None = None
     """A recording to clone the voice from, relative to `library/voices/`."""
+    reference_text: str | None = None
+    """What is said in `reference_audio`. Cloning works without it (cross-lingual mode in
+    CosyVoice) but sounds closer to the speaker with it."""
     default_speed: float = Field(default=1.0, ge=0.5, le=2.0)
     """The speed plans use for this voice unless a person sets another."""
     chars_per_s: float | None = Field(default=None, gt=0)
@@ -28,6 +31,12 @@ class Voice(Strict):
     calibrated_with: str | None = None
     """`TTS.id` of the engine that was measured; another engine's rate is not trusted."""
     calibrated_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _text_needs_audio(self) -> Self:
+        if self.reference_text is not None and self.reference_audio is None:
+            raise ValueError("reference_text describes reference_audio, which is not set")
+        return self
 
     @model_validator(mode="after")
     def _calibration_is_whole(self) -> Self:

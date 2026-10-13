@@ -87,6 +87,18 @@
           ],
           "default": null,
           "title": "Reference Audio"
+        },
+        "reference_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Text"
         }
       },
       "required": [
