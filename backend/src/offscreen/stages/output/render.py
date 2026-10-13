@@ -13,6 +13,7 @@ does no loudness normalization (M6)."""
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,14 +21,19 @@ from pathlib import Path
 from typing import Any
 
 from offscreen.algo.ass import FONT, build_ass
+from offscreen.algo.mixing import DEFAULT_FADE_MS, Placed, ms_to_samples
+from offscreen.algo.mixing import mix as mix_samples
 from offscreen.domain.common import Rational
 from offscreen.domain.job import Lane
 from offscreen.domain.timeline import Timeline
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
+from offscreen.media import audio as media_audio
 from offscreen.media import render as media
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.stages.output.compile import TIMELINE_FILE
 from offscreen.store.repos import AssetRepo
+
+log = logging.getLogger(__name__)
 
 FINAL_FILE = "final.mp4"
 SUBTITLES_FILE = "subtitles.ass"
@@ -43,7 +49,7 @@ def frames_to_ms(frames: int, fps: Rational) -> int:
 
 class RenderStage(Stage):
     name = "output.render"
-    version = 1
+    version = 2
     lane: Lane = "cpu"
 
     def __init__(self, assets: AssetRepo, font: str = FONT) -> None:
@@ -66,8 +72,8 @@ class RenderStage(Stage):
             "final_crf": media.FINAL_CRF,
             "preset": media.PRESET,
             "audio_bitrate": media.AUDIO_BITRATE,
-            "mix_rate": media.MIX_RATE,
-            "fade_ms": media.FADE_MS,
+            "mix_rate": media_audio.MIX_RATE,
+            "fade_ms": DEFAULT_FADE_MS,
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
@@ -177,33 +183,38 @@ def render_timeline(
     progress(0.65, "joined")
 
     # 3. mixdown
-    parts = [
-        media.AudioPart(
-            path=narration_dir / n.file, start_ms=frames_to_ms(n.f0, fps), gain_db=n.gain_db
-        )
-        for n in tl.narration
-    ]
-    if audio is not None:
-        parts += [
-            media.AudioPart(
-                path=audio,
-                start_ms=frames_to_ms(s.f0, fps),
-                gain_db=s.gain_db,
-                seek_ms=s.src_in_ms,
-                duration_ms=frames_to_ms(s.f1 - s.f0, fps),
-                fade=True,
+    rate = media_audio.MIX_RATE
+    total = ms_to_samples(total_ms, rate)
+    narration: list[Placed] = []
+    for n in tl.narration:
+        path = narration_dir / n.file
+        if not path.is_file():
+            raise RenderError(f"audio file missing: {path}")
+        narration.append(
+            Placed(
+                media_audio.read_pcm(path, rate=rate, should_cancel=cancel),
+                ms_to_samples(frames_to_ms(n.f0, fps), rate),
+                n.gain_db,
             )
-            for s in tl.source_audio
-        ]
-    if not parts:
+        )
+    source: list[Placed] = []
+    if audio is not None:
+        if tl.source_audio and not audio.is_file():
+            raise RenderError(f"audio file missing: {audio}")
+        for s in tl.source_audio:
+            span_ms = frames_to_ms(s.f1 - s.f0, fps)
+            pcm = media_audio.read_pcm(
+                audio, rate=rate, seek_ms=s.src_in_ms, duration_ms=span_ms, should_cancel=cancel
+            )
+            source.append(Placed(pcm, ms_to_samples(frames_to_ms(s.f0, fps), rate), s.gain_db))
+    if not narration and not source:
         raise RenderError("timeline has no sound at all")
-    for p in parts:
-        if not p.path.is_file():
-            raise RenderError(f"audio file missing: {p.path}")
     mix = work / "mix.wav"
-    media.mix_audio(
-        parts, mix, total_ms=total_ms, script_file=work / "mix.filter", should_cancel=cancel
+    clipped = media_audio.write_wav(
+        mix, mix_samples(total, rate=rate, narration=narration, source=source), rate=rate
     )
+    if clipped:
+        log.warning("render: %d samples clipped in the mixdown", clipped)
     progress(0.8, "mixed")
 
     # 4. final encode with subtitles

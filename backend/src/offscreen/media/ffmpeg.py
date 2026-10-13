@@ -157,3 +157,58 @@ def read_raw_video(
             stderr="".join(tail),
         )
     return b"".join(chunks)
+
+
+def read_raw_audio(
+    audio: str,
+    *,
+    rate: int,
+    seek_ms: int = 0,
+    duration_ms: int | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    binary: str = "ffmpeg",
+) -> bytes:
+    """The first audio stream as raw interleaved stereo float32 little-endian at `rate`, from
+    `seek_ms` for at most `duration_ms` (shorter if the file ends first). Raises FFmpegError
+    (also for a file with no audio) or FFmpegCanceled."""
+    cmd = [binary, "-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"]
+    if seek_ms > 0:
+        cmd += ["-ss", f"{seek_ms / 1000:.3f}"]
+    if duration_ms is not None:
+        cmd += ["-t", f"{duration_ms / 1000:.3f}"]
+    cmd += [
+        "-i", audio, "-map", "0:a:0", "-vn",
+        "-ar", str(rate), "-ac", "2", "-f", "f32le", "pipe:1",
+    ]  # fmt: skip
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None and proc.stderr is not None
+    tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
+    drain = threading.Thread(
+        target=lambda: tail.extend(line.decode("utf-8", "replace") for line in proc.stderr or ()),
+        daemon=True,
+    )
+    drain.start()
+    chunks: list[bytes] = []
+    try:
+        while True:
+            if should_cancel is not None and should_cancel():
+                proc.kill()
+                raise FFmpegCanceled("ffmpeg canceled")
+            chunk = proc.stdout.read(1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        proc.wait()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        drain.join(timeout=2)
+    if proc.returncode != 0:
+        raise FFmpegError(
+            f"ffmpeg failed (exit {proc.returncode})",
+            returncode=proc.returncode,
+            cmd=cmd,
+            stderr="".join(tail),
+        )
+    return b"".join(chunks)
