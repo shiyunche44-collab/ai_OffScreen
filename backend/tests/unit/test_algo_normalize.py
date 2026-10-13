@@ -157,6 +157,6 @@ def test_source_timings_are_complete_and_monotonic(text: str) -> None:
 
 
 @given(_TEXT)
-def test_normalization_is_idempotent(text: str) -> None:
-    once = spoken_text(text).text
-    assert spoken_text(once).text == once
+def test_no_digits_or_markup_reach_the_engine(text: str) -> None:
+    said = spoken_text(text).text
+    assert not set(said) & set("0123456789０１*#_|^`~～")  # a bare % or $ may stay
