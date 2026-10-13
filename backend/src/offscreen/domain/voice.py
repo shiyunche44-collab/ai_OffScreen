@@ -18,6 +18,8 @@ class Voice(Strict):
     """The TTS engine the voice belongs to (`tts.provider`)."""
     reference_audio: str | None = None
     """A recording to clone the voice from, relative to `library/voices/`."""
+    reference_text: str | None = None
+    """What is said in `reference_audio`; cloning follows the recording's prosody better with it."""
     default_speed: float = Field(default=1.0, ge=0.5, le=2.0)
     """The speed plans use for this voice unless a person sets another."""
     chars_per_s: float | None = Field(default=None, gt=0)
@@ -34,6 +36,8 @@ class Voice(Strict):
         parts = (self.chars_per_s, self.rate_spread, self.calibrated_with, self.calibrated_at)
         if any(p is None for p in parts) and any(p is not None for p in parts):
             raise ValueError("calibration needs chars_per_s, rate_spread, calibrated_with and _at")
+        if self.reference_text is not None and self.reference_audio is None:
+            raise ValueError("reference_text describes reference_audio, which is not set")
         return self
 
 

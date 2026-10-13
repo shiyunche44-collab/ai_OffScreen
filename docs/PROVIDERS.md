@@ -226,7 +226,15 @@ M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l
   - 淡入淡出 + 叠化（各 0.75 秒）+ 1 个硬切：TransNetV2 找到 3 个边界（两个渐变各落在转场区间内，硬切在 ±2 帧内）；PySceneDetect 漏掉淡入淡出，只在叠化结束处出了 1 个、再加硬切。
 - **未做**：任务卡要求的「在人工标注的真实切点上与 PySceneDetect 的对比评估报告」需要真实测试片和标注（M3-01 的工具已就绪：`offscreen cuts evaluate <asset> --raw` 分别在两种检测器下跑）；所以默认检测器仍是 PySceneDetect，没有切换。
 
-## 9. 云环境网络备注
+## 9. CosyVoice（本地侧车，音色克隆；M6-03）
+
+- 侧车：`sidecars/cosyvoice/server.py`（标准库 HTTP；独立 conda 环境里跑 CosyVoice）；安装、启动、协议见 `sidecars/cosyvoice/README.md`。适配器：`providers/adapters/cosyvoice_tts.py`，配置 `tts.provider: cosyvoice`、`tts.model` = 侧车模型目录名、`tts.cosyvoice.url`。
+- 克隆：音色库里带 `reference_audio` 的音色用参考录音克隆；有 `reference_text`（录音原话）走 `inference_zero_shot`，没有走 `inference_cross_lingual`；其他音色 id 当作模型内置音色（`inference_sft`）。录音随每次请求发送，侧车无状态。
+- 不返回时间戳：`char_timings` 为空，字幕按字数均分，直到 M6-05 用 ASR 对齐补上。
+- **未实测**：开发所在云环境拦截 ModelScope、Hugging Face 与 GitHub 上的 CosyVoice 仓库，没有下载到代码和模型。已验证的只有协议：适配器对真实侧车脚本（`--engine fake`）端到端测试通过。侧车调用的 CosyVoice API（`CosyVoice2(model_dir, load_jit, load_trt, fp16)`、`load_wav(path, 16000)`、`inference_*(…, stream=False, speed=…)` 产出 `tts_speech` 张量）按 CosyVoice 2 的公开示例编写；新版本（CosyVoice 3 / `AutoModel`）接口如有变化，改 `CosyVoiceEngine` 一处即可。
+- 首次在本机跑通后待补：显存与 CPU 下的合成速度（字 / 秒）、克隆音色与 MiniMax 的主观对比、`speed` 参数的实际效果、`voice calibrate` 的 `rate_spread`。
+
+## 10. 云环境网络备注
 
 - 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
 - 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）

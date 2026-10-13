@@ -6,6 +6,7 @@ costs nothing, so it reports `billed_chars=0`."""
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from offscreen.algo.tts import tts_cache_key
@@ -14,9 +15,14 @@ from offscreen.store.files import atomic_write_bytes
 
 
 class CachedTTS:
-    def __init__(self, inner: TTS, cache_dir: Path) -> None:
+    def __init__(
+        self, inner: TTS, cache_dir: Path, *, voice_key: Callable[[str], str] | None = None
+    ) -> None:
+        """`voice_key(voice_id)` tells apart what one voice id meant at different times (a
+        cloned voice whose reference recording was replaced); "" when it means nothing new."""
         self.inner = inner
         self.dir = cache_dir
+        self.voice_key = voice_key
         self.hits = 0
         self.misses = 0
 
@@ -25,7 +31,9 @@ class CachedTTS:
         return self.inner.id
 
     def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> SynthesizedAudio:
-        key = tts_cache_key(text, voice_id, speed, self.inner.id).removeprefix("sha256:")
+        salt = self.voice_key(voice_id) if self.voice_key else ""
+        voice = f"{voice_id}#{salt}" if salt else voice_id
+        key = tts_cache_key(text, voice, speed, self.inner.id).removeprefix("sha256:")
         meta_path = self.dir / f"{key}.json"
         hit = self._load(key, meta_path)
         if hit is not None:

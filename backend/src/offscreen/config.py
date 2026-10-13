@@ -94,11 +94,22 @@ class EmbeddingsCfg(_Cfg):
     device: Literal["cuda", "cpu"] = "cpu"
 
 
+class CosyVoiceCfg(_Cfg):
+    """The CosyVoice sidecar (`sidecars/cosyvoice/`), used when `tts.provider` is `cosyvoice`."""
+
+    url: str = "http://127.0.0.1:50021"
+    timeout_s: float = Field(default=600.0, gt=0)
+    """One synthesis; a long segment on a CPU takes minutes."""
+
+
 class TtsCfg(_Cfg):
     provider: str = "minimax"
     model: str = "speech-2.8-hd"
+    """With `cosyvoice`: the model directory's name the sidecar serves (e.g. CosyVoice2-0.5B);
+    a sidecar serving another model is refused, so cached audio never mixes models."""
     default_voice: str = "male-qn-qingse"
     sample_rate: int = 32000
+    cosyvoice: CosyVoiceCfg = CosyVoiceCfg()
 
 
 class BudgetCfg(_Cfg):
