@@ -11,6 +11,7 @@ import pytest
 from offscreen.algo.compile import compile_timeline
 from offscreen.domain.plan import (
     AudioRef,
+    Bgm,
     Clip,
     EditPlan,
     PlanSegment,
@@ -56,11 +57,17 @@ class StubCompile(Stage):
     version = 1
     lane = "cpu"
 
-    def __init__(self, repo: AssetRepo, subtitles: bool = True, layout: str = "keep") -> None:
-        self.repo, self.subtitles, self.layout = repo, subtitles, layout
+    def __init__(
+        self,
+        repo: AssetRepo,
+        subtitles: bool = True,
+        layout: str = "keep",
+        bgm: str | None = None,
+    ) -> None:
+        self.repo, self.subtitles, self.layout, self.bgm = repo, subtitles, layout, bgm
 
     def params(self, scope):  # type: ignore[no-untyped-def]
-        return {"subtitles": self.subtitles, "layout": self.layout}
+        return {"subtitles": self.subtitles, "layout": self.layout, "bgm": self.bgm}
 
     def run(self, ctx: StageContext) -> StageOutput:
         aid = ctx.scope["asset_id"]
@@ -96,6 +103,9 @@ class StubCompile(Stage):
             author="ai",
             script_ref=ScriptRef(id="scr_t", version=1),
             segments=segs,
+            bgm=Bgm(file=self.bgm, gain_db=-12.0, duck_under_narration_db=-8.0)
+            if self.bgm
+            else None,
         )
         spec = OutputSpec(
             profile="source",
@@ -233,3 +243,52 @@ def test_cache_key_covers_the_source_film(clip: Path, repo: AssetRepo, tmp_path:
     assert p["source_fingerprint"].startswith("sha256:") and p["font"] and p["final_crf"]
     with pytest.raises(RenderError, match="unknown asset"):
         RenderStage(repo).params({"asset_id": "ast_nope"})
+
+
+# ---- background music (M6-08) --------------------------------------------------------------
+def test_chosen_music_is_mixed_in_and_the_library_is_part_of_the_cache_key(
+    clip: Path, repo: AssetRepo, tmp_path: Path
+) -> None:
+    import numpy as np
+
+    from offscreen.config import AppConfig
+    from offscreen.media.audio import MIX_RATE, write_wav
+    from offscreen.services.bgm import BgmService
+
+    aid = register(repo, clip, tmp_path)
+    cfg = AppConfig.model_validate(
+        {"data_dir": str(tmp_path / "data"), "tts": {"provider": "edge_tts"}}
+    )
+    library = BgmService(cfg)
+    library.store.dir.mkdir(parents=True)
+    t = np.arange(MIX_RATE) / MIX_RATE  # one second: shorter than the programme, so it loops
+    x = (np.sin(2 * np.pi * 330 * t) * 0.5).astype(np.float32)
+    write_wav(library.store.dir / "m.wav", np.stack([x, x], axis=1))
+    library.add("m.wav")
+
+    def go(name: str, bgm: str | None):  # type: ignore[no-untyped-def]
+        engine = Engine(
+            ArtifactStore(tmp_path / name),
+            [StubCompile(repo, bgm=bgm), RenderStage(repo, bgm=library.store)],  # type: ignore[arg-type]
+        )
+        return engine.ensure("output.render", {"asset_id": aid})
+
+    plain, with_music = go("plain", None), go("music", "m.wav")
+    before = lambda a: json.loads(a.path(LOUDNESS_FILE).read_text())["before"]["integrated_lufs"]  # noqa: E731
+    assert before(with_music) > before(plain) + 3  # the track is audible over the film's sound
+    report = json.loads(with_music.path(LOUDNESS_FILE).read_text())
+    assert report["ok"] is True and report["clipped_samples"] == 0
+    tl = (
+        Engine(ArtifactStore(tmp_path / "music"), [StubCompile(repo, bgm="m.wav")])
+        .ensure("output.compile", {"asset_id": aid})
+        .read_model(TIMELINE_FILE, Timeline)
+    )
+    assert [(b.file, b.f0, b.f1) for b in tl.bgm] == [("m.wav", 0, tl.duration_frames)]
+
+    stage = RenderStage(repo, bgm=library.store)
+    key = stage.params({"asset_id": aid})["bgm_library"]
+    library.remove("m")
+    assert stage.params({"asset_id": aid})["bgm_library"] != key
+    with pytest.raises(RenderError, match="music file missing"):
+        (library.store.dir / "m.wav").unlink()
+        go("gone", "m.wav")

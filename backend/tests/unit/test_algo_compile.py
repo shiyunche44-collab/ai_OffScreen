@@ -162,3 +162,18 @@ def test_frame_grid_properties(segs_clips: list[list[int]], fps: Rational) -> No
 
     assert all(s.f1 <= tl.duration_frames for s in tl.subtitles + tl.source_audio)  # type: ignore[operator]
     assert all(a.f1 <= b.f0 for a, b in zip(tl.subtitles, tl.subtitles[1:], strict=False))
+
+
+def test_plan_music_becomes_one_item_over_the_whole_programme() -> None:
+    from offscreen.domain.plan import Bgm
+
+    p = plan(seg(1, [2000, 1000]), seg(2, [1500])).model_copy(
+        update={"bgm": Bgm(file="warm/home.wav", gain_db=-20.0, duck_under_narration_db=-9.0)}
+    )
+    tl = compile_timeline(p, spec(), subtitle_max_chars=22)
+    (b,) = tl.bgm
+    assert (b.f0, b.f1, b.file, b.gain_db) == (0, tl.duration_frames, "warm/home.wav", -20.0)
+    assert b.duck is not None and b.duck.depth_db == -9.0
+    no_duck = p.model_copy(update={"bgm": Bgm(file="a.wav", duck_under_narration_db=0.0)})
+    assert compile_timeline(no_duck, spec(), subtitle_max_chars=22).bgm[0].duck is None
+    assert compile_timeline(plan(seg(1, [1000])), spec(), subtitle_max_chars=22).bgm == []

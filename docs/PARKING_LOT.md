@@ -62,3 +62,5 @@
 | 真实引擎上的语速标定 | T3 编排 / 声音 | 2026-10-10 | 搁置 | 标定与「估算误差 ≤ 5%」只在假引擎上验证过。真实 MiniMax 音色要跑一次 `offscreen voice calibrate`（约 250 字的额度）看 `rate_spread`；标准文本没有数字和英文，数字读法等 M6-02 规范化后再加进样本 |
 | 标定的音色与项目选项的音色同步 | T3 编排 / 声音 | 2026-10-10 | 搁置 | 管线按 `RunOptions.voice`（或 `tts.default_voice`）查音色库；`Voice.default_speed` 成为新计划的 `VoiceSpec.speed`，已建好的计划段不变（要重新配音须「重建计划」）。库里改了默认语速后，是否提示哪些项目的计划过期，没有做 |
 | 语速标定样本加入数字与英文 | T3 编排 / 声音 | 2026-10-13 | 搁置 | M6-02 规范化（`algo/normalize.py`，经 `NormalizingTTS` 接入）已就绪；标准文本里可加入数字、单位后再标定。规范化规则目前只覆盖中文解说常见场景（整数 / 小数 / 百分数 / 分数 / 年份 / 时刻 / 常用单位 / 符号）；英文读法交给引擎，`pronunciation_dict` 暂未接 |
+| 项目选择 BGM：计划编辑操作与界面 | T3 编排 / 声音 | 2026-10-13 | 搁置 | M6-08 做了音乐库（`offscreen bgm …`、标签、循环 / 裁剪 / 淡出）并让编译器、渲染器读 `EditPlan.bgm`，但还没有改 `EditPlan.bgm` 的办法：`apply_edits` 只处理段，缺一个计划级操作（如 `set_bgm`，会改 OpenAPI 与前端类型）。随 M6-09 声音设置 UI 一起做；在那之前只能手改计划 JSON |
+| BGM 按情绪 / 速度自动推荐 | T3 编排 / 声音 | 2026-10-13 | 搁置 | 库里已有 `moods` / `tempo` 标签与 `offscreen bgm list --mood --tempo` 过滤；按文案情绪自动挑曲没做 |

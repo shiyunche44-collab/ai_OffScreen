@@ -13,6 +13,8 @@ Conventions the renderer relies on:
 - `NarrationItem.file` is the plan's `AudioRef.file`, relative to the plan's directory.
 - Source-audio items follow the clips (one per video item). `mode="mute"` emits none;
   `duck` and `full` both play at `gain_db`: ducking under narration is the mixer's job.
+- The plan's background music becomes one `bgm` item over the whole programme; `Bgm.file` is
+  relative to the music library, and ducking under narration is the mixer's job.
 - Subtitles come from the segment's text snapshot and the voice-over's character timings."""
 
 from __future__ import annotations
@@ -21,6 +23,8 @@ from offscreen.algo.captions import split_caption_lines
 from offscreen.domain.common import Rational
 from offscreen.domain.plan import Clip, EditPlan, PlanSegment
 from offscreen.domain.timeline import (
+    BgmItem,
+    Duck,
     NarrationItem,
     OutputSpec,
     PlanRef,
@@ -87,6 +91,19 @@ def compile_timeline(plan: EditPlan, output: OutputSpec, *, subtitle_max_chars: 
                 subtitles.extend(_subtitles(seg, seg_f0, seg_f1, fps, subtitle_max_chars))
         f_cursor = seg_f1
 
+    bgm = []
+    if plan.bgm is not None:
+        duck = Duck(depth_db=plan.bgm.duck_under_narration_db)
+        bgm.append(
+            BgmItem(
+                f0=0,
+                f1=f_cursor,
+                file=plan.bgm.file,
+                gain_db=plan.bgm.gain_db,
+                duck=duck if plan.bgm.duck_under_narration_db < 0 else None,
+            )
+        )
+
     return Timeline(
         plan_ref=PlanRef(id=plan.id, version=plan.version),
         output=output,
@@ -94,6 +111,7 @@ def compile_timeline(plan: EditPlan, output: OutputSpec, *, subtitle_max_chars: 
         video=video,
         narration=narration,
         source_audio=source_audio,
+        bgm=bgm,
         subtitles=subtitles,
     )
 

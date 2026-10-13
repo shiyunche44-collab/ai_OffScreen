@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from offscreen.domain.artifact import Manifest
 from offscreen.domain.asset import MediaAsset
+from offscreen.domain.bgm import BgmLibrary
 from offscreen.domain.index import (
     Captions,
     Cast,
@@ -54,4 +55,5 @@ DOCUMENTS: dict[str, type[BaseModel]] = {
     "project": Project,
     "manifest": Manifest,
     "voices": VoiceLibrary,
+    "bgm": BgmLibrary,
 }

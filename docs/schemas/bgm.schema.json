@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "BgmTrack": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "file": {
+          "minLength": 1,
+          "title": "File",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "moods": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Moods",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Sha256",
+          "type": "string"
+        },
+        "tempo": {
+          "anyOf": [
+            {
+              "enum": [
+                "slow",
+                "medium",
+                "fast"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tempo"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "file",
+        "duration_ms",
+        "sha256"
+      ],
+      "title": "BgmTrack",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "tracks": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/BgmTrack"
+      },
+      "title": "Tracks",
+      "type": "array"
+    }
+  },
+  "title": "BgmLibrary",
+  "type": "object"
+}

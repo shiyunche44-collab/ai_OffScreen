@@ -53,6 +53,7 @@ from offscreen.stages.creation.review import ReviewStage
 from offscreen.stages.creation.script import ScriptError, ScriptSettings, ScriptStage
 from offscreen.stages.output.compile import CompileStage, CompileStageError
 from offscreen.stages.output.render import FINAL_FILE, RenderError, RenderStage
+from offscreen.store.bgm import BgmStore
 from offscreen.store.db import Database
 from offscreen.store.documents import DocumentStore
 from offscreen.store.outline_edits import OutlineEditStore
@@ -254,7 +255,7 @@ class Pipeline:
                 text_embedder=p.text_embedder,
             ),
             CompileStage(self.assets),
-            RenderStage(self.assets),
+            RenderStage(self.assets, bgm=BgmStore(cfg.data_dir)),
         ]
 
     def stage_chain(self, target: str, asset_id: str, opts: RunOptions | None = None) -> list[str]:

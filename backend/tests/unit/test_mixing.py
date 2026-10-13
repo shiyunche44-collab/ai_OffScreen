@@ -148,3 +148,51 @@ def test_mix_length_and_duck_range_hold_for_any_layout(
     assert out.shape == (total, 2) and np.isfinite(out).all()
     env = duck_envelope(total, [(s, s + n) for s, n in pieces], depth_db=depth, rate=RATE)
     assert env.min() >= db_to_gain(depth) - 1e-6 and env.max() <= 1.0
+
+
+# ---- music: fit, loop, fade out -----------------------------------------------------------
+def ramp(n: int) -> np.ndarray:
+    return np.stack([np.arange(n, dtype=np.float32)] * 2, axis=1)
+
+
+def test_fit_music_trims_a_long_track_and_fades_out() -> None:
+    from offscreen.algo.mixing import fit_music
+
+    out = fit_music(const(1000), 400, fade_out_n=100)
+    assert len(out) == 400 and np.all(out[:300] == 1.0)
+    assert out[300, 0] == 1.0 and out[-1, 0] == 0.0 and np.all(np.diff(out[300:, 0]) <= 0)
+
+
+def test_fit_music_loops_a_short_track_to_the_exact_length() -> None:
+    from offscreen.algo.mixing import fit_music
+
+    for length in (250, 301, 1000):
+        assert len(fit_music(const(100), length)) == length
+        assert len(fit_music(const(100), length, crossfade_n=20)) == length
+    assert fit_music(const(100), 0).shape == (0, 2)
+    assert np.all(fit_music(np.zeros((0, 2), dtype=np.float32), 50) == 0)
+
+
+def test_loop_seams_are_crossfaded_without_a_jump() -> None:
+    from offscreen.algo.mixing import fit_music
+
+    x = np.sin(np.linspace(0, 6.0, 300, dtype=np.float32))[:, None].repeat(2, axis=1)
+    hard = fit_music(x, 900)
+    soft = fit_music(x, 900, crossfade_n=60)
+    assert adjacent_jump(hard) > 0.2  # the sine does not end where it began
+    assert adjacent_jump(soft) < 0.05
+    assert np.allclose(soft[: 300 - 60], x[: 300 - 60])  # the first pass is untouched
+
+
+def test_music_in_the_mix_loops_and_fades_at_its_end() -> None:
+    out = mix(
+        1000,
+        rate=RATE,
+        music=[
+            MusicPlaced(
+                const(300), 100, 900, gain_db=0.0, fade_ms=0, fade_out_ms=200, crossfade_ms=0
+            )
+        ],
+    )
+    assert np.all(out[:100] == 0) and np.all(out[100:700] == 1.0) and np.all(out[900:] == 0)
+    assert out[899, 0] < 0.02 and out[800, 0] < 0.6

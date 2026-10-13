@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from offscreen.config import AppConfig
 from offscreen.services.annotations import AnnotationService
+from offscreen.services.bgm import BgmService
 from offscreen.services.characters import CharacterService
 from offscreen.services.documents import DocumentService
 from offscreen.services.events import JobWatcher
@@ -35,6 +36,7 @@ class AppServices:
         self.preview = PreviewService(cfg, self.db, self.jobs)
         self.selection = SelectionService(cfg, self.db, self.jobs)
         self.voices = VoiceService(cfg, self.db, self.jobs)
+        self.bgm = BgmService(cfg)
         self.annotations = AnnotationService(cfg, self.db, self.jobs)
         self.characters = CharacterService(cfg, self.db, self.jobs)
         self.index = IndexService(cfg, self.db, self.jobs)

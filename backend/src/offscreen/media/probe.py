@@ -86,3 +86,35 @@ def probe(path: Path, binary: str = "ffprobe") -> ProbeResult:
         ),
         audio=audio,
     )
+
+
+def probe_audio_duration_ms(path: Path, binary: str = "ffprobe") -> int:
+    """Length of a sound file, which must have an audio stream."""
+    proc = subprocess.run(
+        [
+            binary,
+            "-v",
+            "error",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if proc.returncode != 0:
+        raise ProbeError(f"ffprobe failed for {path}: {proc.stderr.strip()}")
+    info = json.loads(proc.stdout)
+    streams = info.get("streams", [])
+    if not any(s.get("codec_type") == "audio" for s in streams):
+        raise ProbeError(f"no audio stream in {path}")
+    duration = info.get("format", {}).get("duration") or next(
+        (s["duration"] for s in streams if s.get("duration")), None
+    )
+    if duration is None or float(duration) <= 0:
+        raise ProbeError(f"cannot determine duration of {path}")
+    return round(float(duration) * 1000)

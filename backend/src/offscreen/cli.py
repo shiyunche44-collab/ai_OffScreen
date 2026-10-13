@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from offscreen.config import ConfigError, load_config
+from offscreen.domain.bgm import BgmTrack, Tempo
 from offscreen.domain.index import SelectionLabel
 from offscreen.domain.voice import Voice
 from offscreen.providers.ports import TTSError
@@ -385,6 +386,91 @@ def _voice_line(v: Voice, default: str) -> str:
     mark = " *" if v.id == default else ""
     clone = f"  克隆自 {v.reference_audio}" if v.reference_audio else ""
     return f"{v.id + mark:<22} {v.provider:<10} 语速 {v.default_speed:<4} {rate}{clone}  {v.name}"
+
+
+bgm_app = typer.Typer(
+    help="The music library: background tracks in data/library/bgm/, tagged by mood and tempo",
+    no_args_is_help=True,
+)
+app.add_typer(bgm_app, name="bgm")
+
+MoodsOpt = Annotated[
+    list[str] | None, typer.Option("--mood", help="Mood tag, repeatable (e.g. tense)")
+]
+TempoOpt = Annotated[Tempo | None, typer.Option(help="slow, medium or fast")]
+
+
+def _bgm_line(t: BgmTrack) -> str:
+    moods = ",".join(t.moods) or "-"
+    return f"{t.id:<20} {t.duration_ms / 1000:>7.1f}s  {t.tempo or '-':<7} {moods:<20} {t.file}"
+
+
+@bgm_app.command("list")
+def bgm_list(
+    mood: Annotated[str | None, typer.Option(help="Only tracks with this mood")] = None,
+    tempo: TempoOpt = None,
+    config: ConfigOpt = None,
+) -> None:
+    """The registered tracks."""
+    try:
+        with AppServices(load_config(config)) as services:
+            tracks = services.bgm.list(mood=mood, tempo=tempo)
+    except ConfigError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    if not tracks:
+        typer.echo("(no tracks; put files in data/library/bgm/ and run `offscreen bgm scan`)")
+    for t in tracks:
+        typer.echo(_bgm_line(t))
+
+
+@bgm_app.command("add")
+def bgm_add(
+    file: Annotated[str, typer.Argument(help="A file in data/library/bgm/")],
+    track_id: Annotated[
+        str | None, typer.Option("--id", help="Track id (default: file name)")
+    ] = None,
+    name: Annotated[str | None, typer.Option(help="A name to show")] = None,
+    mood: MoodsOpt = None,
+    tempo: TempoOpt = None,
+    config: ConfigOpt = None,
+) -> None:
+    """Register a music file, or change the tags of a registered one."""
+    try:
+        with AppServices(load_config(config)) as services:
+            t = services.bgm.add(file, track_id=track_id, name=name, moods=mood, tempo=tempo)
+    except (ConfigError, InvalidInput) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(_bgm_line(t))
+
+
+@bgm_app.command("scan")
+def bgm_scan(config: ConfigOpt = None) -> None:
+    """Register every music file in the folder that is not registered yet."""
+    try:
+        with AppServices(load_config(config)) as services:
+            added = services.bgm.scan()
+    except ConfigError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    for t in added:
+        typer.echo(_bgm_line(t))
+    typer.echo(f"{len(added)} new track(s)")
+
+
+@bgm_app.command("remove")
+def bgm_remove(
+    track_id: Annotated[str, typer.Argument(help="Track id")], config: ConfigOpt = None
+) -> None:
+    """Take a track out of the library (the file stays in the folder)."""
+    try:
+        with AppServices(load_config(config)) as services:
+            services.bgm.remove(track_id)
+    except (ConfigError, NotFound) as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"removed {track_id}")
 
 
 @voice_app.command("list")

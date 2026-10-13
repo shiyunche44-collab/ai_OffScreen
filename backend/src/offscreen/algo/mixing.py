@@ -18,6 +18,8 @@ Samples = NDArray[np.float32]
 DEFAULT_FADE_MS = 10.0
 DEFAULT_ATTACK_MS = 60.0
 DEFAULT_RELEASE_MS = 400.0
+MUSIC_FADE_OUT_MS = 2000.0
+MUSIC_CROSSFADE_MS = 500.0
 
 
 def db_to_gain(db: float) -> float:
@@ -48,6 +50,10 @@ class MusicPlaced:
     gain_db: float = -22.0
     duck_depth_db: float | None = None
     fade_ms: float = DEFAULT_FADE_MS
+    fade_out_ms: float = 0.0
+    """A longer fade to silence ending at `end`, so the music does not stop abruptly."""
+    crossfade_ms: float = 0.0
+    """Overlap between repeats when the track is shorter than `[start, end)`."""
 
 
 def with_fades(x: Samples, fade_n: int) -> Samples:
@@ -60,6 +66,35 @@ def with_fades(x: Samples, fade_n: int) -> Samples:
         ramp = (np.arange(k, dtype=np.float32) + 1.0) / (k + 1.0)
         out[:k] *= ramp[:, None]
         out[n - k :] *= ramp[::-1, None]
+    return out
+
+
+def fit_music(x: Samples, length: int, *, fade_out_n: int = 0, crossfade_n: int = 0) -> Samples:
+    """Exactly `length` samples of music: the track trimmed, or repeated (each repeat blended
+    into the previous over `crossfade_n` samples so the seam does not click), with a fade to
+    silence over the last `fade_out_n` samples."""
+    if length <= 0 or len(x) == 0:
+        return np.zeros((max(length, 0), 2), dtype=np.float32)
+    out = x[:length].astype(np.float32, copy=True)
+    if len(out) < length:
+        cf = min(max(crossfade_n, 0), len(x) // 2)
+        up = (np.arange(cf, dtype=np.float32) + 1.0) / (cf + 1.0)
+        pieces = [out]
+        have = len(out)
+        while have < length:
+            nxt = x.astype(np.float32, copy=True)
+            if cf > 0:
+                prev = pieces[-1]
+                blend = prev[-cf:] * up[::-1, None] + nxt[:cf] * up[:, None]
+                pieces[-1] = prev[:-cf]
+                nxt = np.concatenate([blend, nxt[cf:]])
+                have -= cf
+            pieces.append(nxt)
+            have += len(nxt)
+        out = np.concatenate(pieces)[:length]
+    k = min(max(fade_out_n, 0), len(out))
+    if k > 0:
+        out[len(out) - k :] *= np.linspace(1.0, 0.0, k, dtype=np.float32)[:, None]
     return out
 
 
@@ -130,7 +165,12 @@ def mix(
         length = min(m.end, total) - max(m.start, 0)
         if length <= 0:
             continue
-        body = m.samples[: max(m.end - m.start, 0)]  # cut at the item's end
+        body = fit_music(
+            m.samples,
+            m.end - m.start,
+            fade_out_n=ms_to_samples(m.fade_out_ms, rate),
+            crossfade_n=ms_to_samples(m.crossfade_ms, rate),
+        )
         piece = with_fades(body, ms_to_samples(m.fade_ms, rate)) * np.float32(db_to_gain(m.gain_db))
         if m.duck_depth_db is not None and voice_spans:
             env = duck_envelope(

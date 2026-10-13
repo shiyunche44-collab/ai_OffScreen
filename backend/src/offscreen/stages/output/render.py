@@ -31,7 +31,14 @@ from offscreen.algo.loudness import (
     meets_target,
     narration_gain_db,
 )
-from offscreen.algo.mixing import DEFAULT_FADE_MS, Placed, ms_to_samples
+from offscreen.algo.mixing import (
+    DEFAULT_FADE_MS,
+    MUSIC_CROSSFADE_MS,
+    MUSIC_FADE_OUT_MS,
+    MusicPlaced,
+    Placed,
+    ms_to_samples,
+)
 from offscreen.algo.mixing import mix as mix_samples
 from offscreen.domain.common import Rational
 from offscreen.domain.job import Lane
@@ -42,6 +49,7 @@ from offscreen.media import loudness as media_loudness
 from offscreen.media import render as media
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.stages.output.compile import TIMELINE_FILE
+from offscreen.store.bgm import BgmStore
 from offscreen.store.repos import AssetRepo
 
 log = logging.getLogger(__name__)
@@ -61,12 +69,13 @@ def frames_to_ms(frames: int, fps: Rational) -> int:
 
 class RenderStage(Stage):
     name = "output.render"
-    version = 3
+    version = 4
     lane: Lane = "cpu"
 
-    def __init__(self, assets: AssetRepo, font: str = FONT) -> None:
+    def __init__(self, assets: AssetRepo, font: str = FONT, bgm: BgmStore | None = None) -> None:
         self.assets = assets
         self.font = font
+        self.bgm = bgm
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
         return [ArtifactRef("output.compile", scope)]
@@ -80,6 +89,8 @@ class RenderStage(Stage):
             # The film is read from outside the artifact graph, so its identity is in the key.
             "source_fingerprint": asset.fingerprint,
             "font": self.font,
+            # The music files are read from outside the artifact graph.
+            "bgm_library": self.bgm.digest() if self.bgm else None,
             "clip_crf": media.CLIP_CRF,
             "final_crf": media.FINAL_CRF,
             "preset": media.PRESET,
@@ -117,6 +128,7 @@ class RenderStage(Stage):
                     work,
                     video=source,
                     audio=source if asset.audio else None,
+                    bgm_dir=self.bgm.dir if self.bgm else None,
                     font=self.font,
                     progress=ctx.progress,
                     should_cancel=ctx.is_canceled,
@@ -158,6 +170,7 @@ def render_timeline(
     video: Path,
     audio: Path | None,
     font: str,
+    bgm_dir: Path | None = None,
     quality: Quality = DEFAULT_QUALITY,
     progress: Callable[[float, str], None] = lambda _f, _m: None,
     should_cancel: Callable[[], bool] | None = None,
@@ -232,11 +245,30 @@ def render_timeline(
                 audio, rate=rate, seek_ms=s.src_in_ms, duration_ms=span_ms, should_cancel=cancel
             )
             source.append(Placed(pcm, ms_to_samples(frames_to_ms(s.f0, fps), rate), s.gain_db))
-    if not narration and not source:
+    music: list[MusicPlaced] = []
+    if bgm_dir is not None:
+        for b in tl.bgm:
+            path = bgm_dir / b.file
+            if not path.is_file():
+                raise RenderError(f"music file missing: {path} (removed from the music library?)")
+            music.append(
+                MusicPlaced(
+                    media_audio.read_pcm(path, rate=rate, should_cancel=cancel),
+                    ms_to_samples(frames_to_ms(b.f0, fps), rate),
+                    ms_to_samples(frames_to_ms(b.f1, fps), rate),
+                    b.gain_db,
+                    b.duck.depth_db if b.duck else None,
+                    fade_out_ms=MUSIC_FADE_OUT_MS,
+                    crossfade_ms=MUSIC_CROSSFADE_MS,
+                )
+            )
+    if not narration and not source and not music:
         raise RenderError("timeline has no sound at all")
     mix = work / "mix.wav"
     clipped = media_audio.write_wav(
-        mix, mix_samples(total, rate=rate, narration=narration, source=source), rate=rate
+        mix,
+        mix_samples(total, rate=rate, narration=narration, source=source, music=music),
+        rate=rate,
     )
     if clipped:
         log.warning("render: %d samples clipped in the mixdown", clipped)

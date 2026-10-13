@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "tracks": [
+    {
+      "duration_ms": 92500,
+      "file": "tense_01.mp3",
+      "id": "tense_01",
+      "moods": ["tense", "dark"],
+      "name": "Tense 01",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "tempo": "fast"
+    },
+    {
+      "duration_ms": 61000,
+      "file": "warm/home.wav",
+      "id": "warm_home",
+      "moods": ["warm"],
+      "name": "Home",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "tempo": null
+    }
+  ]
+}
