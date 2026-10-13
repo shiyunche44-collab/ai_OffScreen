@@ -212,3 +212,18 @@ def read_raw_audio(
             stderr="".join(tail),
         )
     return b"".join(chunks)
+
+
+def capture_ffmpeg_log(args: Sequence[str], *, binary: str = "ffmpeg") -> str:
+    """Run ffmpeg to completion and return its log (stderr), for filters that report their
+    findings there (loudnorm, ebur128). Raises FFmpegError on a non-zero exit."""
+    cmd = [binary, "-hide_banner", "-nostdin", "-nostats", "-y", *args]
+    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if done.returncode != 0:
+        raise FFmpegError(
+            f"ffmpeg failed (exit {done.returncode})",
+            returncode=done.returncode,
+            cmd=cmd,
+            stderr="\n".join(done.stderr.splitlines()[-STDERR_TAIL_LINES:]),
+        )
+    return done.stderr

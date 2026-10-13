@@ -23,7 +23,13 @@ from offscreen.engine import ArtifactStore, Engine, Stage, StageCanceled, StageC
 from offscreen.providers.adapters.fake import FakeTTS
 from offscreen.stages.analysis.ingest import ingest
 from offscreen.stages.output.compile import TIMELINE_FILE
-from offscreen.stages.output.render import FINAL_FILE, SUBTITLES_FILE, RenderError, RenderStage
+from offscreen.stages.output.render import (
+    FINAL_FILE,
+    LOUDNESS_FILE,
+    SUBTITLES_FILE,
+    RenderError,
+    RenderStage,
+)
 from offscreen.store.db import Database
 from offscreen.store.files import write_model
 from offscreen.store.repos import AssetRepo
@@ -156,8 +162,13 @@ def test_render_produces_the_timeline_exactly(clip: Path, repo: AssetRepo, tmp_p
     assert kinds["audio"]["codec_name"] == "aac"
     expected_ms = tl.duration_frames * 1001 / 24
     assert abs(float(info["format"]["duration"]) * 1000 - expected_ms) < 80
-    # The film's own sound is under the narration (the narration here is silent).
-    assert -60 < mean_volume_db(art.path(FINAL_FILE)) < -20
+    # The film's own sound is under the narration (the narration here is silent), and the
+    # programme is levelled to the platform target with headroom (M6-07).
+    assert -30 < mean_volume_db(art.path(FINAL_FILE)) <= -1.0
+    report = json.loads(art.path(LOUDNESS_FILE).read_text(encoding="utf-8"))
+    assert report["ok"] is True and abs(report["after"]["integrated_lufs"] + 14.0) <= 1.0
+    assert report["after"]["true_peak_dbtp"] <= -0.9 and report["clipped_samples"] == 0
+    assert art.meta["loudness"]["integrated_lufs"] == report["after"]["integrated_lufs"]
 
     assert art.path(SUBTITLES_FILE).read_text(encoding="utf-8").count("Dialogue:") == len(
         tl.subtitles
@@ -165,9 +176,10 @@ def test_render_produces_the_timeline_exactly(clip: Path, repo: AssetRepo, tmp_p
     assert art.meta["duration_frames"] == tl.duration_frames and art.meta["subtitles"] == len(
         tl.subtitles
     )
-    # Scratch files are gone: only the final video and the subtitles remain.
+    # Scratch files are gone: only the final video, the subtitles and the loudness report remain.
     assert sorted(f.name for f in art.dir.iterdir() if f.name != "manifest.json") == [
         FINAL_FILE,
+        LOUDNESS_FILE,
         SUBTITLES_FILE,
     ]
 

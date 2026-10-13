@@ -27,7 +27,7 @@ from offscreen.stages.output.compile import SUBTITLE_CHARS_LANDSCAPE, SUBTITLE_C
 from offscreen.stages.output.render import FINAL_FILE, Quality, RenderError, render_timeline
 
 PREVIEW_HEIGHT = 360
-PREVIEW_QUALITY = Quality(preset="ultrafast", clip_crf=30, final_crf=30)
+PREVIEW_QUALITY = Quality(preset="ultrafast", clip_crf=30, final_crf=30, loudness=False)
 PREVIEW_VERSION = 1
 """Bump when a preview of the same segment would look different."""
 
