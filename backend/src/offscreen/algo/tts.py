@@ -69,3 +69,36 @@ def char_timings_from_spans(
         out.append((s, e))
         prev_end = e
     return out
+
+
+WORD_SLACK = 8
+"""Characters a reported word may start after the previous one (spaces, punctuation, a
+skipped word)."""
+
+
+def spans_from_words(text: str, words: Sequence[tuple[str, float, float]]) -> list[WordSpan]:
+    """Place `(word, start_ms, end_ms)` entries, reported as text without offsets, on the
+    characters of `text`: each is looked for after the previous one. Engines attach
+    punctuation to the word before it and may drop spaces, so a word is matched without
+    surrounding spaces, and failing that without its punctuation. A word is only looked for
+    within `WORD_SLACK` characters of where the previous one ended, so one the engine rewrote
+    cannot latch onto a later occurrence; it is skipped and its characters are left to
+    `char_timings_from_spans`."""
+    spans: list[WordSpan] = []
+    cursor = 0
+    for word, start, end in words:
+        for probe in (word.strip(), _core(word)):
+            if not probe:
+                continue
+            at = text.find(probe, cursor, cursor + WORD_SLACK + len(probe))
+            if at >= 0:
+                spans.append(WordSpan(start, end, at, at + len(probe)))
+                cursor = at + len(probe)
+                break
+    return spans
+
+
+def _core(word: str) -> str:
+    """The word without the punctuation and spaces around it."""
+    keep = [i for i, c in enumerate(word) if c.isalnum()]
+    return word[keep[0] : keep[-1] + 1] if keep else ""

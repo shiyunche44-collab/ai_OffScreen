@@ -66,3 +66,5 @@
 | 多音字与自定义读音 | T3 编排 / 声音 | 2026-10-13 | 搁置 | M6-02 只处理数字、符号、单位和几个英文缩写；多音字（「重」「行」）、人名地名的读音没管。MiniMax 有 `pronunciation_dict`（PROVIDERS.md §4），可做成项目级读音表传给适配器 |
 | 换了参考录音后计划不会自动重配 | T3 编排 / plan | 2026-10-13 | 搁置 | M6-03 的配音缓存键含参考录音与原话的摘要，换录音后再合成会重新生成；但增量构建只比 `text_hash` 与 `VoiceSpec`（音色 id + 语速），同 id 换了录音的段仍沿用旧配音，要「重建计划」。可把音色摘要记进 `VoiceSpec` 或段里 |
 | 参考录音原话自动转写 | T3 编排 / 声音 | 2026-10-13 | 搁置 | CosyVoice 有录音原话（`reference_text`）时克隆效果更好，现在要手填。可在 `voice add` 时用 ASR 端口自动转写，人再改 |
+| 豆包与 MiniMax 盲听结果 | T3 编排 / 声音 | 2026-10-13 | 待人工 | M6-04 生成了 6 对盲听样本（`scripts/tts_ab.py`，MiniMax `male-qn-qingse` 对 豆包 `zh_male_jieshuoxiaoming_uranus_bigtts`），主观结论要人听后填 `answers.txt` 再 `--score`；结果补进 PROVIDERS.md §5.5，再决定默认 TTS 是否换。样本没有做响度对齐（豆包各段响度差到 ~3 dB），偏好可能受音量影响 |
+| 豆包音色列表与声音复刻 | providers / 声音 | 2026-10-13 | 搁置 | V3 接口没有列音色的端点，可用音色只能从控制台抄（PROVIDERS.md §5.2 列了实测可用的 12 个）；当前 Key 未开通 `seed-icl-*`（声音复刻）和 `seed-tts-1.0`。开通复刻后可作为 CosyVoice 之外的云端克隆方案 |

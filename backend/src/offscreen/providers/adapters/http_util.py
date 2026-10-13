@@ -23,6 +23,11 @@ _QUOTA_WORDS = re.compile(
 )
 
 
+def mentions_quota(text: str) -> bool:
+    """The message speaks of balance or quota (not of a plain rate limit)."""
+    return bool(_QUOTA_WORDS.search(text))
+
+
 def classify_failure(status: int, body: Any, text: str = "") -> FailureKind:
     """Decide how to react to an error response. `body` is the parsed JSON, if any."""
     base = body.get("base_resp") if isinstance(body, dict) else None

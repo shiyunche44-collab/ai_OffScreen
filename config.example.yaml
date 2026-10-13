@@ -31,9 +31,10 @@ providers:
     max_concurrency: 4
     enabled: false
 
-  volc_speech:          # 火山豆包语音（M6-04 接入）
+  volc_speech:          # 火山豆包语音 V3（docs/PROVIDERS.md §5）；base_url 默认 https://openspeech.bytedance.com
     kind: volc_tts
-    api_key_env: VOLC_SPEECH_API_KEY
+    api_key_env: VOLC_SPEECH_API_KEY   # 新版控制台的 API Key（X-Api-Key）
+    max_concurrency: 2
     enabled: false
 
 tasks:                  # 每个 LLM 任务单独选供应商和模型
@@ -75,6 +76,8 @@ tts:
   default_voice: male-qn-qingse
   sample_rate: 32000
   # 备选：edge_tts（免费）、volc_speech、cosyvoice（侧车，音色克隆）
+  # 豆包：provider: volc_speech（并把上面的 enabled 改为 true）、model: seed-tts-2.0（资源 id）、
+  #       default_voice: zh_male_jieshuoxiaoming_uranus_bigtts 等 2.0 音色、sample_rate: 24000
   # cosyvoice:                    # tts.provider: cosyvoice 时使用；model 填侧车的模型目录名（如 CosyVoice2-0.5B）
   #   url: http://127.0.0.1:50021 # 见 sidecars/cosyvoice/README.md
   #   timeout_s: 600

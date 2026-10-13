@@ -6,6 +6,7 @@ from offscreen.config import AppConfig
 from offscreen.providers.adapters.cosyvoice_tts import CosyVoiceTTS, PromptLookup, VoicePrompt
 from offscreen.providers.adapters.minimax_tts import MiniMaxTTS
 from offscreen.providers.adapters.tts_cache import CachedTTS
+from offscreen.providers.adapters.volc_tts import VolcTTS
 from offscreen.store.voices import VoiceStore
 
 
@@ -14,6 +15,9 @@ def build_tts(cfg: AppConfig) -> CachedTTS:
     if cfg.tts.provider == "cosyvoice":
         cosy = CosyVoiceTTS(cfg, prompts=library_prompts(cfg))
         return CachedTTS(cosy, cache, voice_key=cosy.voice_key)
+    pcfg = cfg.providers.get(cfg.tts.provider)
+    if pcfg is not None and pcfg.kind == "volc_tts":
+        return CachedTTS(VolcTTS(cfg), cache)
     return CachedTTS(MiniMaxTTS(cfg), cache)
 
 

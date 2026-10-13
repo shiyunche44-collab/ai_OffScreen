@@ -12,7 +12,7 @@
 |------|---------|---------|---------|
 | `MINIMAX_API_KEY` | MiniMax Token Plan 订阅 Key（`sk-cp-` 开头），国内站 | ✅ 文本 / 图片理解 / 语音合成均成功 | **默认**：LLM、VLM、TTS |
 | `DEEPSEEK_API_KEY` | DeepSeek 按量付费 Key | ✅ 模型列表可读（未发起生成请求） | 备选 LLM、审稿 |
-| `VOLC_SPEECH_API_KEY` | 火山豆包语音 Key | 未测试 | TTS 备选（M6-04） |
+| `VOLC_SPEECH_API_KEY` | 火山豆包语音 API Key（新版控制台，UUID 格式） | ✅ `seed-tts-2.0` 语音合成成功，带字级时间戳（2026-10-13） | TTS 备选（M6-04，见 §5） |
 | `ARK_API_KEY` | 火山方舟 **Coding Plan** Key（`ark-` 开头） | ⚠️ 通用端点 401；仅编程套餐端点可认证 | ❌ **不接入平台**（见 §4） |
 | `ARK_PAYG_API_KEY` | 火山方舟按量付费 Key | 尚未配置 | 将来如需豆包模型时使用 |
 
@@ -194,11 +194,57 @@
 
 ---
 
-## 5. 火山豆包语音（TTS 备选，待接入）
+## 5. 火山豆包语音（TTS 备选；M6-04）
 
-`VOLC_SPEECH_API_KEY` 已在环境中配置，格式为 UUID。尚未实测，接入时（M6-04）先确认：接口版本、鉴权头、可用音色、是否返回字级时间戳；若不返回时间戳，走 ASR 对齐（M6-05）。
+2026-10-13 在云环境实测（`openspeech.bytedance.com` 可访问；`www.volcengine.com` 文档站被拦截，以下全部来自实际请求）。适配器：`providers/adapters/volc_tts.py`。
 
----
+### 5.1 接口与鉴权
+
+- **V3 HTTP 单向流式**：`POST https://openspeech.bytedance.com/api/v3/tts/unidirectional`
+- 请求头：`X-Api-Key: <VOLC_SPEECH_API_KEY>`（新版控制台的 API Key，**不需要** App ID / Access Token）、`X-Api-Resource-Id: <资源>`、`X-Api-Request-Id: <uuid>`（可选，便于排查）
+- 请求体：
+
+```json
+{"user": {"uid": "offscreen"},
+ "req_params": {"text": "…", "speaker": "zh_female_vv_uranus_bigtts",
+   "audio_params": {"format": "pcm", "sample_rate": 24000, "speech_rate": 0, "enable_subtitle": true}}}
+```
+
+### 5.2 资源与音色（当前 Key）
+
+| 资源 `X-Api-Resource-Id` | 结果 |
+|---|---|
+| `seed-tts-2.0` | ✅ 已开通 |
+| `seed-tts-1.0`（= `volc.service_type.10029`） | ❌ 403 `45000030 requested resource not granted` |
+| `seed-icl-1.0` / `seed-icl-2.0`（声音复刻） | ❌ 403 未开通 → 克隆仍走 CosyVoice 侧车（§9） |
+
+- 音色必须属于该资源，否则 HTTP 200 + `55000000 resource ID is mismatched with speaker related resource`。2.0 资源下实测可用（各自音频不同；编造的名字会被拒）：`zh_female_vv_uranus_bigtts`、`zh_female_xiaohe_uranus_bigtts`、`zh_female_cancan_uranus_bigtts`、`zh_male_m191_uranus_bigtts`、`zh_male_taocheng_uranus_bigtts`、`zh_male_dayi_uranus_bigtts`、`zh_male_ruyayichen_uranus_bigtts`、`zh_male_jieshuoxiaoming_uranus_bigtts`、`zh_male_shenyeboke_uranus_bigtts`、`zh_female_meilinvyou_saturn_bigtts`、`zh_male_dayi_saturn_bigtts`、`saturn_zh_female_cancan_tob`；1.0 音色（`*_mars_bigtts`、`*_moon_bigtts`）不可用。完整音色列表在控制台。
+
+### 5.3 响应
+
+- 换行分隔的 JSON：若干 `{"code":0,"data":"<base64 音频>"}`；`sentence` 事件；最后 `{"code":20000000,"message":"OK"}`
+- **时间戳**：要 `audio_params.enable_subtitle: true`（`enable_timestamp` 与 `additions` 里的开关在 2.0 上都不出时间戳）。每句一个 `sentence` 事件，`words: [{word, startTime, endTime, confidence}]`，单位**秒**、全文累计；另有一个整段文本、`words` 为空的事件。
+- `word` 只有文字、**没有字符偏移**：中文一字一个，英文整词（`iPhone`），标点粘在前一个词上（`生。`、`说：“`），空格不出现。适配器按顺序回找（`algo.tts.spans_from_words`）。
+- 未规范化的数字时间戳不可靠（`1990` 得到 30ms、置信度 0.15）；平台先规范化（M6-02）后，实测每个读出的字都有时间戳。
+- **音频格式**：`pcm` 是 16 位单声道裸流（采样率按请求，24000 / 32000 均可）；`wav` 的头部长度字段是占位的 `0xFFFFFFFF`（流式），所以适配器取 `pcm` 自己封装 WAV。`mp3`、`ogg_opus` 也可用。
+- **语速** `speech_rate`（-50..100）：实测同一句 -50 → 6.34 秒、0 → 3.01 秒、50 → 2.12 秒、100 → 1.50 秒，即 速度 ≈ 1 + rate/100（50 实测 1.42 倍）。适配器换算 `speech_rate = (speed - 1) × 100`；准确语速以 `voice calibrate` 为准。
+
+### 5.4 错误
+
+| 情况 | HTTP | code |
+|---|---|---|
+| 没带 Key | 400 | `45000000 app key not found` |
+| Key 错误 | 401 | `45000010 Invalid X-Api-Key` |
+| 资源未开通 | 403 | `45000030` |
+| 音色不属于该资源 | **200** | `55000000` |
+| 文本为空 / 只有标点 | **200** | `45002001 No readable text!` |
+
+4xx 的错误在 `header.code`，200 里的错误在顶层 `code`。限流、额度用尽的错误码未遇到：适配器把 429 / 5xx / 断流当作临时错误重试，消息里有额度类字样的当作额度用尽。
+
+### 5.5 与 MiniMax 的对比（同 6 段解说文本，各一个男声）
+
+- `scripts/tts_ab.py` 生成盲听样本（两边统一为 24 kHz 单声道 WAV，A/B 每段随机），听完填 `answers.txt` 后 `--score` 出结果。**主观结果待人工盲听**（MiniMax `male-qn-qingse` 对 豆包 `zh_male_jieshuoxiaoming_uranus_bigtts`）。
+- 客观：速度 1.0 时豆包 4.82 字/秒、MiniMax 3.76 字/秒（含首尾静音）；响度豆包 -23.2..-20.3 LUFS、MiniMax -23.4..-22.7 LUFS（成片响度由 M6-07 统一）。
 
 ## 6. InsightFace（人脸检测与特征，本地）
 
@@ -236,6 +282,6 @@ M3-07 实测（云环境 CPU，`insightface` + `onnxruntime`，模型 `buffalo_l
 
 ## 10. 云环境网络备注
 
-- 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`
-- 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）
+- 可访问：`api.minimaxi.com`、`api.deepseek.com`、`ark.cn-beijing.volces.com`、`openspeech.bytedance.com`
+- 被拦截：`*.aliyuncs.com`（MiniMax 非流式字幕文件）、`www.volcengine.com`（文档站）、`openspeech.volcengineapi.com`、ModelScope、Hugging Face
 - 本地运行不受这些限制；云环境中如需放行，在环境的网络策略里添加域名
