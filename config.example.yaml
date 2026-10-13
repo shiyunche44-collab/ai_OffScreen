@@ -81,6 +81,12 @@ mix:                    # 渲染混音（algo/mixing.py）
   duck_attack_ms: 150     # 配乐在解说开始前多久开始压低
   duck_release_ms: 400    # 解说结束后配乐多久回到原音量
 
+loudness:               # 成片响度（EBU R128）
+  target_lufs: -14        # 短视频平台常用
+  max_true_peak_db: -1.0  # 成片真峰值上限（验收）
+  true_peak_db: -1.5      # 归一化时瞄准的真峰值，给 AAC 编码留余量
+  narration_lufs: -16     # 混音前每段配音先归一到这个响度
+
 budget:
   confirm_above_tokens: 2000000   # 单个作业预估 token 超过此值需确认
 

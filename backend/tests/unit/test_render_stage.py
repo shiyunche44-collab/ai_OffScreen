@@ -23,7 +23,13 @@ from offscreen.engine import ArtifactStore, Engine, Stage, StageCanceled, StageC
 from offscreen.providers.adapters.fake import FakeTTS
 from offscreen.stages.analysis.ingest import ingest
 from offscreen.stages.output.compile import TIMELINE_FILE
-from offscreen.stages.output.render import FINAL_FILE, SUBTITLES_FILE, RenderError, RenderStage
+from offscreen.stages.output.render import (
+    FINAL_FILE,
+    LOUDNESS_FILE,
+    SUBTITLES_FILE,
+    RenderError,
+    RenderStage,
+)
 from offscreen.store.db import Database
 from offscreen.store.files import write_model
 from offscreen.store.repos import AssetRepo
@@ -156,8 +162,18 @@ def test_render_produces_the_timeline_exactly(clip: Path, repo: AssetRepo, tmp_p
     assert kinds["audio"]["codec_name"] == "aac"
     expected_ms = tl.duration_frames * 1001 / 24
     assert abs(float(info["format"]["duration"]) * 1000 - expected_ms) < 80
-    # The film's own sound is under the narration (the narration here is silent).
-    assert -60 < mean_volume_db(art.path(FINAL_FILE)) < -20
+    # The film's own sound is under the narration (the narration here is silent), raised to
+    # the programme loudness without going over the true-peak ceiling.
+    assert -20 < mean_volume_db(art.path(FINAL_FILE)) < -1
+    report = json.loads(art.path(LOUDNESS_FILE).read_text(encoding="utf-8"))
+    assert report["within_target"] is True and art.meta["loudness_within_target"] is True
+    assert abs(report["final"]["integrated"] + 14) <= 1
+    assert report["final"]["true_peak"] <= -1.0 and art.meta["true_peak_db"] <= -1.0
+    assert [n["seg"] for n in report["narration"]] == ["seg_01", "seg_02"]
+    assert all(
+        n["measured"]["integrated"] is None and n["gain_db"] == 0 for n in report["narration"]
+    )
+    assert report["mix"]["clipped_samples"] == 0
 
     assert art.path(SUBTITLES_FILE).read_text(encoding="utf-8").count("Dialogue:") == len(
         tl.subtitles
@@ -166,10 +182,9 @@ def test_render_produces_the_timeline_exactly(clip: Path, repo: AssetRepo, tmp_p
         tl.subtitles
     )
     # Scratch files are gone: only the final video and the subtitles remain.
-    assert sorted(f.name for f in art.dir.iterdir() if f.name != "manifest.json") == [
-        FINAL_FILE,
-        SUBTITLES_FILE,
-    ]
+    assert sorted(f.name for f in art.dir.iterdir() if f.name != "manifest.json") == sorted(
+        [FINAL_FILE, LOUDNESS_FILE, SUBTITLES_FILE]
+    )
 
 
 def test_subtitles_are_burned_into_the_lower_part_of_the_picture(

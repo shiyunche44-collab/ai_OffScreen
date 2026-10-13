@@ -201,3 +201,52 @@ def read_ffmpeg_output(
             stderr="".join(tail),
         )
     return b"".join(chunks)
+
+
+def run_ffmpeg_log(
+    args: Sequence[str],
+    *,
+    should_cancel: Callable[[], bool] | None = None,
+    binary: str = "ffmpeg",
+) -> str:
+    """Run ffmpeg and return all it logged (filters such as loudnorm print their measurements
+    there). Raises FFmpegError (with the log tail) or FFmpegCanceled."""
+    cmd = [binary, "-hide_banner", "-nostdin", "-nostats", "-y", *args]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert proc.stderr is not None
+    lines: list[str] = []
+    drain = threading.Thread(target=lambda: lines.extend(proc.stderr or ()), daemon=True)
+    drain.start()
+    canceled = False
+    try:
+        while proc.poll() is None:
+            if should_cancel is not None and should_cancel():
+                canceled = True
+                proc.kill()
+                break
+            time.sleep(0.02)
+        proc.wait()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        drain.join(timeout=2)
+    log = "".join(lines)
+    if canceled:
+        raise FFmpegCanceled("ffmpeg canceled")
+    if proc.returncode != 0:
+        tail = "".join(lines[-STDERR_TAIL_LINES:])
+        raise FFmpegError(
+            f"ffmpeg failed (exit {proc.returncode})",
+            returncode=proc.returncode,
+            cmd=cmd,
+            stderr=tail,
+        )
+    return log

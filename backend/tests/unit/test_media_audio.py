@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from offscreen.algo.loudness import LoudnessSettings
 from offscreen.algo.mixing import MixSettings, db_to_gain
 from offscreen.domain.common import Rational
 from offscreen.domain.timeline import (
@@ -79,10 +80,8 @@ def test_music_is_ducked_under_the_narration(tmp_path: Path) -> None:
         bgm=[BgmItem(f0=0, f1=100, file="m.wav", gain_db=0.0, duck=Duck(depth_db=-20.0))],
     )
     mix = MixSettings(duck_attack_ms=100, duck_release_ms=200)
-    report = mix_timeline(
-        tl, tmp_path, tmp_path / "mix.wav", film_audio=None, bgm_dir=tmp_path / "bgm", mix=mix
-    )
-    out = read_wav(tmp_path / "mix.wav")
+    mixed = mix_timeline(tl, tmp_path, film_audio=None, bgm_dir=tmp_path / "bgm", mix=mix)
+    out, report = mixed.audio, mixed.report
     assert out.shape == (4 * RATE, 2)  # exactly the programme
     at = lambda s: float(out[round(s * RATE), 0])  # noqa: E731
     assert at(0.5) == pytest.approx(0.5, abs=1e-3)  # music alone
@@ -104,8 +103,7 @@ def test_film_sound_is_cut_to_its_items_and_missing_files_are_named(
             )
         ],
     )
-    mix_timeline(tl, tmp_path, tmp_path / "m.wav", film_audio=clip, bgm_dir=None, mix=MixSettings())
-    out = read_wav(tmp_path / "m.wav")
+    out = mix_timeline(tl, tmp_path, film_audio=clip, bgm_dir=None, mix=MixSettings()).audio
     assert out.shape == (2 * RATE, 2)
     assert np.abs(out[: RATE - 1000]).max() > 0.05 and np.all(out[RATE:] == 0)
 
@@ -113,7 +111,6 @@ def test_film_sound_is_cut_to_its_items_and_missing_files_are_named(
         mix_timeline(
             timeline(50, narration=[NarrationItem(seg="seg_01", f0=0, file="nope.wav")]),
             tmp_path,
-            tmp_path / "m.wav",
             film_audio=None,
             bgm_dir=None,
             mix=MixSettings(),
@@ -122,8 +119,35 @@ def test_film_sound_is_cut_to_its_items_and_missing_files_are_named(
         mix_timeline(
             timeline(50, bgm=[BgmItem(f0=0, f1=50, file="m.wav")]),
             tmp_path,
-            tmp_path / "m.wav",
             film_audio=None,
             bgm_dir=None,
             mix=MixSettings(),
         )
+
+
+def test_every_narration_file_is_brought_to_one_loudness(tmp_path: Path) -> None:
+    rng = np.random.default_rng(3)
+    for name, level in (("quiet", 0.02), ("loud", 0.25)):
+        noise = (rng.standard_normal(RATE) * level).astype(np.float32)[:, None]
+        write_wav(tmp_path / f"{name}.wav", noise, RATE)
+    tl = timeline(
+        50,  # 2 s
+        narration=[
+            NarrationItem(seg="seg_01", f0=0, file="quiet.wav"),
+            NarrationItem(seg="seg_02", f0=25, file="loud.wav"),
+        ],
+    )
+    settings = LoudnessSettings(narration_lufs=-20.0)
+    mixed = mix_timeline(
+        tl, tmp_path, film_audio=None, bgm_dir=None, mix=MixSettings(), loudness=settings
+    )
+    gains = [n.gain_db for n in mixed.narration]
+    assert gains[0] > 0 > gains[1]
+    for n in mixed.narration:
+        assert n.measured.integrated + n.gain_db == pytest.approx(-20.0, abs=0.01)
+
+    def rms(a: np.ndarray) -> float:
+        return float(np.sqrt(np.mean(a**2)))
+
+    first, second = mixed.audio[1000 : RATE - 1000], mixed.audio[RATE + 1000 : -1000]
+    assert rms(first) == pytest.approx(rms(second), rel=0.05)

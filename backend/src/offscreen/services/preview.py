@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from offscreen.algo.loudness import LoudnessSettings
 from offscreen.algo.mixing import MixSettings
 from offscreen.config import AppConfig
 from offscreen.domain.plan import EditPlan
@@ -74,6 +75,7 @@ class PreviewService:
                 audio=proxy.path(AUDIO_48K) if asset.audio else None,
                 previews_dir=self.cfg.data_dir / PREVIEWS_DIR,
                 mix=MixSettings(**self.cfg.mix.model_dump()),
+                loudness=LoudnessSettings(**self.cfg.loudness.model_dump()),
             )
         except PreviewError as e:
             raise InvalidInput(str(e)) from e

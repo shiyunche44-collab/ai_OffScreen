@@ -112,6 +112,20 @@ class MixCfg(_Cfg):
     """Music takes this long to come back after the narration."""
 
 
+class LoudnessCfg(_Cfg):
+    """Loudness of the finished film (`algo/loudness.py`, EBU R128)."""
+
+    target_lufs: float = Field(default=-14.0, ge=-70, le=-5)
+    tolerance_lu: float = Field(default=1.0, gt=0)
+    max_true_peak_db: float = Field(default=-1.0, ge=-9, le=0)
+    """The finished file must stay under this."""
+    true_peak_db: float = Field(default=-1.5, ge=-9, le=0)
+    """What the normalizer aims at (headroom for the AAC encoder)."""
+    narration_lufs: float = Field(default=-16.0, ge=-70, le=-5)
+    """Every narration file is brought to this before mixing."""
+    max_narration_gain_db: float = Field(default=12.0, ge=0)
+
+
 class BudgetCfg(_Cfg):
     confirm_above_tokens: int = Field(default=2_000_000, ge=0)
 
@@ -136,6 +150,7 @@ class AppConfig(_Cfg):
     embeddings: EmbeddingsCfg = EmbeddingsCfg()
     tts: TtsCfg = TtsCfg()
     mix: MixCfg = MixCfg()
+    loudness: LoudnessCfg = LoudnessCfg()
     budget: BudgetCfg = BudgetCfg()
     worker: WorkerCfg = WorkerCfg()
 

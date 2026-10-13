@@ -6,16 +6,21 @@ that is removed afterwards:
 1. each video item becomes a silent clip of exactly `f1 - f0` frames in one common encoding;
 2. the clips are joined without re-encoding;
 3. all sound (narration, the film's own audio under it, music ducked under the narration) is
-   mixed as a whole, sample by sample, into one wav (`algo/mixing.py`);
-4. the video is re-encoded once with the subtitles burned in, with the mixdown as AAC.
+   mixed as a whole, sample by sample (`algo/mixing.py`), each narration file first brought
+   to one loudness; the mixdown is then normalized to the programme target (-14 LUFS, true
+   peak under -1 dBTP) in two loudnorm passes (`algo/loudness.py`);
+4. the video is re-encoded once with the subtitles burned in, with the mixdown as AAC;
+5. the finished file is measured, and everything measured is written to `loudness.json`.
 
-v0 keeps the source frame size (layout "keep"), takes the film's first audio stream, and does
-no loudness normalization yet (M6-07). The timeline's music is only rendered when a music folder
-is given; nothing compiles music into a timeline before M6-08."""
+v0 keeps the source frame size (layout "keep") and takes the film's first audio stream. The
+timeline's music is only rendered when a music folder is given; nothing compiles music into a
+timeline before M6-08."""
 
 from __future__ import annotations
 
 import dataclasses
+import json
+import math
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from offscreen.algo.ass import FONT, build_ass
+from offscreen.algo.loudness import Loudness, LoudnessSettings, meets_target, narration_gain_db
 from offscreen.algo.mixing import (
     Audio,
     Layer,
@@ -37,13 +43,18 @@ from offscreen.domain.job import Lane
 from offscreen.domain.timeline import Timeline
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.media import audio as audio_io
+from offscreen.media import loudness as loud
 from offscreen.media import render as media
 from offscreen.media.ffmpeg import FFmpegCanceled
+from offscreen.media.loudness import Normalized
 from offscreen.stages.output.compile import TIMELINE_FILE
+from offscreen.store.files import atomic_write_bytes
 from offscreen.store.repos import AssetRepo
 
 FINAL_FILE = "final.mp4"
+LOUDNESS_FILE = "loudness.json"
 DEFAULT_MIX = MixSettings()
+DEFAULT_LOUDNESS = LoudnessSettings()
 SUBTITLES_FILE = "subtitles.ass"
 
 
@@ -57,13 +68,21 @@ def frames_to_ms(frames: int, fps: Rational) -> int:
 
 class RenderStage(Stage):
     name = "output.render"
-    version = 2  # 2: numpy mixdown (edge fades, music ducked under the narration)
+    version = 3  # 2: numpy mixdown (edge fades, music ducked under the narration)
+    # 3: narration leveled per file, programme normalized (two-pass loudnorm), loudness.json
     lane: Lane = "cpu"
 
-    def __init__(self, assets: AssetRepo, font: str = FONT, mix: MixSettings = DEFAULT_MIX) -> None:
+    def __init__(
+        self,
+        assets: AssetRepo,
+        font: str = FONT,
+        mix: MixSettings = DEFAULT_MIX,
+        loudness: LoudnessSettings = DEFAULT_LOUDNESS,
+    ) -> None:
         self.assets = assets
         self.font = font
         self.mix = mix
+        self.loudness = loudness
 
     def inputs(self, scope: Scope) -> list[ArtifactRef]:
         return [ArtifactRef("output.compile", scope)]
@@ -82,6 +101,7 @@ class RenderStage(Stage):
             "preset": media.PRESET,
             "audio_bitrate": media.AUDIO_BITRATE,
             "mix": dataclasses.asdict(self.mix),
+            "loudness": dataclasses.asdict(self.loudness),
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
@@ -114,6 +134,7 @@ class RenderStage(Stage):
                     audio=source if asset.audio else None,
                     font=self.font,
                     mix=self.mix,
+                    loudness=self.loudness,
                     progress=ctx.progress,
                     should_cancel=ctx.is_canceled,
                 )
@@ -126,8 +147,11 @@ class RenderStage(Stage):
                 "duration_ms": total_ms,
                 "bytes": final.stat().st_size,
                 "subtitles": len(tl.subtitles),
-                "mix_peak": round(report.peak, 4),
-                "mix_clipped_samples": report.clipped,
+                "mix_clipped_samples": report.mix.clipped,
+                "loudness_lufs": _finite(report.final.integrated),
+                "true_peak_db": _finite(report.final.true_peak),
+                "loudness_mode": report.normalized.mode,
+                "loudness_within_target": report.within_target,
             }
         )
 
@@ -144,6 +168,43 @@ class Quality:
 DEFAULT_QUALITY = Quality()
 
 
+@dataclass(frozen=True)
+class SoundReport:
+    """Written as `loudness.json` beside the film: how loud every part was and what came out."""
+
+    settings: LoudnessSettings
+    narration: list[NarrationLevel]
+    mix: MixReport
+    normalized: Normalized
+    final: Loudness
+    within_target: bool
+
+    def to_json(self) -> dict[str, Any]:
+        def lou(x: Loudness) -> dict[str, float | None]:
+            return {k: _finite(v) for k, v in dataclasses.asdict(x).items()}
+
+        return {
+            "target": dataclasses.asdict(self.settings),
+            "narration": [
+                {"seg": n.seg, "file": n.file, "measured": lou(n.measured), "gain_db": n.gain_db}
+                for n in self.narration
+            ],
+            "mix": {"peak": round(self.mix.peak, 4), "clipped_samples": self.mix.clipped},
+            "normalization": {
+                "mode": self.normalized.mode,
+                "input": lou(self.normalized.measured),
+                "output": lou(self.normalized.output),
+            },
+            "final": lou(self.final),
+            "within_target": self.within_target,
+        }
+
+
+def _finite(x: float) -> float | None:
+    """JSON has no infinities: silence is reported as null."""
+    return round(x, 2) if math.isfinite(x) else None
+
+
 def render_timeline(
     tl: Timeline,
     narration_dir: Path,
@@ -155,10 +216,11 @@ def render_timeline(
     font: str,
     quality: Quality = DEFAULT_QUALITY,
     mix: MixSettings = DEFAULT_MIX,
+    loudness: LoudnessSettings = DEFAULT_LOUDNESS,
     bgm_dir: Path | None = None,
     progress: Callable[[float, str], None] = lambda _f, _m: None,
     should_cancel: Callable[[], bool] | None = None,
-) -> MixReport:
+) -> SoundReport:
     """Timeline -> `out_dir/final.mp4` (and the subtitle file), working in `work`.
 
     `video` supplies the picture, `audio` the film's own sound (None: the film has none); the
@@ -195,14 +257,28 @@ def render_timeline(
         f.unlink()
     progress(0.65, "joined")
 
-    # 3. mixdown
+    # 3. mixdown, then the whole programme to the loudness target (two passes)
     if not tl.narration and not (audio is not None and tl.source_audio) and not tl.bgm:
         raise RenderError("timeline has no sound at all")
-    mix_file = work / "mix.wav"
-    report = mix_timeline(
-        tl, narration_dir, mix_file, film_audio=audio, bgm_dir=bgm_dir, mix=mix, cancel=cancel
+    mixed = mix_timeline(
+        tl,
+        narration_dir,
+        film_audio=audio,
+        bgm_dir=bgm_dir,
+        mix=mix,
+        loudness=loudness,
+        cancel=cancel,
     )
-    progress(0.8, "mixed")
+    progress(0.72, "mixed")
+    raw_file, mix_file = work / "mix.f32", work / "mix.wav"
+    raw = loud.write_raw(raw_file, mixed.audio, mix.sample_rate)
+    mixed_levels, mix_report = mixed.narration, mixed.report
+    del mixed  # the whole programme's samples: free them before encoding
+    normalized = loud.normalize_loudness(
+        raw_file, mix_file, loudness, sample_rate=mix.sample_rate, raw=raw, should_cancel=cancel
+    )
+    raw_file.unlink()
+    progress(0.8, "loudness")
 
     # 4. final encode with subtitles
     subs: Path | None = None
@@ -217,24 +293,53 @@ def render_timeline(
         duration_ms=total_ms,
         preset=quality.preset,
         crf=quality.final_crf,
-        on_progress=lambda f: progress(0.8 + 0.2 * f, "encoding"),
+        on_progress=lambda f: progress(0.8 + 0.19 * f, "encoding"),
         should_cancel=cancel,
     )
-    return report
+
+    # 5. what the listener gets: measured on the finished file (after AAC)
+    final = loud.measure_loudness(out_dir / FINAL_FILE, should_cancel=cancel)
+    sound = SoundReport(
+        settings=loudness,
+        narration=mixed_levels,
+        mix=mix_report,
+        normalized=normalized,
+        final=final,
+        within_target=meets_target(final, loudness),
+    )
+    report_json = json.dumps(sound.to_json(), ensure_ascii=False, sort_keys=True, indent=2)
+    atomic_write_bytes(out_dir / LOUDNESS_FILE, report_json.encode("utf-8"))
+    return sound
+
+
+@dataclass(frozen=True)
+class NarrationLevel:
+    seg: str
+    file: str
+    measured: Loudness
+    gain_db: float
+
+
+@dataclass(frozen=True)
+class Mixdown:
+    audio: Audio
+    report: MixReport
+    narration: list[NarrationLevel]
 
 
 def mix_timeline(
     tl: Timeline,
     narration_dir: Path,
-    dst: Path,
     *,
     film_audio: Path | None,
     bgm_dir: Path | None,
     mix: MixSettings,
+    loudness: LoudnessSettings | None = None,
     cancel: Callable[[], bool] | None = None,
-) -> MixReport:
-    """All of the timeline's sound in one wav of exactly the programme's length: narration,
-    the film's sound under each clip, and music ducked under the narration (ARCHITECTURE §7.5)."""
+) -> Mixdown:
+    """All of the timeline's sound, exactly the programme's length: narration (each file
+    brought to `loudness.narration_lufs` first, unless `loudness` is None), the film's sound
+    under each clip, and music ducked under the narration (ARCHITECTURE §7.5)."""
     fps, rate, ch = tl.output.fps, mix.sample_rate, mix.channels
     total = frame_to_sample(tl.duration_frames, fps, rate)
 
@@ -253,7 +358,18 @@ def mix_timeline(
             should_cancel=cancel,
         )
 
-    voice = [Placement(decode(narration_dir / n.file), at(n.f0), n.gain_db) for n in tl.narration]
+    voice: list[Placement] = []
+    levels: list[NarrationLevel] = []
+    for n in tl.narration:
+        path = narration_dir / n.file
+        samples = decode(path)
+        gain = n.gain_db
+        if loudness is not None:
+            measured = loud.measure_loudness(path, should_cancel=cancel)
+            level = narration_gain_db(measured, loudness)
+            levels.append(NarrationLevel(n.seg, n.file, measured, level))
+            gain += level
+        voice.append(Placement(samples, at(n.f0), gain))
     spoken = [(p.start, p.start + len(p.audio)) for p in voice]
     layers = [Layer(voice)]
     if film_audio is not None and tl.source_audio:
@@ -276,5 +392,4 @@ def mix_timeline(
             )
         )
     signal, report = mixdown(total, layers, mix)
-    audio_io.write_wav(dst, signal, rate)
-    return report
+    return Mixdown(signal, report, levels)

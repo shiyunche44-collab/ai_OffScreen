@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from offscreen.algo.calibrate import voice_timing
+from offscreen.algo.loudness import LoudnessSettings
 from offscreen.algo.mixing import MixSettings
 from offscreen.config import AppConfig, ConfigError
 from offscreen.engine import Artifact, ArtifactStore, Engine, StageRun
@@ -255,7 +256,11 @@ class Pipeline:
                 text_embedder=p.text_embedder,
             ),
             CompileStage(self.assets),
-            RenderStage(self.assets, mix=MixSettings(**cfg.mix.model_dump())),
+            RenderStage(
+                self.assets,
+                mix=MixSettings(**cfg.mix.model_dump()),
+                loudness=LoudnessSettings(**cfg.loudness.model_dump()),
+            ),
         ]
 
     def stage_chain(self, target: str, asset_id: str, opts: RunOptions | None = None) -> list[str]:
