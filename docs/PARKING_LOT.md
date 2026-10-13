@@ -61,3 +61,6 @@
 | 音色库的 HTTP 接口与页面 | 前端 / 声音 | 2026-10-10 | 搁置 | M6-01 只做了存储、`VoiceService` 和 `offscreen voice …` 命令；`GET/PUT/DELETE /voices`、`POST /voices/{id}:calibrate` 与前端选择器留给 M6-09。在那之前文案页的时长估算（`CHARS_PER_SECOND = 4.5`，`frontend/src/lib/project.ts`）仍是固定值，不随音色 |
 | 真实引擎上的语速标定 | T3 编排 / 声音 | 2026-10-10 | 搁置 | 标定与「估算误差 ≤ 5%」只在假引擎上验证过。真实 MiniMax 音色要跑一次 `offscreen voice calibrate`（约 250 字的额度）看 `rate_spread`；标准文本没有数字和英文，数字读法等 M6-02 规范化后再加进样本 |
 | 标定的音色与项目选项的音色同步 | T3 编排 / 声音 | 2026-10-10 | 搁置 | 管线按 `RunOptions.voice`（或 `tts.default_voice`）查音色库；`Voice.default_speed` 成为新计划的 `VoiceSpec.speed`，已建好的计划段不变（要重新配音须「重建计划」）。库里改了默认语速后，是否提示哪些项目的计划过期，没有做 |
+| 文案字数按读法估算 | T2 写作 / 声音 | 2026-10-13 | 搁置 | `count_chars` 数的是写出来的字（`100万` 4 字，读作「一百万」3 字；`$5` 1 字，读作「五美元」3 字）。M6-02 后配音读的是 `algo/textnorm.normalize` 的结果；数字多的文案时长估算会偏。可改为 `count_chars(normalize(text).text)`，要连同文案规则校验、大纲篇幅一起看 |
+| 规范化之前生成的计划段 | T3 编排 / plan | 2026-10-13 | 搁置 | 增量构建按 `text_hash`（原文）判断是否沿用，M6-02 之前建好的含数字的段会沿用旧配音（数字按引擎自己的读法），直到改了文案或「重建计划」。要不要把规范化版本记进段里、变了就重配，等真实使用再定 |
+| 多音字与自定义读音 | T3 编排 / 声音 | 2026-10-13 | 搁置 | M6-02 只处理数字、符号、单位和几个英文缩写；多音字（「重」「行」）、人名地名的读音没管。MiniMax 有 `pronunciation_dict`（PROVIDERS.md §4），可做成项目级读音表传给适配器 |

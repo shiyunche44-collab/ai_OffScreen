@@ -45,6 +45,8 @@ from offscreen.algo.plan_build import (
     with_fresh_footage,
 )
 from offscreen.algo.scoring import ScoringWeights
+from offscreen.algo.textnorm import VERSION as TEXT_NORM_VERSION
+from offscreen.algo.textnorm import normalize as normalize_for_speech
 from offscreen.algo.tts import tts_cache_key
 from offscreen.algo.vectors import TOP_K
 from offscreen.domain.index import (
@@ -117,7 +119,7 @@ class PlanSettings:
 
 class PlanStage(Stage):
     name = "creation.plan"
-    version = 3  # 3: scored footage, speed fitting, incremental build, original segments
+    version = 4  # 3: scored footage, fitting, incremental build; 4: text normalized for speech
     lane: Lane = "api"
 
     def __init__(
@@ -154,6 +156,7 @@ class PlanStage(Stage):
         return {
             "asset_id": scope["asset_id"],
             "voice_speed": self.voice_speed,
+            "text_norm": TEXT_NORM_VERSION,
             "max_clip_ms": MAX_CLIP_MS,
             "min_clip_ms": MIN_CLIP_MS,
             "min_speed": MIN_SPEED,
@@ -329,8 +332,9 @@ class PlanStage(Stage):
         taken: list[Clip],
         asset_id: str,
     ) -> PlanSegment:
-        audio = self.tts.synthesize(seg.text, voice_id=voice.voice_id, speed=voice.speed)
-        key = tts_cache_key(seg.text, voice.voice_id, voice.speed, self.tts.id)
+        speech = normalize_for_speech(seg.text)
+        audio = self.tts.synthesize(speech.text, voice_id=voice.voice_id, speed=voice.speed)
+        key = tts_cache_key(speech.text, voice.voice_id, voice.speed, self.tts.id)
         rel = f"{AUDIO_DIR}/{key.removeprefix('sha256:')[:16]}.{audio.format}"
         (ctx.out_dir / rel).write_bytes(audio.data)
 
@@ -348,7 +352,9 @@ class PlanStage(Stage):
             voice=voice,
             voice_pinned=bool(old and old.kind == "narration" and old.voice_pinned),
             audio=AudioRef(
-                file=rel, duration_ms=audio.duration_ms, char_timings=audio.char_timings
+                file=rel,
+                duration_ms=audio.duration_ms,
+                char_timings=speech.source_timings(audio.char_timings, audio.duration_ms),
             ),
             clips=clips,
             source_audio=SourceAudio(mode="duck", stem="mix", gain_db=NARRATION_SOURCE_GAIN_DB),

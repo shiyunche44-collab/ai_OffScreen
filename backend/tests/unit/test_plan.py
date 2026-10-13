@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 import sys
 from pathlib import Path
@@ -296,6 +297,25 @@ def test_unknown_scene_and_unknown_lines_fail(tmp_path: Path) -> None:
     orig = ScriptSegment(id="seg_01", kind="original", text="（原声）", line_refs=["ln_404"])
     with pytest.raises(PlanError, match="ln_404"):
         build(tmp_path, [orig], FakeTTS()).ensure("creation.plan", SCOPE)
+
+
+def test_the_engine_hears_numbers_spelled_out_and_subtitles_keep_the_script_text(
+    tmp_path: Path,
+) -> None:
+    tts = FakeTTS()
+    text = "他在1990年出生，花了$2亿。"
+    plan = plan_of(
+        build(tmp_path, [narration(1, text, ["sc_001"])], tts).ensure("creation.plan", SCOPE)
+    )
+    assert tts.calls[0][0] == "他在一九九零年出生，花了两亿美元。"
+    (seg,) = plan.segments
+    assert seg.text == text and seg.audio is not None
+    timings = seg.audio.char_timings
+    assert len(timings) == len(text)
+    assert all(a <= b <= c for (a, b), (c, _) in itertools.pairwise(timings))
+    assert timings[-1][1] <= seg.audio.duration_ms
+    year = timings[2:6]  # "1990" shares the time of 一九九零
+    assert year[0][0] < year[-1][1] and year[-1][1] - year[0][0] >= 600
 
 
 def test_tts_failure_propagates_and_leaves_no_artifact(tmp_path: Path) -> None:
