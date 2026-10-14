@@ -5,7 +5,8 @@ film the timeline's items point to. Steps (ARCHITECTURE §7.5), all in a scratch
 that is removed afterwards:
 1. each video item becomes a silent clip of exactly `f1 - f0` frames in one common encoding;
 2. the clips are joined without re-encoding;
-3. all sound (narration, and the film's own audio under it) is mixed as a whole into one wav;
+3. all sound (narration, and the film's own audio under it) is mixed as a whole into one wav
+   (`algo/mixing`, sample-exact);
 4. the video is re-encoded once with the subtitles burned in, with the mixdown as AAC.
 
 v0 keeps the source frame size (layout "keep"), takes the film's first audio stream, and
@@ -20,11 +21,14 @@ from pathlib import Path
 from typing import Any
 
 from offscreen.algo.ass import FONT, build_ass
+from offscreen.algo.mixing import FADE_MS_DEFAULT, RATE, Piece
+from offscreen.algo.mixing import mix as mix_pieces
 from offscreen.domain.common import Rational
 from offscreen.domain.job import Lane
 from offscreen.domain.timeline import Timeline
 from offscreen.engine import ArtifactRef, Scope, Stage, StageCanceled, StageContext, StageOutput
 from offscreen.media import render as media
+from offscreen.media.audio import decode_stereo, fit_length, write_wav
 from offscreen.media.ffmpeg import FFmpegCanceled
 from offscreen.stages.output.compile import TIMELINE_FILE
 from offscreen.store.repos import AssetRepo
@@ -41,9 +45,14 @@ def frames_to_ms(frames: int, fps: Rational) -> int:
     return round(frames * 1000 * fps.den / fps.num)
 
 
+def samples_at(frames: int, fps: Rational) -> int:
+    """Output sample position of a frame number (rounded once, so errors never accumulate)."""
+    return round(frames * RATE * fps.den / fps.num)
+
+
 class RenderStage(Stage):
     name = "output.render"
-    version = 1
+    version = 2
     lane: Lane = "cpu"
 
     def __init__(self, assets: AssetRepo, font: str = FONT) -> None:
@@ -66,8 +75,8 @@ class RenderStage(Stage):
             "final_crf": media.FINAL_CRF,
             "preset": media.PRESET,
             "audio_bitrate": media.AUDIO_BITRATE,
-            "mix_rate": media.MIX_RATE,
-            "fade_ms": media.FADE_MS,
+            "mix_rate": RATE,
+            "fade_ms": FADE_MS_DEFAULT,
         }
 
     def run(self, ctx: StageContext) -> StageOutput:
@@ -177,33 +186,33 @@ def render_timeline(
     progress(0.65, "joined")
 
     # 3. mixdown
-    parts = [
-        media.AudioPart(
-            path=narration_dir / n.file, start_ms=frames_to_ms(n.f0, fps), gain_db=n.gain_db
-        )
-        for n in tl.narration
-    ]
-    if audio is not None:
-        parts += [
-            media.AudioPart(
-                path=audio,
-                start_ms=frames_to_ms(s.f0, fps),
-                gain_db=s.gain_db,
-                seek_ms=s.src_in_ms,
-                duration_ms=frames_to_ms(s.f1 - s.f0, fps),
-                fade=True,
-            )
-            for s in tl.source_audio
-        ]
-    if not parts:
+    if not tl.narration and not (audio is not None and tl.source_audio):
         raise RenderError("timeline has no sound at all")
-    for p in parts:
-        if not p.path.is_file():
-            raise RenderError(f"audio file missing: {p.path}")
+    total = samples_at(tl.duration_frames, fps)
+    raw = work / "audio.raw"
+    narration = []
+    for n in tl.narration:
+        path = narration_dir / n.file
+        if not path.is_file():
+            raise RenderError(f"audio file missing: {path}")
+        x = decode_stereo(path, raw, should_cancel=cancel)
+        narration.append(Piece(samples_at(n.f0, fps), x, n.gain_db))
+    others = []
+    if audio is not None:
+        for s in tl.source_audio:
+            n_samples = samples_at(s.f1 - s.f0, fps)
+            x = decode_stereo(
+                audio,
+                raw,
+                seek_ms=s.src_in_ms,
+                duration_ms=frames_to_ms(s.f1 - s.f0, fps) + 1,
+                should_cancel=cancel,
+            )
+            others.append(
+                Piece(samples_at(s.f0, fps), fit_length(x, n_samples), s.gain_db, FADE_MS_DEFAULT)
+            )
     mix = work / "mix.wav"
-    media.mix_audio(
-        parts, mix, total_ms=total_ms, script_file=work / "mix.filter", should_cancel=cancel
-    )
+    write_wav(mix_pieces(total, narration, others), mix, raw, cancel=cancel)
     progress(0.8, "mixed")
 
     # 4. final encode with subtitles

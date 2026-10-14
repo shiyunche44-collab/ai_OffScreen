@@ -63,3 +63,4 @@
 | 标定的音色与项目选项的音色同步 | T3 编排 / 声音 | 2026-10-10 | 搁置 | 管线按 `RunOptions.voice`（或 `tts.default_voice`）查音色库；`Voice.default_speed` 成为新计划的 `VoiceSpec.speed`，已建好的计划段不变（要重新配音须「重建计划」）。库里改了默认语速后，是否提示哪些项目的计划过期，没有做 |
 | 文案字数估算按读音计 | T3 文案 / 声音 | 2026-10-14 | 搁置 | M6-02 的 `to_spoken` 只用于合成前；`count_chars`（时长估算、标定）仍按原文字符数，含数字的文案会偏差（"100" 计 3 字，读作「一百」2 字）。改成 `count_chars(to_spoken(text).text)` 并在标定样本里加数字、英文后，再复核「误差 ≤ 5%」 |
 | 发音词典未接入配置 | T3 编排 / 声音 | 2026-10-14 | 搁置 | `to_spoken(text, lexicon)` 支持词典（英文名、多音字），但 `plan` 阶段没传；项目 / 全局词典的存放与 UI 另议。MiniMax 还支持 `pronunciation_dict`，两条路径未对比 |
+| 原声闪避仍是固定增益 | T5 渲染 / 声音 | 2026-10-14 | 搁置 | M6-06 的混音器支持按解说包络动态闪避（`Piece.duck`），但编译器仍把 `duck` 模式折成常量 `gain_db`，渲染阶段不传 `duck`；`Timeline.bgm` 渲染阶段也还没读。动态闪避与 BGM 摆放留给 M6-08 / M6-09 接线（可能需要 `SourceAudioItem` 加 duck 字段，走 schema 变更流程） |

@@ -8,19 +8,15 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
 from offscreen.domain.common import Rational
 from offscreen.media.ffmpeg import ProgressFn, run_ffmpeg
 
-MIX_RATE = 48_000
 CLIP_CRF = 16
 FINAL_CRF = 18
 PRESET = "veryfast"
 AUDIO_BITRATE = "192k"
-FADE_MS = 10
-"""Fade at both ends of every source-audio piece, so cuts between pieces do not click."""
 
 Cancel = Callable[[], bool] | None
 
@@ -90,73 +86,6 @@ def concat_videos(
         ["-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(dst)],
         should_cancel=should_cancel,
     )
-
-
-@dataclass(frozen=True)
-class AudioPart:
-    """A piece of sound placed on the programme timeline."""
-
-    path: Path
-    start_ms: int
-    gain_db: float
-    seek_ms: int = 0
-    duration_ms: int | None = None
-    """Play only this much of the file (None: all of it)."""
-    fade: bool = False
-
-
-def mix_graph(parts: Sequence[AudioPart], total_ms: int) -> str:
-    """The `filter_complex` that places every part, sums them (no automatic gain change) and
-    pads or cuts the result to exactly `total_ms`."""
-    if not parts:
-        raise ValueError("nothing to mix")
-    total_s = f"{total_ms / 1000:.3f}"
-    chains = []
-    for i, p in enumerate(parts):
-        chain = [
-            f"aresample={MIX_RATE}",
-            "aformat=sample_fmts=fltp:channel_layouts=stereo",
-            f"volume={p.gain_db:.2f}dB",
-        ]
-        if p.fade and p.duration_ms and p.duration_ms > 2 * FADE_MS:
-            fade_s = FADE_MS / 1000
-            chain += [
-                f"afade=t=in:d={fade_s}",
-                f"afade=t=out:st={(p.duration_ms - FADE_MS) / 1000:.3f}:d={fade_s}",
-            ]
-        chain.append(f"adelay={max(0, p.start_ms)}:all=1")
-        chains.append(f"[{i}:a:0]{','.join(chain)}[a{i}]")
-    labels = "".join(f"[a{i}]" for i in range(len(parts)))
-    chains.append(
-        f"{labels}amix=inputs={len(parts)}:normalize=0:duration=longest,"
-        f"apad=whole_dur={total_s},atrim=end={total_s}[out]"
-    )
-    return ";\n".join(chains)
-
-
-def mix_audio(
-    parts: Sequence[AudioPart],
-    dst: Path,
-    *,
-    total_ms: int,
-    script_file: Path,
-    should_cancel: Cancel = None,
-) -> None:
-    """One stereo 48 kHz wav of the whole programme's sound."""
-    script_file.write_text(mix_graph(parts, total_ms), encoding="utf-8")
-    args: list[str] = []
-    for p in parts:
-        if p.seek_ms:
-            args += ["-ss", f"{p.seek_ms / 1000:.3f}"]
-        if p.duration_ms is not None:
-            args += ["-t", f"{p.duration_ms / 1000:.3f}"]
-        args += ["-i", str(p.path)]
-    args += [
-        "-filter_complex_script", str(script_file), "-map", "[out]",
-        "-c:a", "pcm_s16le", "-ar", str(MIX_RATE), "-ac", "2",
-        str(dst),
-    ]  # fmt: skip
-    run_ffmpeg(args, duration_ms=total_ms, should_cancel=should_cancel)
 
 
 _FILTER_SPECIAL = re.compile(r"([\\':,\[\]])")
