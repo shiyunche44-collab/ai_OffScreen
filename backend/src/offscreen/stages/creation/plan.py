@@ -1,6 +1,8 @@
 """plan: script + scenes + shots (+ shot vectors) -> plan.json, with the voice-over audio (T3).
 
-Per narration segment: the TTS port speaks the text, and footage is chosen in three steps
+Per narration segment: the TTS port speaks the text, as normalized for speech (`algo.textnorm`:
+digits, units, symbols, Latin letters; its timestamps are mapped back onto the script's
+characters), and footage is chosen in three steps
 (ARCHITECTURE §7.3): candidates (the shots of the cited scenes, the best matches of a vector
 search, `algo.candidates`), a weighted score (`algo.scoring`, with a character-bigram text
 similarity, which works without spaces), then the best-scored shots are cut and sped up or down
@@ -45,6 +47,7 @@ from offscreen.algo.plan_build import (
     with_fresh_footage,
 )
 from offscreen.algo.scoring import ScoringWeights
+from offscreen.algo.textnorm import to_spoken
 from offscreen.algo.tts import tts_cache_key
 from offscreen.algo.vectors import TOP_K
 from offscreen.domain.index import (
@@ -117,7 +120,7 @@ class PlanSettings:
 
 class PlanStage(Stage):
     name = "creation.plan"
-    version = 3  # 3: scored footage, speed fitting, incremental build, original segments
+    version = 4  # 4: text normalized for speech; 3: scored footage, speed fitting, incremental
     lane: Lane = "api"
 
     def __init__(
@@ -329,8 +332,9 @@ class PlanStage(Stage):
         taken: list[Clip],
         asset_id: str,
     ) -> PlanSegment:
-        audio = self.tts.synthesize(seg.text, voice_id=voice.voice_id, speed=voice.speed)
-        key = tts_cache_key(seg.text, voice.voice_id, voice.speed, self.tts.id)
+        spoken = to_spoken(seg.text)
+        audio = self.tts.synthesize(spoken.text, voice_id=voice.voice_id, speed=voice.speed)
+        key = tts_cache_key(spoken.text, voice.voice_id, voice.speed, self.tts.id)
         rel = f"{AUDIO_DIR}/{key.removeprefix('sha256:')[:16]}.{audio.format}"
         (ctx.out_dir / rel).write_bytes(audio.data)
 
@@ -348,7 +352,9 @@ class PlanStage(Stage):
             voice=voice,
             voice_pinned=bool(old and old.kind == "narration" and old.voice_pinned),
             audio=AudioRef(
-                file=rel, duration_ms=audio.duration_ms, char_timings=audio.char_timings
+                file=rel,
+                duration_ms=audio.duration_ms,
+                char_timings=spoken.source_timings(audio.char_timings),
             ),
             clips=clips,
             source_audio=SourceAudio(mode="duck", stem="mix", gain_db=NARRATION_SOURCE_GAIN_DB),

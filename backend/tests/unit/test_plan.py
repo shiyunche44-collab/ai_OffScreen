@@ -226,6 +226,21 @@ def test_plan_fills_each_voice_over_exactly_with_footage_from_its_scenes(tmp_pat
     assert tts.calls[0] == ("字" * 9, "voice-a", 1.0)
 
 
+def test_the_engine_reads_the_normalized_text_and_timings_follow_the_script(
+    tmp_path: Path,
+) -> None:
+    tts = FakeTTS()
+    text = "2008年，他37岁，走了2.5km。"
+    plan = plan_of(
+        build(tmp_path, [narration(1, text, ["sc_001"])], tts).ensure("creation.plan", SCOPE)
+    )
+    assert tts.calls[0][0] == "二零零八年，他三十七岁，走了二点五公里。"
+    seg = plan.segments[0]
+    assert seg.text == text and seg.audio is not None
+    assert len(seg.audio.char_timings) == len(text)
+    assert seg.audio.char_timings[-1][1] <= seg.audio.duration_ms
+
+
 def test_footage_runs_forward_in_film_time(tmp_path: Path) -> None:
     plan = plan_of(
         build(tmp_path, [narration(1, "字" * 54, ["sc_002"])], FakeTTS()).ensure(
